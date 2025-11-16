@@ -35,14 +35,6 @@ function ClassroomManager() {
   // Get schoolId from user object - handle multiple possible property names
   const schoolId = user?.school_id || user?.schoolId || user?.school?.id;
 
-  // Debug logging
-  useEffect(() => {
-    if (user) {
-      console.log('User object:', user);
-      console.log('Extracted schoolId:', schoolId);
-    }
-  }, [user]);
-
   // --- Data Fetching ---
   useEffect(() => {
     if (schoolId) {
@@ -62,7 +54,6 @@ function ClassroomManager() {
       setClassrooms(classroomsResponse?.data || classroomsResponse || []);
       setTeachers(teachersResponse?.teachers || teachersResponse?.data || []);
     } catch (error) {
-      console.error('Failed to fetch data:', error);
       const errorMessage = error?.response?.data?.message || error?.message || 'Failed to load data';
       toast.error(errorMessage);
       
@@ -99,7 +90,6 @@ function ClassroomManager() {
       const response = await apiRequest(`classrooms/${classroom.id}/streams`, 'GET');
       setStreams(response?.streams || response?.data || response || []);
     } catch (error) {
-      console.error('Failed to fetch streams:', error);
       const errorMessage = error?.response?.data?.message || 'Could not load streams';
       toast.error(errorMessage);
       setStreams([]);
@@ -153,7 +143,6 @@ function ClassroomManager() {
           });
           toast.success('Teacher assigned successfully');
         } catch (teacherError) {
-          console.error('Teacher assignment failed:', teacherError);
           const errorMessage = teacherError?.response?.data?.message || 'Teacher assignment failed';
           toast.warning(`Classroom saved, but ${errorMessage}`);
         }
@@ -161,7 +150,6 @@ function ClassroomManager() {
       
       backToList();
     } catch (error) {
-      console.error('Error:', error);
       const errorMessage = error?.response?.data?.message || error?.message || 'An error occurred';
       toast.error(`Failed to ${view === 'edit' ? 'update' : 'create'} classroom: ${errorMessage}`);
     } finally {
@@ -177,7 +165,6 @@ function ClassroomManager() {
         toast.success('Classroom deleted successfully');
         fetchInitialData();
       } catch (error) {
-        console.error('Delete error:', error);
         const errorMessage = error?.response?.data?.message || 'Failed to delete classroom';
         toast.error(errorMessage);
       } finally {
@@ -194,7 +181,6 @@ function ClassroomManager() {
         toast.success('Class teacher removed successfully');
         fetchInitialData();
       } catch (error) {
-        console.error('Remove teacher error:', error);
         const errorMessage = error?.response?.data?.message || 'Failed to remove class teacher';
         toast.error(errorMessage);
       } finally {

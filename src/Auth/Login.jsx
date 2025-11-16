@@ -16,7 +16,8 @@ const Login = () => {
   // Redirect if user is already authenticated
   useEffect(() => {
     if (user && !authLoading) {
-      navigate(`/${user.role}/dashboard`, { replace: true });
+      const role = user.role || user.role_name?.toLowerCase().replace('-', '_') || 'admin';
+      navigate(`/${role}/dashboard`, { replace: true });
     }
   }, [user, authLoading, navigate]);
 
@@ -41,17 +42,25 @@ const Login = () => {
         throw new Error(data.message || 'Login failed. Please check your credentials.');
       }
 
-      console.log('Login response:', data); 
-      const { user: userData, token } = data;
+      // ✅ FIXED: Backend now returns flat object with token at root level
+      // Check if data has a token property (new format) or user property (old format)
+      const token = data.token;
       
-      const role = userData.role_name?.toLowerCase().replace('-', '_');
+      // If there's a nested user object, use it; otherwise data itself is the user
+      const userData = data.user || data;
       
-      localStorage.setItem('auth_token', token);
-
-      // ✅ Fixed: Include school_id and all relevant user data
+      if (!token) {
+        throw new Error('No authentication token received');
+      }
+      
+      // Extract role name and normalize it
+      const roleName = userData.role_name || userData.role || 'admin';
+      const role = roleName.toLowerCase().replace(/[-\s]/g, '_');
+      
+      // ✅ Construct complete user info object
       const userInfo = {
         id: userData.id,
-        school_id: userData.school_id, // ✅ Now included!
+        school_id: userData.school_id,
         role_id: userData.role_id,
         name: userData.full_name || userData.name || userData.email,
         full_name: userData.full_name,
@@ -60,14 +69,16 @@ const Login = () => {
         gender: userData.gender,
         status: userData.status,
         role: role,
-        role_name: userData.role_name,
+        role_name: roleName,
         token: token,
-        must_change_password: userData.must_change_password,
+        must_change_password: userData.must_change_password || false,
         email_verified_at: userData.email_verified_at
       };
 
-      console.log('Saving user info:', userInfo);
+      // Save to context and localStorage
       login(userInfo);
+      
+      // Navigate to appropriate dashboard
       navigate(`/${role}/dashboard`, { replace: true });
       
     } catch (error) {
