@@ -2,7 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import DashboardLayout from "./Dashboard/Layout/DashboardLayout";
-import SchoolList from './Dashboard/Pages/SuperAdmin/SchoolList';
+import SchoolManager from './Dashboard/Pages/SuperAdmin/SchoolManager';
 import Roles from './Dashboard/Pages/SuperAdmin/Roles';
 import Login from './Auth/Login';
 import SchoolProfile from './Dashboard/Pages/Admin/SchoolProfile';
@@ -54,7 +54,8 @@ function App() {
             </ProtectedRoute>
           }>
             <Route index element={<Navigate to="dashboard" replace />} />
-            <Route path="dashboard" element={<SchoolList />} />
+            <Route path="dashboard" element={<SchoolManager />} />
+            <Route path="schools" element={<SchoolManager />} />
             <Route path="roles" element={<Roles />} />
           </Route>
 

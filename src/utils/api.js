@@ -15,12 +15,16 @@ export const apiRequest = async (endpoint, method = "GET", body = null) => {
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}/${endpoint}`, {
+  // Build the full URL
+  let url = `${API_BASE_URL}/${endpoint}`;
+
+  const response = await fetch(url, {
     method,
     headers,
     body: body && method !== "GET" ? (isFormData ? body : JSON.stringify(body)) : null,
   });
 
+  // Try to parse JSON response
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
@@ -28,6 +32,7 @@ export const apiRequest = async (endpoint, method = "GET", body = null) => {
     const error = new Error(data.message || "API request failed");
     error.status = response.status;
     error.data = data;
+    error.response = { data }; // Add this for compatibility with your error handling
     throw error;
   }
 

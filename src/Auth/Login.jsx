@@ -32,7 +32,6 @@ const Login = () => {
           "Content-Type": "application/json",
           Accept: "application/json",
         },
-        // ✅ Laravel expects "login" not "email"
         body: JSON.stringify({ login: email, password }),
       });
 
@@ -42,22 +41,32 @@ const Login = () => {
         throw new Error(data.message || 'Login failed. Please check your credentials.');
       }
 
-      console.log(data); 
+      console.log('Login response:', data); 
       const { user: userData, token } = data;
       
       const role = userData.role_name?.toLowerCase().replace('-', '_');
       
       localStorage.setItem('auth_token', token);
 
+      // ✅ Fixed: Include school_id and all relevant user data
       const userInfo = {
         id: userData.id,
-        name: userData.name || userData.email,
+        school_id: userData.school_id, // ✅ Now included!
+        role_id: userData.role_id,
+        name: userData.full_name || userData.name || userData.email,
+        full_name: userData.full_name,
         email: userData.email,
+        phone: userData.phone,
+        gender: userData.gender,
+        status: userData.status,
         role: role,
+        role_name: userData.role_name,
         token: token,
-        must_change_password: userData.must_change_password
+        must_change_password: userData.must_change_password,
+        email_verified_at: userData.email_verified_at
       };
 
+      console.log('Saving user info:', userInfo);
       login(userInfo);
       navigate(`/${role}/dashboard`, { replace: true });
       

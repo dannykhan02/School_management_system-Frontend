@@ -16,24 +16,39 @@ export const AuthProvider = ({ children }) => {
       return userData;
     } catch (error) {
       console.error('Failed to refresh user:', error);
-      logout(); // Force logout if refresh fails
+      // Only logout if it's a 401 error
+      if (error.status === 401) {
+        logout();
+      }
       return null;
     }
   };
 
   const login = (userData) => {
-    setUser(userData);
-    localStorage.setItem('user', JSON.stringify(userData));
-    if (userData.token) {
-      localStorage.setItem('auth_token', userData.token);
+    // Ensure userData has the token extracted
+    const token = userData.token;
+    
+    // Store token separately
+    if (token) {
+      localStorage.setItem('auth_token', token);
     }
+    
+    // Store user data (without token in the user object for cleaner state)
+    const userWithoutToken = { ...userData };
+    delete userWithoutToken.token;
+    
+    setUser(userWithoutToken);
+    localStorage.setItem('user', JSON.stringify(userWithoutToken));
   };
 
   const logout = async () => {
     try {
-      // We don't need to wait for the API call to complete to clear local state
-      apiRequest("auth/logout", "POST").catch(err => console.error('Logout API error:', err));
+      // Try to call logout endpoint, but don't block on errors
+      await apiRequest("auth/logout", "POST").catch(err => {
+        console.error('Logout API error:', err);
+      });
     } finally {
+      // Always clear local state
       setUser(null);
       localStorage.removeItem('user');
       localStorage.removeItem('auth_token');
@@ -58,8 +73,15 @@ export const AuthProvider = ({ children }) => {
         if (savedUser && token) {
           const userData = JSON.parse(savedUser);
           setUser(userData);
-          // Optional: You could refresh the user on app load to ensure data is fresh
-          // await refreshUser();
+          
+          // Optional: Refresh user data on app load
+          // This ensures we have the latest user info
+          try {
+            await refreshUser();
+          } catch (error) {
+            // If refresh fails, still use cached data
+            console.warn('Could not refresh user on init, using cached data');
+          }
         }
       } catch (error) {
         console.error('Auth initialization error:', error);
@@ -73,6 +95,9 @@ export const AuthProvider = ({ children }) => {
     initializeAuth();
   }, []);
 
+  // Expose schoolId as a computed property for convenience
+  const schoolId = user?.school_id;
+
   return (
     <AuthContext.Provider value={{ 
       user, 
@@ -80,7 +105,8 @@ export const AuthProvider = ({ children }) => {
       logout, 
       loading,
       refreshUser,
-      getAuthHeaders 
+      getAuthHeaders,
+      schoolId // Added for easier access
     }}>
       {children}
     </AuthContext.Provider>

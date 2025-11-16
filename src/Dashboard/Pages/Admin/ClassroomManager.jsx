@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { apiRequest } from '../../../utils/api';
-import { useAuth } from '../../../contexts/AuthContext'; // Import useAuth
+import { useAuth } from '../../../contexts/AuthContext';
 import { 
   Edit, 
   Trash2, 
@@ -16,8 +16,7 @@ import {
 import { toast } from "react-toastify";
 
 function ClassroomManager() {
-  // Get authenticated user's school
-  const { schoolId, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   
   // --- State Management ---
   const [classrooms, setClassrooms] = useState([]);
@@ -33,6 +32,17 @@ function ClassroomManager() {
     class_teacher_id: '',
   });
 
+  // Get schoolId from user object - handle multiple possible property names
+  const schoolId = user?.school_id || user?.schoolId || user?.school?.id;
+
+  // Debug logging
+  useEffect(() => {
+    if (user) {
+      console.log('User object:', user);
+      console.log('Extracted schoolId:', schoolId);
+    }
+  }, [user]);
+
   // --- Data Fetching ---
   useEffect(() => {
     if (schoolId) {
@@ -47,11 +57,18 @@ function ClassroomManager() {
         apiRequest('classrooms', 'GET'),
         apiRequest(`teachers/school/${schoolId}`, 'GET')
       ]);
-      setClassrooms(classroomsResponse || []);
-      setTeachers(teachersResponse?.teachers || []);
+      
+      // Handle different response structures
+      setClassrooms(classroomsResponse?.data || classroomsResponse || []);
+      setTeachers(teachersResponse?.teachers || teachersResponse?.data || []);
     } catch (error) {
       console.error('Failed to fetch data:', error);
-      toast.error('Failed to load data. Please refresh the page.');
+      const errorMessage = error?.response?.data?.message || error?.message || 'Failed to load data';
+      toast.error(errorMessage);
+      
+      // Set empty arrays on error to prevent UI issues
+      setClassrooms([]);
+      setTeachers([]);
     } finally {
       setLoading(false);
     }
@@ -79,12 +96,12 @@ function ClassroomManager() {
     setSelectedClassroom(classroom);
     setLoading(true);
     try {
-      // Using the standardized route - prefer classrooms endpoint for consistency
       const response = await apiRequest(`classrooms/${classroom.id}/streams`, 'GET');
-      setStreams(response.streams || []);
+      setStreams(response?.streams || response?.data || response || []);
     } catch (error) {
       console.error('Failed to fetch streams:', error);
-      toast.error('Could not load streams for this classroom.');
+      const errorMessage = error?.response?.data?.message || 'Could not load streams';
+      toast.error(errorMessage);
       setStreams([]);
     } finally {
       setLoading(false);
@@ -106,31 +123,47 @@ function ClassroomManager() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    
     try {
-      const payload = { ...formData, school_id: schoolId };
+      // Prepare payload with school_id
+      const payload = { 
+        class_name: formData.class_name,
+        capacity: formData.capacity,
+        school_id: schoolId // Always include school_id
+      };
       
       let classroomId;
+      let response;
+      
       if (view === 'edit') {
-        await apiRequest(`classrooms/${selectedClassroom.id}`, 'PUT', payload);
+        response = await apiRequest(`classrooms/${selectedClassroom.id}`, 'PUT', payload);
         classroomId = selectedClassroom.id;
         toast.success('Classroom updated successfully');
       } else {
-        const response = await apiRequest('classrooms', 'POST', payload);
-        classroomId = response.id || response.data?.id;
+        response = await apiRequest('classrooms', 'POST', payload);
+        classroomId = response?.data?.id || response?.id;
         toast.success('Classroom created successfully');
       }
 
-      // Use dedicated endpoint for teacher assignment if specified
+      // Assign teacher if specified (using dedicated endpoint)
       if (formData.class_teacher_id && classroomId) {
-        await apiRequest(`classrooms/${classroomId}/assign-teacher`, 'POST', { 
-          teacher_id: formData.class_teacher_id 
-        });
+        try {
+          await apiRequest(`classrooms/${classroomId}/assign-teacher`, 'POST', { 
+            teacher_id: formData.class_teacher_id 
+          });
+          toast.success('Teacher assigned successfully');
+        } catch (teacherError) {
+          console.error('Teacher assignment failed:', teacherError);
+          const errorMessage = teacherError?.response?.data?.message || 'Teacher assignment failed';
+          toast.warning(`Classroom saved, but ${errorMessage}`);
+        }
       }
       
       backToList();
     } catch (error) {
       console.error('Error:', error);
-      toast.error(`Failed to ${view === 'edit' ? 'update' : 'create'} classroom.`);
+      const errorMessage = error?.response?.data?.message || error?.message || 'An error occurred';
+      toast.error(`Failed to ${view === 'edit' ? 'update' : 'create'} classroom: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
@@ -138,24 +171,34 @@ function ClassroomManager() {
 
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this classroom? This action cannot be undone.')) {
+      setLoading(true);
       try {
         await apiRequest(`classrooms/${id}`, 'DELETE');
         toast.success('Classroom deleted successfully');
         fetchInitialData();
       } catch (error) {
-        toast.error('Failed to delete classroom.');
+        console.error('Delete error:', error);
+        const errorMessage = error?.response?.data?.message || 'Failed to delete classroom';
+        toast.error(errorMessage);
+      } finally {
+        setLoading(false);
       }
     }
   };
 
   const handleRemoveTeacher = async (classroomId) => {
     if (window.confirm('Remove class teacher from this classroom?')) {
+      setLoading(true);
       try {
         await apiRequest(`classrooms/${classroomId}/remove-teacher`, 'DELETE');
         toast.success('Class teacher removed successfully');
         fetchInitialData();
       } catch (error) {
-        toast.error('Failed to remove class teacher.');
+        console.error('Remove teacher error:', error);
+        const errorMessage = error?.response?.data?.message || 'Failed to remove class teacher';
+        toast.error(errorMessage);
+      } finally {
+        setLoading(false);
       }
     }
   };
@@ -207,7 +250,7 @@ function ClassroomManager() {
                       <td className="px-6 py-4 text-slate-500 dark:text-slate-400">
                         {classroom.teacher ? (
                           <div className="flex items-center justify-between gap-2">
-                            <span className="truncate">{classroom.teacher.user?.name}</span>
+                            <span className="truncate">{classroom.teacher.user?.name || classroom.teacher.name}</span>
                             <button 
                               onClick={() => handleRemoveTeacher(classroom.id)} 
                               className="p-1 text-slate-400 hover:text-red-600 rounded transition-colors"
@@ -322,7 +365,7 @@ function ClassroomManager() {
             <option value="">Select a teacher (optional)</option>
             {teachers.map(teacher => (
               <option key={teacher.id} value={teacher.id}>
-                {teacher.user?.name}
+                {teacher.user?.name || teacher.name}
               </option>
             ))}
           </select>
@@ -381,7 +424,7 @@ function ClassroomManager() {
                   <div>
                     <p className="font-medium text-slate-900 dark:text-white">{stream.name}</p>
                     <p className="text-sm text-slate-500 dark:text-slate-400">
-                      Class Teacher: {stream.classTeacher?.user?.name || 'Not Assigned'}
+                      Class Teacher: {stream.classTeacher?.user?.name || stream.class_teacher?.name || 'Not Assigned'}
                     </p>
                   </div>
                   <ChevronRight className="w-5 h-5 text-slate-400" />
@@ -408,6 +451,33 @@ function ClassroomManager() {
         <div className="flex flex-col items-center justify-center py-16">
           <Loader className="w-12 h-12 text-gray-600 dark:text-gray-400 animate-spin" />
           <p className="mt-4 text-slate-500 dark:text-slate-400">Initializing...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Check if user is authenticated and has schoolId
+  if (!user || !schoolId) {
+    return (
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex flex-col items-center justify-center py-16">
+          <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
+          <p className="text-slate-900 dark:text-slate-100 text-lg font-semibold mb-2">
+            Unable to access classroom management
+          </p>
+          <p className="text-slate-500 dark:text-slate-400 mb-4">
+            {!user ? 'Please log in to continue.' : 'Your account is missing school information.'}
+          </p>
+          <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-lg max-w-md">
+            <p className="text-sm text-slate-600 dark:text-slate-400 mb-2">Debug Info:</p>
+            <pre className="text-xs overflow-auto">
+              {JSON.stringify({ 
+                hasUser: !!user, 
+                schoolId: schoolId,
+                userKeys: user ? Object.keys(user) : []
+              }, null, 2)}
+            </pre>
+          </div>
         </div>
       </div>
     );
