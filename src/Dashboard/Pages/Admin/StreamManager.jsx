@@ -57,19 +57,11 @@ function StreamManager() {
       const classroomsData = classroomsResponse?.data || classroomsResponse || [];
       const teachersData = teachersResponse?.teachers || teachersResponse?.data || [];
       
-      console.log('=== FETCHED DATA ===');
-      console.log('Streams:', streamsData);
-      console.log('Classrooms:', classroomsData);
-      console.log('Teachers:', teachersData);
-      console.log('School ID:', schoolId);
-      console.log('==================');
-      
       setStreams(streamsData);
       setClassrooms(classroomsData);
       setTeachers(teachersData);
     } catch (error) {
       const errorMessage = error?.response?.data?.message || error?.message || 'Failed to load data';
-      console.error('Failed to fetch data:', error);
       toast.error(errorMessage);
       
       // Set empty arrays on error to prevent UI issues
@@ -111,7 +103,6 @@ function StreamManager() {
       setTeacherAssignmentData({ teacher_ids: freshIds });
     } catch (error) {
       const errorMessage = error?.response?.data?.message || 'Could not fetch the latest teacher assignments';
-      console.error('Failed to fetch stream teachers:', error);
       toast.error(errorMessage);
       // Fallback to data in stream object
       const assignedTeacherIds = stream.teachers?.map(t => t.id) || [];
@@ -129,7 +120,6 @@ function StreamManager() {
       setAllClassTeachers(response?.data || response || []);
     } catch (error) {
       const errorMessage = error?.response?.data?.message || 'Failed to fetch class teachers';
-      console.error('Failed to fetch class teachers:', error);
       toast.error(errorMessage);
       setAllClassTeachers([]);
     } finally {
@@ -176,7 +166,6 @@ function StreamManager() {
         // Include school_id for validation
         payload.school_id = schoolId;
         
-        console.log('Edit Payload:', payload);
         response = await apiRequest(`streams/${selectedStream.id}`, 'PUT', payload);
         streamId = selectedStream.id;
         toast.success('Stream updated successfully');
@@ -221,19 +210,6 @@ function StreamManager() {
           class_id: parseInt(formData.class_id, 10)
         };
         
-        // Debug logging
-        console.log('=== CREATE STREAM DEBUG ===');
-        console.log('Form Data:', formData);
-        console.log('Selected Classroom:', selectedClassroom);
-        console.log('Create Payload:', payload);
-        console.log('Payload types:', {
-          name: typeof payload.name,
-          class_id: typeof payload.class_id,
-          isClassIdInteger: Number.isInteger(payload.class_id)
-        });
-        console.log('Available Classrooms:', classrooms);
-        console.log('========================');
-        
         response = await apiRequest('streams', 'POST', payload);
         streamId = response?.data?.id || response?.id;
         toast.success('Stream created successfully');
@@ -248,26 +224,16 @@ function StreamManager() {
           toast.success('Class teacher assigned successfully');
         } catch (teacherError) {
           const errorMessage = teacherError?.response?.data?.message || 'Class teacher assignment failed';
-          console.error('Class teacher assignment error:', teacherError);
           toast.warning(`Stream saved, but ${errorMessage}`);
         }
       }
       
       backToList();
     } catch (error) {
-      // Enhanced error logging
-      console.error('=== ERROR DEBUG ===');
-      console.error('Full error object:', error);
-      console.error('Error response:', error?.response);
-      console.error('Error response data:', error?.response?.data);
-      console.error('Error status:', error?.response?.status);
-      console.error('==================');
-      
       const errorMessage = error?.response?.data?.message || error?.message || 'An error occurred';
       const validationErrors = error?.response?.data?.errors;
       
       if (validationErrors) {
-        console.error('Validation errors:', validationErrors);
         // Show specific validation errors
         Object.keys(validationErrors).forEach(key => {
           const messages = Array.isArray(validationErrors[key]) 
@@ -292,7 +258,6 @@ function StreamManager() {
         fetchInitialData();
       } catch (error) {
         const errorMessage = error?.response?.data?.message || 'Failed to delete stream';
-        console.error('Delete error:', error);
         toast.error(errorMessage);
       } finally {
         setLoading(false);
@@ -312,7 +277,6 @@ function StreamManager() {
       fetchInitialData();
     } catch (error) {
       const errorMessage = error?.response?.data?.message || 'Failed to assign class teacher';
-      console.error('Assign class teacher error:', error);
       toast.error(errorMessage);
     } finally {
       setLoading(false);
@@ -335,7 +299,6 @@ function StreamManager() {
       fetchInitialData();
     } catch (error) {
       const errorMessage = error?.response?.data?.message || 'Failed to remove class teacher';
-      console.error('Remove class teacher error:', error);
       toast.error(errorMessage);
     } finally {
       setLoading(false);
@@ -356,7 +319,6 @@ function StreamManager() {
       backToList();
     } catch (error) {
       const errorMessage = error?.response?.data?.message || 'Failed to update teacher assignments';
-      console.error('Save teacher assignments error:', error);
       toast.error(errorMessage);
     } finally {
       setLoading(false);
