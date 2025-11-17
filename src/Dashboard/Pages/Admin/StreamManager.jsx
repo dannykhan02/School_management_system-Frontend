@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { apiRequest } from '../../../utils/api';
-import { useAuth } from '../../../contexts/AuthContext'; // Import useAuth
+import { useAuth } from '../../../contexts/AuthContext';
 import { 
   Edit, 
   Trash2, 
@@ -17,8 +17,8 @@ import {
 import { toast } from "react-toastify";
 
 function StreamManager() {
-  // Get authenticated user's school
-  const { schoolId, loading: authLoading } = useAuth();
+  // Get authenticated user's school - handle multiple possible property names
+  const { user, loading: authLoading } = useAuth();
   
   // --- State Management ---
   const [streams, setStreams] = useState([]);
@@ -32,6 +32,9 @@ function StreamManager() {
   const [selectedStream, setSelectedStream] = useState(null);
   const [formData, setFormData] = useState({ name: '', class_id: '', class_teacher_id: '' });
   const [teacherAssignmentData, setTeacherAssignmentData] = useState({ teacher_ids: [] });
+
+  // Get schoolId from user object - handle multiple possible property names
+  const schoolId = user?.school_id || user?.schoolId || user?.school?.id;
 
   // --- Data Fetching ---
   useEffect(() => {
@@ -48,12 +51,31 @@ function StreamManager() {
         apiRequest('classrooms', 'GET'),
         apiRequest(`teachers/school/${schoolId}`, 'GET')
       ]);
-      setStreams(streamsResponse || []);
-      setClassrooms(classroomsResponse || []);
-      setTeachers(teachersResponse?.teachers || []);
+      
+      // Handle different response structures
+      const streamsData = streamsResponse?.data || streamsResponse || [];
+      const classroomsData = classroomsResponse?.data || classroomsResponse || [];
+      const teachersData = teachersResponse?.teachers || teachersResponse?.data || [];
+      
+      console.log('=== FETCHED DATA ===');
+      console.log('Streams:', streamsData);
+      console.log('Classrooms:', classroomsData);
+      console.log('Teachers:', teachersData);
+      console.log('School ID:', schoolId);
+      console.log('==================');
+      
+      setStreams(streamsData);
+      setClassrooms(classroomsData);
+      setTeachers(teachersData);
     } catch (error) {
+      const errorMessage = error?.response?.data?.message || error?.message || 'Failed to load data';
       console.error('Failed to fetch data:', error);
-      toast.error('Failed to load data. Please refresh the page.');
+      toast.error(errorMessage);
+      
+      // Set empty arrays on error to prevent UI issues
+      setStreams([]);
+      setClassrooms([]);
+      setTeachers([]);
     } finally {
       setLoading(false);
     }
@@ -71,7 +93,7 @@ function StreamManager() {
     setSelectedStream(stream);
     setFormData({
       name: stream.name,
-      class_id: stream.class_id,
+      class_id: stream.class_id || '',
       class_teacher_id: stream.class_teacher_id || '',
     });
   };
@@ -88,8 +110,9 @@ function StreamManager() {
       const freshIds = response.teachers?.map(t => t.id) || [];
       setTeacherAssignmentData({ teacher_ids: freshIds });
     } catch (error) {
+      const errorMessage = error?.response?.data?.message || 'Could not fetch the latest teacher assignments';
       console.error('Failed to fetch stream teachers:', error);
-      toast.error('Could not fetch the latest teacher assignments.');
+      toast.error(errorMessage);
       // Fallback to data in stream object
       const assignedTeacherIds = stream.teachers?.map(t => t.id) || [];
       setTeacherAssignmentData({ teacher_ids: assignedTeacherIds });
@@ -103,10 +126,11 @@ function StreamManager() {
     setLoading(true);
     try {
       const response = await apiRequest('streams/class-teachers', 'GET');
-      setAllClassTeachers(response || []);
+      setAllClassTeachers(response?.data || response || []);
     } catch (error) {
+      const errorMessage = error?.response?.data?.message || 'Failed to fetch class teachers';
       console.error('Failed to fetch class teachers:', error);
-      toast.error('Failed to fetch class teachers.');
+      toast.error(errorMessage);
       setAllClassTeachers([]);
     } finally {
       setLoading(false);
@@ -135,30 +159,125 @@ function StreamManager() {
     setLoading(true);
     
     try {
-      const payload = { ...formData, school_id: schoolId };
       let streamId;
+      let response;
       
       if (view === 'edit') {
-        await apiRequest(`streams/${selectedStream.id}`, 'PUT', payload);
+        // For edit, prepare the payload
+        const payload = { 
+          name: formData.name.trim()
+        };
+        
+        // Only include class_id if it was actually changed and is valid
+        if (formData.class_id && formData.class_id !== selectedStream.class_id) {
+          payload.class_id = parseInt(formData.class_id, 10);
+        }
+        
+        // Include school_id for validation
+        payload.school_id = schoolId;
+        
+        console.log('Edit Payload:', payload);
+        response = await apiRequest(`streams/${selectedStream.id}`, 'PUT', payload);
         streamId = selectedStream.id;
         toast.success('Stream updated successfully');
       } else {
-        const response = await apiRequest('streams', 'POST', payload);
-        streamId = response.id || response.data?.id;
+        // For create, validate required fields
+        if (!formData.name.trim()) {
+          toast.error('Please enter a stream name');
+          setLoading(false);
+          return;
+        }
+        
+        if (!formData.class_id) {
+          toast.error('Please select a classroom');
+          setLoading(false);
+          return;
+        }
+        
+        if (!schoolId) {
+          toast.error('School ID is missing. Please refresh and try again.');
+          setLoading(false);
+          return;
+        }
+        
+        // Verify the classroom exists and belongs to this school
+        const selectedClassroom = classrooms.find(c => c.id === parseInt(formData.class_id, 10));
+        if (!selectedClassroom) {
+          toast.error('Selected classroom not found. Please refresh and try again.');
+          setLoading(false);
+          return;
+        }
+        
+        // Verify classroom belongs to the same school
+        if (selectedClassroom.school_id !== schoolId) {
+          toast.error('Selected classroom does not belong to your school.');
+          setLoading(false);
+          return;
+        }
+        
+        // Build the payload WITHOUT school_id (backend sets it automatically)
+        const payload = { 
+          name: formData.name.trim(),
+          class_id: parseInt(formData.class_id, 10)
+        };
+        
+        // Debug logging
+        console.log('=== CREATE STREAM DEBUG ===');
+        console.log('Form Data:', formData);
+        console.log('Selected Classroom:', selectedClassroom);
+        console.log('Create Payload:', payload);
+        console.log('Payload types:', {
+          name: typeof payload.name,
+          class_id: typeof payload.class_id,
+          isClassIdInteger: Number.isInteger(payload.class_id)
+        });
+        console.log('Available Classrooms:', classrooms);
+        console.log('========================');
+        
+        response = await apiRequest('streams', 'POST', payload);
+        streamId = response?.data?.id || response?.id;
         toast.success('Stream created successfully');
       }
 
       // Use dedicated endpoint for class teacher assignment if specified
       if (formData.class_teacher_id && streamId) {
-        await apiRequest(`streams/${streamId}/assign-class-teacher`, 'POST', { 
-          teacher_id: formData.class_teacher_id 
-        });
+        try {
+          await apiRequest(`streams/${streamId}/assign-class-teacher`, 'POST', { 
+            teacher_id: parseInt(formData.class_teacher_id, 10)
+          });
+          toast.success('Class teacher assigned successfully');
+        } catch (teacherError) {
+          const errorMessage = teacherError?.response?.data?.message || 'Class teacher assignment failed';
+          console.error('Class teacher assignment error:', teacherError);
+          toast.warning(`Stream saved, but ${errorMessage}`);
+        }
       }
       
       backToList();
     } catch (error) {
-      console.error('Error:', error);
-      toast.error(`Failed to ${view === 'edit' ? 'update' : 'create'} stream.`);
+      // Enhanced error logging
+      console.error('=== ERROR DEBUG ===');
+      console.error('Full error object:', error);
+      console.error('Error response:', error?.response);
+      console.error('Error response data:', error?.response?.data);
+      console.error('Error status:', error?.response?.status);
+      console.error('==================');
+      
+      const errorMessage = error?.response?.data?.message || error?.message || 'An error occurred';
+      const validationErrors = error?.response?.data?.errors;
+      
+      if (validationErrors) {
+        console.error('Validation errors:', validationErrors);
+        // Show specific validation errors
+        Object.keys(validationErrors).forEach(key => {
+          const messages = Array.isArray(validationErrors[key]) 
+            ? validationErrors[key].join(', ') 
+            : validationErrors[key];
+          toast.error(`${key}: ${messages}`);
+        });
+      } else {
+        toast.error(`Failed to ${view === 'edit' ? 'update' : 'create'} stream: ${errorMessage}`);
+      }
     } finally {
       setLoading(false);
     }
@@ -166,12 +285,17 @@ function StreamManager() {
 
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this stream? This action cannot be undone.')) {
+      setLoading(true);
       try {
         await apiRequest(`streams/${id}`, 'DELETE');
         toast.success('Stream deleted successfully');
         fetchInitialData();
       } catch (error) {
-        toast.error('Failed to delete stream.');
+        const errorMessage = error?.response?.data?.message || 'Failed to delete stream';
+        console.error('Delete error:', error);
+        toast.error(errorMessage);
+      } finally {
+        setLoading(false);
       }
     }
   };
@@ -179,25 +303,42 @@ function StreamManager() {
   const handleAssignClassTeacher = async (streamId, teacherId) => {
     if (!teacherId) return;
     
+    setLoading(true);
     try {
-      await apiRequest(`streams/${streamId}/assign-class-teacher`, 'POST', { teacher_id: teacherId });
+      await apiRequest(`streams/${streamId}/assign-class-teacher`, 'POST', { 
+        teacher_id: parseInt(teacherId, 10)
+      });
       toast.success('Class teacher assigned successfully');
       fetchInitialData();
     } catch (error) {
-      toast.error('Failed to assign class teacher.');
+      const errorMessage = error?.response?.data?.message || 'Failed to assign class teacher';
+      console.error('Assign class teacher error:', error);
+      toast.error(errorMessage);
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleRemoveClassTeacher = async (streamId) => {
     if (!window.confirm('Remove class teacher from this stream?')) return;
     
+    setLoading(true);
     try {
-      // Using PUT with null as no dedicated DELETE endpoint exists
-      await apiRequest(`streams/${streamId}`, 'PUT', { class_teacher_id: null });
+      const stream = streams.find(s => s.id === streamId);
+      await apiRequest(`streams/${streamId}`, 'PUT', { 
+        name: stream.name,
+        class_id: parseInt(stream.class_id, 10),
+        school_id: schoolId,
+        class_teacher_id: null,
+      });
       toast.success('Class teacher removed successfully');
       fetchInitialData();
     } catch (error) {
-      toast.error('Failed to remove class teacher.');
+      const errorMessage = error?.response?.data?.message || 'Failed to remove class teacher';
+      console.error('Remove class teacher error:', error);
+      toast.error(errorMessage);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -206,11 +347,17 @@ function StreamManager() {
     setLoading(true);
     
     try {
-      await apiRequest(`streams/${selectedStream.id}/assign-teachers`, 'POST', teacherAssignmentData);
+      const payload = {
+        teacher_ids: teacherAssignmentData.teacher_ids.map(id => parseInt(id, 10))
+      };
+      
+      await apiRequest(`streams/${selectedStream.id}/assign-teachers`, 'POST', payload);
       toast.success('Teacher assignments updated successfully');
       backToList();
     } catch (error) {
-      toast.error('Failed to update teacher assignments.');
+      const errorMessage = error?.response?.data?.message || 'Failed to update teacher assignments';
+      console.error('Save teacher assignments error:', error);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -275,7 +422,7 @@ function StreamManager() {
                       <td className="px-6 py-4 text-slate-500 dark:text-slate-400">
                         {stream.classTeacher ? (
                           <div className="flex items-center justify-between gap-2">
-                            <span className="truncate">{stream.classTeacher.user?.name}</span>
+                            <span className="truncate">{stream.classTeacher.user?.name || stream.classTeacher.name}</span>
                             <button 
                               onClick={() => handleRemoveClassTeacher(stream.id)} 
                               className="p-1 text-slate-400 hover:text-red-600 rounded transition-colors"
@@ -292,7 +439,7 @@ function StreamManager() {
                           >
                             <option value="" disabled>Assign Teacher</option>
                             {teachers.map(t => (
-                              <option key={t.id} value={t.id}>{t.user?.name}</option>
+                              <option key={t.id} value={t.id}>{t.user?.name || t.name}</option>
                             ))}
                           </select>
                         )}
@@ -381,7 +528,7 @@ function StreamManager() {
             className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
           >
             <option value="">Select a classroom</option>
-            {classrooms.map(c => (
+            {Array.isArray(classrooms) && classrooms.map(c => (
               <option key={c.id} value={c.id}>{c.class_name}</option>
             ))}
           </select>
@@ -397,9 +544,9 @@ function StreamManager() {
             className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
           >
             <option value="">Select a teacher (optional)</option>
-            {teachers.map(teacher => (
+            {Array.isArray(teachers) && teachers.map(teacher => (
               <option key={teacher.id} value={teacher.id}>
-                {teacher.user?.name}
+                {teacher.user?.name || teacher.name}
               </option>
             ))}
           </select>
@@ -464,9 +611,9 @@ function StreamManager() {
                 className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
                 size="8"
               >
-                {teachers.map(teacher => (
+                {Array.isArray(teachers) && teachers.map(teacher => (
                   <option key={teacher.id} value={teacher.id}>
-                    {teacher.user?.name}
+                    {teacher.user?.name || teacher.name}
                   </option>
                 ))}
               </select>
@@ -533,7 +680,7 @@ function StreamManager() {
                   </div>
                   <div className="text-right">
                     <p className="font-medium text-slate-700 dark:text-slate-300">
-                      {stream.classTeacher?.user?.name || 'Not Assigned'}
+                      {stream.classTeacher?.user?.name || stream.classTeacher?.name || 'Not Assigned'}
                     </p>
                     <p className="text-xs text-slate-500">Class Teacher</p>
                   </div>
@@ -560,6 +707,23 @@ function StreamManager() {
         <div className="flex flex-col items-center justify-center py-16">
           <Loader className="w-12 h-12 text-gray-600 dark:text-gray-400 animate-spin" />
           <p className="mt-4 text-slate-500 dark:text-slate-400">Initializing...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Check if user is authenticated and has schoolId
+  if (!user || !schoolId) {
+    return (
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+        <div className="flex flex-col items-center justify-center py-16">
+          <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
+          <p className="text-slate-900 dark:text-slate-100 text-lg font-semibold mb-2">
+            Unable to access stream management
+          </p>
+          <p className="text-slate-500 dark:text-slate-400 mb-4">
+            {!user ? 'Please log in to continue.' : 'Your account is missing school information.'}
+          </p>
         </div>
       </div>
     );
