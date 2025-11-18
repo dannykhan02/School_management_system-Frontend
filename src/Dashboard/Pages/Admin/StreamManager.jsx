@@ -1,3 +1,4 @@
+// src/Dashboard/Pages/Admin/StreamManager.jsx
 import React, { useEffect, useState } from 'react';
 import { apiRequest } from '../../../utils/api';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -12,31 +13,37 @@ import {
   UserMinus,
   GraduationCap,
   Crown,
-  AlertCircle
+  AlertCircle,
+  CheckCircle
 } from 'lucide-react';
 import { toast } from "react-toastify";
 
 function StreamManager() {
-  // Get authenticated user's school - handle multiple possible property names
   const { user, loading: authLoading } = useAuth();
   
-  // --- State Management ---
   const [streams, setStreams] = useState([]);
   const [classrooms, setClassrooms] = useState([]);
   const [teachers, setTeachers] = useState([]);
   const [allClassTeachers, setAllClassTeachers] = useState([]);
-  const [streamTeachers, setStreamTeachers] = useState([]);
+  const [streamDetails, setStreamDetails] = useState(null);
   const [loading, setLoading] = useState(false);
   const [view, setView] = useState('list');
   
   const [selectedStream, setSelectedStream] = useState(null);
-  const [formData, setFormData] = useState({ name: '', class_id: '', class_teacher_id: '' });
-  const [teacherAssignmentData, setTeacherAssignmentData] = useState({ teacher_ids: [] });
+  const [formData, setFormData] = useState({ 
+    name: '', 
+    class_id: '', 
+    class_teacher_id: '',
+    capacity: '' 
+  });
 
-  // Get schoolId from user object - handle multiple possible property names
+  // For managing teaching staff
+  const [selectedTeachers, setSelectedTeachers] = useState([]);
+  const [availableTeachersForStream, setAvailableTeachersForStream] = useState([]);
+  const [isSavingTeachers, setIsSavingTeachers] = useState(false);
+
   const schoolId = user?.school_id || user?.schoolId || user?.school?.id;
 
-  // --- Data Fetching ---
   useEffect(() => {
     if (schoolId) {
       fetchInitialData();
@@ -52,19 +59,18 @@ function StreamManager() {
         apiRequest(`teachers/school/${schoolId}`, 'GET')
       ]);
       
-      // Handle different response structures
       const streamsData = streamsResponse?.data || streamsResponse || [];
       const classroomsData = classroomsResponse?.data || classroomsResponse || [];
-      const teachersData = teachersResponse?.teachers || teachersResponse?.data || [];
+      const teachersData = teachersResponse?.teachers || teachersResponse?.data || teachersResponse || [];
       
       setStreams(streamsData);
       setClassrooms(classroomsData);
-      setTeachers(teachersData);
+      setTeachers(Array.isArray(teachersData) ? teachersData : []);
     } catch (error) {
       const errorMessage = error?.response?.data?.message || error?.message || 'Failed to load data';
       toast.error(errorMessage);
+      console.error('Fetch error:', error);
       
-      // Set empty arrays on error to prevent UI issues
       setStreams([]);
       setClassrooms([]);
       setTeachers([]);
@@ -73,11 +79,10 @@ function StreamManager() {
     }
   };
 
-  // --- View Handlers ---
   const showCreateForm = () => {
     setView('create');
     setSelectedStream(null);
-    setFormData({ name: '', class_id: '', class_teacher_id: '' });
+    setFormData({ name: '', class_id: '', class_teacher_id: '', capacity: '' });
   };
 
   const showEditForm = (stream) => {
@@ -87,6 +92,7 @@ function StreamManager() {
       name: stream.name,
       class_id: stream.class_id || '',
       class_teacher_id: stream.class_teacher_id || '',
+      capacity: stream.capacity || ''
     });
   };
 
@@ -94,20 +100,27 @@ function StreamManager() {
     setView('manage-teachers');
     setSelectedStream(stream);
     setLoading(true);
-    
+
+    // Use the stream object from the list as the base
+    let detailedStream = { ...stream };
+
     try {
-      // Fetch fresh teacher data for this specific stream
+      // Fetch the specific list of teachers assigned to this stream
       const response = await apiRequest(`streams/${stream.id}/teachers`, 'GET');
-      setStreamTeachers(response.teachers || []);
-      const freshIds = response.teachers?.map(t => t.id) || [];
-      setTeacherAssignmentData({ teacher_ids: freshIds });
+      const teachersFromApi = response?.teachers || response?.data?.teachers || [];
+
+      // Update the teachers list on our base stream object
+      detailedStream.teachers = teachersFromApi;
+
+      // Set the selected teachers based on the API response
+      setSelectedTeachers(teachersFromApi.map(t => t.id));
+
     } catch (error) {
-      const errorMessage = error?.response?.data?.message || 'Could not fetch the latest teacher assignments';
+      const errorMessage = error?.response?.data?.message || 'Could not fetch teaching staff list';
       toast.error(errorMessage);
-      // Fallback to data in stream object
-      const assignedTeacherIds = stream.teachers?.map(t => t.id) || [];
-      setTeacherAssignmentData({ teacher_ids: assignedTeacherIds });
+      setSelectedTeachers([]);
     } finally {
+      setStreamDetails(detailedStream);
       setLoading(false);
     }
   };
@@ -130,18 +143,15 @@ function StreamManager() {
   const backToList = () => {
     setView('list');
     setSelectedStream(null);
+    setStreamDetails(null);
+    setSelectedTeachers([]);
+    setAvailableTeachersForStream([]);
     fetchInitialData();
   };
 
-  // --- CRUD Operations ---
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleTeacherAssignmentChange = (e) => {
-    const selectedOptions = Array.from(e.target.selectedOptions, option => Number(option.value));
-    setTeacherAssignmentData({ teacher_ids: selectedOptions });
   };
 
   const handleSubmit = async (e) => {
@@ -149,28 +159,26 @@ function StreamManager() {
     setLoading(true);
     
     try {
-      let streamId;
-      let response;
-      
       if (view === 'edit') {
-        // For edit, prepare the payload
         const payload = { 
           name: formData.name.trim()
         };
         
-        // Only include class_id if it was actually changed and is valid
         if (formData.class_id && formData.class_id !== selectedStream.class_id) {
           payload.class_id = parseInt(formData.class_id, 10);
         }
         
-        // Include school_id for validation
-        payload.school_id = schoolId;
+        if (formData.capacity) {
+          payload.capacity = parseInt(formData.capacity, 10);
+        }
         
-        response = await apiRequest(`streams/${selectedStream.id}`, 'PUT', payload);
-        streamId = selectedStream.id;
+        if (formData.class_teacher_id !== undefined) {
+          payload.class_teacher_id = formData.class_teacher_id ? parseInt(formData.class_teacher_id, 10) : null;
+        }
+        
+        await apiRequest(`streams/${selectedStream.id}`, 'PUT', payload);
         toast.success('Stream updated successfully');
       } else {
-        // For create, validate required fields
         if (!formData.name.trim()) {
           toast.error('Please enter a stream name');
           setLoading(false);
@@ -183,64 +191,50 @@ function StreamManager() {
           return;
         }
         
-        if (!schoolId) {
-          toast.error('School ID is missing. Please refresh and try again.');
+        if (!formData.capacity) {
+          toast.error('Please enter a capacity');
           setLoading(false);
           return;
         }
         
-        // Verify the classroom exists and belongs to this school
-        const selectedClassroom = classrooms.find(c => c.id === parseInt(formData.class_id, 10));
-        if (!selectedClassroom) {
-          toast.error('Selected classroom not found. Please refresh and try again.');
+        if (parseInt(formData.capacity, 10) < 1) {
+          toast.error('Capacity must be at least 1');
           setLoading(false);
           return;
         }
         
-        // Verify classroom belongs to the same school
-        if (selectedClassroom.school_id !== schoolId) {
-          toast.error('Selected classroom does not belong to your school.');
-          setLoading(false);
-          return;
-        }
-        
-        // Build the payload WITHOUT school_id (backend sets it automatically)
         const payload = { 
           name: formData.name.trim(),
-          class_id: parseInt(formData.class_id, 10)
+          class_id: parseInt(formData.class_id, 10),
+          capacity: parseInt(formData.capacity, 10)
         };
-        
-        response = await apiRequest('streams', 'POST', payload);
-        streamId = response?.data?.id || response?.id;
-        toast.success('Stream created successfully');
-      }
 
-      // Use dedicated endpoint for class teacher assignment if specified
-      if (formData.class_teacher_id && streamId) {
-        try {
-          await apiRequest(`streams/${streamId}/assign-class-teacher`, 'POST', { 
-            teacher_id: parseInt(formData.class_teacher_id, 10)
-          });
-          toast.success('Class teacher assigned successfully');
-        } catch (teacherError) {
-          const errorMessage = teacherError?.response?.data?.message || 'Class teacher assignment failed';
-          toast.warning(`Stream saved, but ${errorMessage}`);
+        if (formData.class_teacher_id) {
+          payload.class_teacher_id = parseInt(formData.class_teacher_id, 10);
         }
+        
+        await apiRequest('streams', 'POST', payload);
+        toast.success('Stream created successfully');
       }
       
       backToList();
     } catch (error) {
       const errorMessage = error?.response?.data?.message || error?.message || 'An error occurred';
       const validationErrors = error?.response?.data?.errors;
+      const existingStream = error?.response?.data?.existing_stream;
       
       if (validationErrors) {
-        // Show specific validation errors
         Object.keys(validationErrors).forEach(key => {
           const messages = Array.isArray(validationErrors[key]) 
             ? validationErrors[key].join(', ') 
             : validationErrors[key];
           toast.error(`${key}: ${messages}`);
         });
+        
+        // Show existing stream info if available
+        if (existingStream) {
+          toast.info(`Teacher is already assigned to stream: ${existingStream}`);
+        }
       } else {
         toast.error(`Failed to ${view === 'edit' ? 'update' : 'create'} stream: ${errorMessage}`);
       }
@@ -277,7 +271,24 @@ function StreamManager() {
       fetchInitialData();
     } catch (error) {
       const errorMessage = error?.response?.data?.message || 'Failed to assign class teacher';
-      toast.error(errorMessage);
+      const validationErrors = error?.response?.data?.errors;
+      const existingStream = error?.response?.data?.existing_stream;
+      
+      if (validationErrors) {
+        Object.keys(validationErrors).forEach(key => {
+          const messages = Array.isArray(validationErrors[key]) 
+            ? validationErrors[key].join(', ') 
+            : validationErrors[key];
+          toast.error(`${key}: ${messages}`);
+        });
+        
+        // Show existing stream info if available
+        if (existingStream) {
+          toast.info(`Teacher is already assigned to stream: ${existingStream}`);
+        }
+      } else {
+        toast.error(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
@@ -288,13 +299,7 @@ function StreamManager() {
     
     setLoading(true);
     try {
-      const stream = streams.find(s => s.id === streamId);
-      await apiRequest(`streams/${streamId}`, 'PUT', { 
-        name: stream.name,
-        class_id: parseInt(stream.class_id, 10),
-        school_id: schoolId,
-        class_teacher_id: null,
-      });
+      await apiRequest(`streams/${streamId}/remove-class-teacher`, 'DELETE');
       toast.success('Class teacher removed successfully');
       fetchInitialData();
     } catch (error) {
@@ -305,27 +310,79 @@ function StreamManager() {
     }
   };
 
-  const handleSaveTeacherAssignments = async (e) => {
-    e.preventDefault();
-    setLoading(true);
+  // Handle assigning/removing teaching staff
+  const handleTeacherToggle = (teacherId) => {
+    setSelectedTeachers(prev => {
+      if (prev.includes(teacherId)) {
+        return prev.filter(id => id !== teacherId);
+      } else {
+        return [...prev, teacherId];
+      }
+    });
+  };
+
+  const handleSaveTeachingStaff = async () => {
+    if (!selectedStream) return;
     
+    setIsSavingTeachers(true);
     try {
-      const payload = {
-        teacher_ids: teacherAssignmentData.teacher_ids.map(id => parseInt(id, 10))
-      };
-      
-      await apiRequest(`streams/${selectedStream.id}/assign-teachers`, 'POST', payload);
-      toast.success('Teacher assignments updated successfully');
+      await apiRequest(`streams/${selectedStream.id}/assign-teachers`, 'POST', {
+        teacher_ids: selectedTeachers
+      });
+      toast.success('Teaching staff updated successfully');
       backToList();
     } catch (error) {
-      const errorMessage = error?.response?.data?.message || 'Failed to update teacher assignments';
-      toast.error(errorMessage);
+      const errorMessage = error?.response?.data?.message || 'Failed to update teaching staff';
+      const validationErrors = error?.response?.data?.errors;
+      
+      if (validationErrors) {
+        Object.keys(validationErrors).forEach(key => {
+          const messages = Array.isArray(validationErrors[key]) 
+            ? validationErrors[key].join(', ') 
+            : validationErrors[key];
+          toast.error(`${key}: ${messages}`);
+        });
+      } else {
+        toast.error(errorMessage);
+      }
     } finally {
-      setLoading(false);
+      setIsSavingTeachers(false);
     }
   };
 
-  // --- Render Functions ---
+  const getTeacherName = (teacher) => {
+    if (!teacher) return 'Unknown';
+    
+    // Try different possible structures for teacher data
+    if (teacher.user) {
+      if (teacher.user.full_name) return teacher.user.full_name;
+      if (teacher.user.name) return teacher.user.name;
+      if (teacher.user.first_name && teacher.user.last_name) {
+        return `${teacher.user.first_name} ${teacher.user.last_name}`;
+      }
+      if (teacher.user.first_name) return teacher.user.first_name;
+    }
+    
+    if (teacher.full_name) return teacher.full_name;
+    if (teacher.name) return teacher.name;
+    if (teacher.first_name && teacher.last_name) {
+      return `${teacher.first_name} ${teacher.last_name}`;
+    }
+    if (teacher.first_name) return teacher.first_name;
+    
+    return `Teacher #${teacher.id}`;
+  };
+
+  const getAvailableTeachers = (currentStreamId = null) => {
+    if (!Array.isArray(teachers)) return [];
+    
+    const assignedTeacherIds = streams
+      .filter(s => s.class_teacher_id && s.id !== currentStreamId)
+      .map(s => s.class_teacher_id);
+    
+    return teachers.filter(t => !assignedTeacherIds.includes(t.id));
+  };
+
   const renderListView = () => (
     <>
       <div className="flex flex-wrap justify-between items-center gap-3 mb-8">
@@ -355,6 +412,15 @@ function StreamManager() {
         </div>
       </div>
 
+      {teachers.length === 0 && (
+        <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+          <p className="text-yellow-800 dark:text-yellow-200 text-sm flex items-center gap-2">
+            <AlertCircle className="w-4 h-4" />
+            No teachers found for your school. Please add teachers first.
+          </p>
+        </div>
+      )}
+
       <div className="bg-white dark:bg-background-dark/50 rounded-xl border border-slate-200 dark:border-slate-800 p-6">
         <h2 className="text-[#0d141b] dark:text-white text-2xl font-bold leading-tight tracking-[-0.015em] mb-6">
           Existing Streams
@@ -366,78 +432,92 @@ function StreamManager() {
                 <tr>
                   <th className="px-6 py-4 font-medium">Stream Name</th>
                   <th className="px-6 py-4 font-medium">Classroom</th>
+                  <th className="px-6 py-4 font-medium">Capacity</th>
                   <th className="px-6 py-4 font-medium">Class Teacher</th>
-                  <th className="px-6 py-4 font-medium">Teachers</th>
+                  <th className="px-6 py-4 font-medium">Staff</th>
                   <th className="px-6 py-4 font-medium text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
                 {streams.length > 0 ? (
-                  streams.map((stream) => (
-                    <tr key={stream.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/20 transition-colors">
-                      <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
-                        {stream.name}
-                      </td>
-                      <td className="px-6 py-4 text-slate-500 dark:text-slate-400">
-                        {stream.classroom?.class_name || 'N/A'}
-                      </td>
-                      <td className="px-6 py-4 text-slate-500 dark:text-slate-400">
-                        {stream.classTeacher ? (
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="truncate">{stream.classTeacher.user?.name || stream.classTeacher.name}</span>
-                            <button 
-                              onClick={() => handleRemoveClassTeacher(stream.id)} 
-                              className="p-1 text-slate-400 hover:text-red-600 rounded transition-colors"
-                              title="Remove class teacher"
+                  streams.map((stream) => {
+                    const availableTeachers = getAvailableTeachers(stream.id);
+                    const classTeacher = stream.classTeacher || stream.class_teacher;
+                    
+                    return (
+                      <tr key={stream.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/20 transition-colors">
+                        <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
+                          {stream.name}
+                        </td>
+                        <td className="px-6 py-4 text-slate-500 dark:text-slate-400">
+                          {stream.classroom?.class_name || 'N/A'}
+                        </td>
+                        <td className="px-6 py-4 text-slate-500 dark:text-slate-400">
+                          {stream.capacity || 'N/A'}
+                        </td>
+                        <td className="px-6 py-4 text-slate-500 dark:text-slate-400">
+                          {classTeacher ? (
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="truncate">{getTeacherName(classTeacher)}</span>
+                              <button 
+                                onClick={() => handleRemoveClassTeacher(stream.id)} 
+                                className="p-1 text-slate-400 hover:text-red-600 rounded transition-colors"
+                                title="Remove class teacher"
+                              >
+                                <UserMinus className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ) : (
+                            <select 
+                              onChange={(e) => handleAssignClassTeacher(stream.id, e.target.value)}
+                              className="text-xs border border-slate-300 rounded px-2 py-1 dark:bg-slate-700 dark:border-slate-600 focus:ring-2 focus:ring-blue-500"
+                              defaultValue=""
+                              disabled={availableTeachers.length === 0}
                             >
-                              <UserMinus className="w-4 h-4" />
+                              <option value="" disabled>
+                                {availableTeachers.length === 0 ? 'No teachers available' : 'Assign Teacher'}
+                              </option>
+                              {availableTeachers.map(t => (
+                                <option key={t.id} value={t.id}>
+                                  {getTeacherName(t)}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-slate-500 dark:text-slate-400">
+                          <button 
+                            onClick={() => showManageTeachersView(stream)} 
+                            className="flex items-center gap-1 text-blue-600 hover:text-blue-700 hover:underline transition-colors"
+                          >
+                            <Users className="w-4 h-4" />
+                            <span>Manage ({stream.teachers?.length || 0})</span>
+                          </button>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex justify-end gap-2">
+                            <button 
+                              onClick={() => showEditForm(stream)} 
+                              className="p-2 text-slate-500 hover:text-blue-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                              title="Edit stream"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button 
+                              onClick={() => handleDelete(stream.id)} 
+                              className="p-2 text-slate-500 hover:text-red-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                              title="Delete stream"
+                            >
+                              <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
-                        ) : (
-                          <select 
-                            onChange={(e) => handleAssignClassTeacher(stream.id, e.target.value)}
-                            className="text-xs border border-slate-300 rounded px-2 py-1 dark:bg-slate-700 dark:border-slate-600 focus:ring-2 focus:ring-blue-500"
-                            defaultValue=""
-                          >
-                            <option value="" disabled>Assign Teacher</option>
-                            {teachers.map(t => (
-                              <option key={t.id} value={t.id}>{t.user?.name || t.name}</option>
-                            ))}
-                          </select>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-slate-500 dark:text-slate-400">
-                        <button 
-                          onClick={() => showManageTeachersView(stream)} 
-                          className="flex items-center gap-1 text-blue-600 hover:text-blue-700 hover:underline transition-colors"
-                        >
-                          <Users className="w-4 h-4" />
-                          <span>{stream.teachers?.length || 0} Assigned</span>
-                        </button>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end gap-2">
-                          <button 
-                            onClick={() => showEditForm(stream)} 
-                            className="p-2 text-slate-500 hover:text-blue-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                            title="Edit stream"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button 
-                            onClick={() => handleDelete(stream.id)} 
-                            className="p-2 text-slate-500 hover:text-red-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                            title="Delete stream"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                        </td>
+                      </tr>
+                    );
+                  })
                 ) : (
                   <tr>
-                    <td colSpan="5" className="px-6 py-8 text-center text-slate-500 dark:text-slate-400">
+                    <td colSpan="6" className="px-6 py-8 text-center text-slate-500 dark:text-slate-400">
                       No streams found. Create one to get started.
                     </td>
                   </tr>
@@ -450,157 +530,327 @@ function StreamManager() {
     </>
   );
 
-  const renderFormView = () => (
-    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-md mx-auto">
-      <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
-        <h3 className="text-xl font-semibold text-slate-900 dark:text-white">
-          {view === 'edit' ? 'Edit Stream' : 'Create New Stream'}
-        </h3>
-        <button 
-          onClick={backToList} 
-          className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
-        >
-          <X className="w-6 h-6" />
-        </button>
-      </div>
-      <form onSubmit={handleSubmit} className="p-6 space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Stream Name <span className="text-red-500">*</span>
-          </label>
-          <input 
-            type="text" 
-            name="name" 
-            value={formData.name} 
-            onChange={handleInputChange} 
-            required
-            placeholder="e.g., Stream A, Blue Stream"
-            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white" 
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Classroom <span className="text-red-500">*</span>
-          </label>
-          <select 
-            name="class_id" 
-            value={formData.class_id} 
-            onChange={handleInputChange} 
-            required
-            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
-          >
-            <option value="">Select a classroom</option>
-            {Array.isArray(classrooms) && classrooms.map(c => (
-              <option key={c.id} value={c.id}>{c.class_name}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Class Teacher
-          </label>
-          <select 
-            name="class_teacher_id" 
-            value={formData.class_teacher_id} 
-            onChange={handleInputChange}
-            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
-          >
-            <option value="">Select a teacher (optional)</option>
-            {Array.isArray(teachers) && teachers.map(teacher => (
-              <option key={teacher.id} value={teacher.id}>
-                {teacher.user?.name || teacher.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="flex justify-end gap-3 pt-4">
-          <button 
-            type="button" 
-            onClick={backToList} 
-            className="px-4 py-2 text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg font-medium transition-colors"
-          >
-            Cancel
-          </button>
-          <button 
-            type="submit" 
-            disabled={loading} 
-            className="px-4 py-2 bg-black text-white rounded-lg font-medium hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {loading ? 'Saving...' : (view === 'edit' ? 'Update' : 'Create')}
-          </button>
-        </div>
-      </form>
-    </div>
-  );
+  const renderFormView = () => {
+    const availableTeachers = view === 'edit' 
+      ? getAvailableTeachers(selectedStream?.id)
+      : getAvailableTeachers();
 
-  const renderManageTeachersView = () => (
-    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-2xl mx-auto">
-      <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
-        <div>
-          <h3 className="text-xl font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-            <Users className="w-5 h-5"/>
-            Manage Teachers
+    return (
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-md mx-auto">
+        <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+          <h3 className="text-xl font-semibold text-slate-900 dark:text-white">
+            {view === 'edit' ? 'Edit Stream' : 'Create New Stream'}
           </h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            For Stream: {selectedStream?.name}
-          </p>
+          <button 
+            onClick={backToList} 
+            className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+          >
+            <X className="w-6 h-6" />
+          </button>
         </div>
-        <button 
-          onClick={backToList} 
-          className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
-        >
-          <X className="w-6 h-6" />
-        </button>
-      </div>
-      <form onSubmit={handleSaveTeacherAssignments} className="p-6">
-        {loading ? (
-          <div className="flex justify-center py-8">
-            <Loader className="w-8 h-8 animate-spin text-slate-500" />
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Stream Name <span className="text-red-500">*</span>
+            </label>
+            <input 
+              type="text" 
+              name="name" 
+              value={formData.name} 
+              onChange={handleInputChange} 
+              required
+              placeholder="e.g., Stream A, Blue Stream"
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white" 
+            />
           </div>
-        ) : (
-          <>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                Assign Teachers to this Stream
-              </label>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">
-                Hold Ctrl (Windows) or Cmd (Mac) to select multiple teachers.
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Classroom <span className="text-red-500">*</span>
+            </label>
+            <select 
+              name="class_id" 
+              value={formData.class_id} 
+              onChange={handleInputChange} 
+              required
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+            >
+              <option value="">Select a classroom</option>
+              {Array.isArray(classrooms) && classrooms.map(c => (
+                <option key={c.id} value={c.id}>{c.class_name}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Capacity <span className="text-red-500">*</span>
+            </label>
+            <input 
+              type="number" 
+              name="capacity" 
+              value={formData.capacity} 
+              onChange={handleInputChange} 
+              required
+              min="1"
+              placeholder="Maximum number of students"
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white" 
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Class Teacher
+            </label>
+            <select 
+              name="class_teacher_id" 
+              value={formData.class_teacher_id} 
+              onChange={handleInputChange}
+              disabled={availableTeachers.length === 0}
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <option value="">
+                {availableTeachers.length === 0 ? 'No teachers available' : 'Select a teacher (optional)'}
+              </option>
+              {availableTeachers.map(teacher => (
+                <option key={teacher.id} value={teacher.id}>
+                  {getTeacherName(teacher)}
+                </option>
+              ))}
+            </select>
+            {availableTeachers.length === 0 && teachers.length > 0 && (
+              <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                All teachers are already assigned as class teachers
               </p>
-              <select 
-                multiple 
-                value={teacherAssignmentData.teacher_ids}
-                onChange={handleTeacherAssignmentChange}
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
-                size="8"
-              >
-                {Array.isArray(teachers) && teachers.map(teacher => (
-                  <option key={teacher.id} value={teacher.id}>
-                    {teacher.user?.name || teacher.name}
-                  </option>
-                ))}
-              </select>
+            )}
+            {teachers.length === 0 && (
+              <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                No teachers found. Please add teachers first.
+              </p>
+            )}
+            {formData.class_teacher_id && (
+              <p className="mt-1 text-xs text-blue-600 dark:text-blue-400">
+                <CheckCircle className="inline-block w-3 h-3 mr-1" />
+                This teacher will be automatically added to the teaching staff
+              </p>
+            )}
+          </div>
+          <div className="flex justify-end gap-3 pt-4">
+            <button 
+              type="button" 
+              onClick={backToList} 
+              className="px-4 py-2 text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg font-medium transition-colors"
+            >
+              Cancel
+            </button>
+            <button 
+              type="submit" 
+              disabled={loading} 
+              className="px-4 py-2 bg-black text-white rounded-lg font-medium hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {loading ? 'Saving...' : (view === 'edit' ? 'Update' : 'Create')}
+            </button>
+          </div>
+        </form>
+      </div>
+    );
+  };
+
+  const renderManageTeachersView = () => {
+    const classTeacher = streamDetails?.classTeacher || streamDetails?.class_teacher;
+    
+    return (
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-2xl mx-auto">
+        <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+          <div>
+            <h3 className="text-xl font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+              <Users className="w-5 h-5"/>
+              Manage Teaching Staff
+            </h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              {selectedStream?.name} - {selectedStream?.classroom?.class_name}
+            </p>
+          </div>
+          <button 
+            onClick={backToList} 
+            className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+          >
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+        <div className="p-6">
+          {loading ? (
+            <div className="flex justify-center py-8">
+              <Loader className="w-8 h-8 animate-spin text-slate-500" />
             </div>
-            <div className="flex justify-end gap-3 pt-4">
-              <button 
-                type="button" 
-                onClick={backToList} 
-                className="px-4 py-2 text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg font-medium transition-colors"
-              >
-                Cancel
-              </button>
-              <button 
-                type="submit" 
-                disabled={loading} 
-                className="px-4 py-2 bg-black text-white rounded-lg font-medium hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {loading ? 'Saving...' : 'Save Assignments'}
-              </button>
+          ) : (
+            <div className="space-y-6">
+              {/* Stream Information */}
+              <div className="p-4 border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-900/30">
+                <h4 className="font-semibold text-slate-900 dark:text-white mb-3">Stream Information</h4>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <span className="text-slate-500 dark:text-slate-400">Capacity:</span>
+                    <p className="font-medium text-slate-900 dark:text-white">{streamDetails?.capacity || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 dark:text-slate-400">Class Teacher:</span>
+                    <p className="font-medium text-slate-900 dark:text-white">
+                      {classTeacher ? getTeacherName(classTeacher) : 'Not Assigned'}
+                    </p>
+                  </div>
+                </div>
+                {classTeacher && (
+                  <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded text-xs text-blue-700 dark:text-blue-300">
+                    <CheckCircle className="inline-block w-3 h-3 mr-1" />
+                    The class teacher is automatically included in the teaching staff
+                  </div>
+                )}
+              </div>
+
+              {/* Current Teaching Staff */}
+              <div className="p-4 border border-slate-200 dark:border-slate-600 rounded-lg">
+                <h4 className="font-semibold text-slate-900 dark:text-white mb-3">
+                  Current Teaching Staff ({streamDetails?.teachers?.length || 0})
+                </h4>
+                {streamDetails?.teachers && streamDetails.teachers.length > 0 ? (
+                  <div className="space-y-2">
+                    {streamDetails.teachers.map(teacher => {
+                      const isClassTeacher = streamDetails?.class_teacher_id === teacher.id;
+                      
+                      return (
+                        <div key={teacher.id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded">
+                          <div className="flex items-center gap-3">
+                            <GraduationCap className="w-5 h-5 text-slate-400" />
+                            <div>
+                              <p className="text-slate-900 dark:text-white font-medium">{getTeacherName(teacher)}</p>
+                              <p className="text-xs text-slate-500 dark:text-slate-400">
+                                {teacher.qualification || 'Teacher'}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {isClassTeacher && (
+                              <span className="text-xs px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded">
+                                Class Teacher
+                              </span>
+                            )}
+                            <span className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
+                              Teaching
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-6 text-slate-500 dark:text-slate-400">
+                    <AlertCircle className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                    <p>No teachers assigned to this stream yet.</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Assign Teachers Section */}
+              <div className="p-4 border border-slate-200 dark:border-slate-600 rounded-lg">
+                <h4 className="font-semibold text-slate-900 dark:text-white mb-3">
+                  Assign Teachers to Stream
+                </h4>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                  Select teachers who will teach in this stream
+                </p>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {teachers.length > 0 ? (
+                    teachers.map(teacher => {
+                      const isSelected = selectedTeachers.includes(teacher.id);
+                      const isClassTeacher = streamDetails?.class_teacher_id === teacher.id;
+                      
+                      return (
+                        <div 
+                          key={teacher.id} 
+                          className={`flex items-center justify-between p-3 rounded cursor-pointer transition-colors ${
+                            isSelected 
+                              ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800' 
+                              : 'bg-slate-50 dark:bg-slate-700/30 hover:bg-slate-100 dark:hover:bg-slate-700/50'
+                          } ${isClassTeacher ? 'opacity-75 cursor-not-allowed' : ''}`}
+                          onClick={() => !isClassTeacher && handleTeacherToggle(teacher.id)}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                              isSelected 
+                                ? 'bg-blue-600 border-blue-600' 
+                                : 'border-slate-300 dark:border-slate-600'
+                            } ${isClassTeacher ? 'bg-purple-600 border-purple-600' : ''}`}>
+                              {(isSelected || isClassTeacher) && <CheckCircle className="w-4 h-4 text-white" />}
+                            </div>
+                            <div>
+                              <p className="text-slate-900 dark:text-white font-medium">
+                                {getTeacherName(teacher)}
+                              </p>
+                              <p className="text-xs text-slate-500 dark:text-slate-400">
+                                {teacher.qualification || 'No qualification specified'}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {isClassTeacher && (
+                              <span className="text-xs px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded">
+                                Class Teacher
+                              </span>
+                            )}
+                            {isSelected && !isClassTeacher && (
+                              <span className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
+                                Teaching
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="text-center py-4 text-slate-500 dark:text-slate-400">
+                      <AlertCircle className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                      <p>No teachers available</p>
+                    </div>
+                  )}
+                </div>
+                {streamDetails?.class_teacher_id && (
+                  <div className="mt-3 p-2 bg-amber-50 dark:bg-amber-900/20 rounded text-xs text-amber-700 dark:text-amber-300">
+                    <AlertCircle className="inline-block w-3 h-3 mr-1" />
+                    The class teacher cannot be removed from teaching staff
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+                <button 
+                  onClick={backToList} 
+                  className="px-4 py-2 text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg font-medium transition-colors"
+                >
+                  Close
+                </button>
+                <button 
+                  onClick={handleSaveTeachingStaff} 
+                  disabled={isSavingTeachers}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                >
+                  {isSavingTeachers ? (
+                    <>
+                      <Loader className="w-4 h-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus className="w-4 h-4" />
+                      Save Teaching Staff
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
-          </>
-        )}
-      </form>
-    </div>
-  );
+          )}
+        </div>
+      </div>
+    );
+  };
 
   const renderAllClassTeachersView = () => (
     <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-4xl mx-auto">
@@ -629,30 +879,34 @@ function StreamManager() {
         ) : (
           <div className="space-y-3">
             {allClassTeachers.length > 0 ? (
-              allClassTeachers.map(stream => (
-                <div 
-                  key={stream.id} 
-                  className="flex justify-between items-center p-4 border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
-                >
-                  <div>
-                    <p className="font-medium text-slate-900 dark:text-white">{stream.name}</p>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">
-                      Classroom: {stream.classroom?.class_name || 'N/A'}
-                    </p>
+              allClassTeachers.map(stream => {
+                const classTeacher = stream.classTeacher || stream.class_teacher;
+                
+                return (
+                  <div 
+                    key={stream.id} 
+                    className="flex justify-between items-center p-4 border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+                  >
+                    <div>
+                      <p className="font-medium text-slate-900 dark:text-white">{stream.name}</p>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        Classroom: {stream.classroom?.class_name || 'N/A'}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium text-slate-700 dark:text-slate-300">
+                        {classTeacher ? getTeacherName(classTeacher) : 'Not Assigned'}
+                      </p>
+                      <p className="text-xs text-slate-500">Class Teacher</p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-medium text-slate-700 dark:text-slate-300">
-                      {stream.classTeacher?.user?.name || stream.classTeacher?.name || 'Not Assigned'}
-                    </p>
-                    <p className="text-xs text-slate-500">Class Teacher</p>
-                  </div>
-                </div>
-              ))
+                );
+              })
             ) : (
               <div className="text-center py-8">
                 <AlertCircle className="w-12 h-12 text-slate-300 mx-auto mb-3" />
                 <p className="text-slate-500 dark:text-slate-400">
-                  No class teachers found.
+                  No class teachers assigned yet.
                 </p>
               </div>
             )}
@@ -662,7 +916,6 @@ function StreamManager() {
     </div>
   );
 
-  // Show loading while auth is initializing
   if (authLoading) {
     return (
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
@@ -674,7 +927,6 @@ function StreamManager() {
     );
   }
 
-  // Check if user is authenticated and has schoolId
   if (!user || !schoolId) {
     return (
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">

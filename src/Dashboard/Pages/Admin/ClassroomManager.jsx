@@ -1,3 +1,4 @@
+// src/Dashboard/Pages/Admin/ClassroomManager.jsx
 import React, { useEffect, useState } from 'react';
 import { apiRequest } from '../../../utils/api';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -5,13 +6,12 @@ import {
   Edit, 
   Trash2, 
   Loader, 
-  Users, 
   MapPin, 
-  UserMinus, 
   Plus, 
   X,
   ChevronRight,
-  AlertCircle
+  AlertCircle,
+  Users
 } from 'lucide-react';
 import { toast } from "react-toastify";
 
@@ -20,7 +20,6 @@ function ClassroomManager() {
   
   // --- State Management ---
   const [classrooms, setClassrooms] = useState([]);
-  const [teachers, setTeachers] = useState([]);
   const [streams, setStreams] = useState([]);
   const [loading, setLoading] = useState(false);
   const [view, setView] = useState('list');
@@ -29,7 +28,6 @@ function ClassroomManager() {
   const [formData, setFormData] = useState({
     class_name: '',
     capacity: '',
-    class_teacher_id: '',
   });
 
   // Get schoolId from user object - handle multiple possible property names
@@ -45,21 +43,37 @@ function ClassroomManager() {
   const fetchInitialData = async () => {
     setLoading(true);
     try {
-      const [classroomsResponse, teachersResponse] = await Promise.all([
+      const [classroomsResponse, streamsResponse] = await Promise.all([
         apiRequest('classrooms', 'GET'),
-        apiRequest(`teachers/school/${schoolId}`, 'GET')
+        apiRequest('streams', 'GET')
       ]);
       
       // Handle different response structures
-      setClassrooms(classroomsResponse?.data || classroomsResponse || []);
-      setTeachers(teachersResponse?.teachers || teachersResponse?.data || []);
+      const classroomsData = classroomsResponse?.data || classroomsResponse || [];
+      const streamsData = streamsResponse?.data || streamsResponse || [];
+      
+      // Calculate total capacity for each classroom by summing stream capacities
+      const classroomsWithCapacity = classroomsData.map(classroom => {
+        const classroomStreams = streamsData.filter(stream => stream.class_id === classroom.id);
+        const totalCapacity = classroomStreams.reduce((sum, stream) => sum + (stream.capacity || 0), 0);
+        
+        return {
+          ...classroom,
+          streams: classroomStreams,
+          calculatedCapacity: totalCapacity,
+          streamCount: classroomStreams.length
+        };
+      });
+      
+      setClassrooms(classroomsWithCapacity);
+      setStreams(streamsData);
     } catch (error) {
       const errorMessage = error?.response?.data?.message || error?.message || 'Failed to load data';
       toast.error(errorMessage);
       
       // Set empty arrays on error to prevent UI issues
       setClassrooms([]);
-      setTeachers([]);
+      setStreams([]);
     } finally {
       setLoading(false);
     }
@@ -69,7 +83,7 @@ function ClassroomManager() {
   const showCreateForm = () => {
     setView('create');
     setSelectedClassroom(null);
-    setFormData({ class_name: '', capacity: '', class_teacher_id: '' });
+    setFormData({ class_name: '', capacity: '' });
   };
 
   const showEditForm = (classroom) => {
@@ -78,7 +92,6 @@ function ClassroomManager() {
     setFormData({
       class_name: classroom.class_name,
       capacity: classroom.capacity || '',
-      class_teacher_id: classroom.class_teacher_id || '',
     });
   };
 
@@ -88,7 +101,17 @@ function ClassroomManager() {
     setLoading(true);
     try {
       const response = await apiRequest(`classrooms/${classroom.id}/streams`, 'GET');
-      setStreams(response?.streams || response?.data || response || []);
+      const classroomStreams = response?.streams || response?.data || response || [];
+      
+      // Calculate total capacity for this classroom's streams
+      const totalCapacity = classroomStreams.reduce((sum, stream) => sum + (stream.capacity || 0), 0);
+      
+      setStreams(classroomStreams);
+      setSelectedClassroom(prev => ({
+        ...prev,
+        calculatedCapacity: totalCapacity,
+        streamCount: classroomStreams.length
+      }));
     } catch (error) {
       const errorMessage = error?.response?.data?.message || 'Could not load streams';
       toast.error(errorMessage);
@@ -122,32 +145,16 @@ function ClassroomManager() {
         school_id: schoolId // Always include school_id
       };
       
-      let classroomId;
       let response;
       
       if (view === 'edit') {
         response = await apiRequest(`classrooms/${selectedClassroom.id}`, 'PUT', payload);
-        classroomId = selectedClassroom.id;
         toast.success('Classroom updated successfully');
       } else {
         response = await apiRequest('classrooms', 'POST', payload);
-        classroomId = response?.data?.id || response?.id;
         toast.success('Classroom created successfully');
       }
 
-      // Assign teacher if specified (using dedicated endpoint)
-      if (formData.class_teacher_id && classroomId) {
-        try {
-          await apiRequest(`classrooms/${classroomId}/assign-teacher`, 'POST', { 
-            teacher_id: formData.class_teacher_id 
-          });
-          toast.success('Teacher assigned successfully');
-        } catch (teacherError) {
-          const errorMessage = teacherError?.response?.data?.message || 'Teacher assignment failed';
-          toast.warning(`Classroom saved, but ${errorMessage}`);
-        }
-      }
-      
       backToList();
     } catch (error) {
       const errorMessage = error?.response?.data?.message || error?.message || 'An error occurred';
@@ -173,22 +180,6 @@ function ClassroomManager() {
     }
   };
 
-  const handleRemoveTeacher = async (classroomId) => {
-    if (window.confirm('Remove class teacher from this classroom?')) {
-      setLoading(true);
-      try {
-        await apiRequest(`classrooms/${classroomId}/remove-teacher`, 'DELETE');
-        toast.success('Class teacher removed successfully');
-        fetchInitialData();
-      } catch (error) {
-        const errorMessage = error?.response?.data?.message || 'Failed to remove class teacher';
-        toast.error(errorMessage);
-      } finally {
-        setLoading(false);
-      }
-    }
-  };
-
   // --- Render Functions ---
   const renderListView = () => (
     <>
@@ -198,13 +189,10 @@ function ClassroomManager() {
             Classroom Management
           </h1>
           <p className="text-[#4c739a] dark:text-slate-400 text-base font-normal leading-normal">
-            Manage classrooms, assign teachers, and view associated streams.
+            Manage classrooms and their associated streams
           </p>
         </div>
-        <button 
-          onClick={showCreateForm} 
-          className="bg-black text-white px-6 py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors"
-        >
+        <button onClick={showCreateForm} className="bg-black text-white px-6 py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors">
           <Plus className="inline-block w-5 h-5 mr-2" />
           New Classroom
         </button>
@@ -220,7 +208,6 @@ function ClassroomManager() {
               <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-300">
                 <tr>
                   <th className="px-6 py-4 font-medium">Class Name</th>
-                  <th className="px-6 py-4 font-medium">Class Teacher</th>
                   <th className="px-6 py-4 font-medium">Capacity</th>
                   <th className="px-6 py-4 font-medium">Streams</th>
                   <th className="px-6 py-4 font-medium text-right">Actions</th>
@@ -228,62 +215,63 @@ function ClassroomManager() {
               </thead>
               <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
                 {classrooms.length > 0 ? (
-                  classrooms.map((classroom) => (
-                    <tr key={classroom.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/20 transition-colors">
-                      <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
-                        {classroom.class_name}
-                      </td>
-                      <td className="px-6 py-4 text-slate-500 dark:text-slate-400">
-                        {classroom.teacher ? (
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="truncate">{classroom.teacher.user?.name || classroom.teacher.name}</span>
+                  classrooms.map((classroom) => {
+                    // Use calculated capacity if streams exist, otherwise use manual capacity
+                    const displayCapacity = classroom.streamCount > 0 
+                      ? classroom.calculatedCapacity 
+                      : (classroom.capacity || 0);
+                    
+                    return (
+                      <tr key={classroom.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/20 transition-colors">
+                        <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
+                          {classroom.class_name}
+                        </td>
+                        <td className="px-6 py-4 text-slate-500 dark:text-slate-400">
+                          <div className="flex items-center gap-2">
+                            <Users className="w-4 h-4 text-slate-400" />
+                            <span>{displayCapacity} students</span>
+                            {classroom.streamCount > 0 && classroom.capacity && (
+                              <span className="text-xs text-slate-400">(Manual: {classroom.capacity})</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-slate-500 dark:text-slate-400">
+                          {classroom.streamCount > 0 ? (
                             <button 
-                              onClick={() => handleRemoveTeacher(classroom.id)} 
-                              className="p-1 text-slate-400 hover:text-red-600 rounded transition-colors"
-                              title="Remove teacher"
+                              onClick={() => showStreamsView(classroom)} 
+                              className="flex items-center gap-1 text-blue-600 hover:text-blue-700 hover:underline transition-colors"
                             >
-                              <UserMinus className="w-4 h-4" />
+                              <MapPin className="w-4 h-4" />
+                              <span>{classroom.streamCount} Stream(s)</span>
+                            </button>
+                          ) : (
+                            <span className="text-slate-400">No streams</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex justify-end gap-2">
+                            <button 
+                              onClick={() => showEditForm(classroom)} 
+                              className="p-2 text-slate-500 hover:text-blue-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                              title="Edit classroom"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button 
+                              onClick={() => handleDelete(classroom.id)} 
+                              className="p-2 text-slate-500 hover:text-red-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                              title="Delete classroom"
+                            >
+                              <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
-                        ) : (
-                          <span className="text-slate-400 italic">Not Assigned</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-slate-500 dark:text-slate-400">
-                        {classroom.capacity || '-'}
-                      </td>
-                      <td className="px-6 py-4 text-slate-500 dark:text-slate-400">
-                        <button 
-                          onClick={() => showStreamsView(classroom)} 
-                          className="flex items-center gap-1 text-blue-600 hover:text-blue-700 hover:underline transition-colors"
-                        >
-                          <MapPin className="w-4 h-4" />
-                          <span>{classroom.streams?.length || 0} Stream(s)</span>
-                        </button>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end gap-2">
-                          <button 
-                            onClick={() => showEditForm(classroom)} 
-                            className="p-2 text-slate-500 hover:text-blue-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                            title="Edit classroom"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button 
-                            onClick={() => handleDelete(classroom.id)} 
-                            className="p-2 text-slate-500 hover:text-red-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                            title="Delete classroom"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                        </td>
+                      </tr>
+                    );
+                  })
                 ) : (
                   <tr>
-                    <td colSpan="5" className="px-6 py-8 text-center text-slate-500 dark:text-slate-400">
+                    <td colSpan="4" className="px-6 py-8 text-center text-slate-500 dark:text-slate-400">
                       No classrooms found. Create one to get started.
                     </td>
                   </tr>
@@ -302,14 +290,11 @@ function ClassroomManager() {
         <h3 className="text-xl font-semibold text-slate-900 dark:text-white">
           {view === 'edit' ? 'Edit Classroom' : 'Create New Classroom'}
         </h3>
-        <button 
-          onClick={backToList} 
-          className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
-        >
+        <button onClick={backToList} className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors">
           <X className="w-6 h-6" />
         </button>
       </div>
-      <form onSubmit={handleSubmit} className="p-6 space-y-4">
+      <div className="p-6 space-y-4">
         <div>
           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
             Class Name <span className="text-red-500">*</span>
@@ -337,24 +322,9 @@ function ClassroomManager() {
             placeholder="Maximum number of students"
             className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white" 
           />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Class Teacher
-          </label>
-          <select 
-            name="class_teacher_id" 
-            value={formData.class_teacher_id} 
-            onChange={handleInputChange}
-            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
-          >
-            <option value="">Select a teacher (optional)</option>
-            {teachers.map(teacher => (
-              <option key={teacher.id} value={teacher.id}>
-                {teacher.user?.name || teacher.name}
-              </option>
-            ))}
-          </select>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            Note: For schools with streams, capacity will be calculated from stream capacities.
+          </p>
         </div>
         <div className="flex justify-end gap-3 pt-4">
           <button 
@@ -365,14 +335,15 @@ function ClassroomManager() {
             Cancel
           </button>
           <button 
-            type="submit" 
+            type="button"
+            onClick={handleSubmit} 
             disabled={loading} 
             className="px-4 py-2 bg-black text-white rounded-lg font-medium hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {loading ? 'Saving...' : (view === 'edit' ? 'Update' : 'Create')}
           </button>
         </div>
-      </form>
+      </div>
     </div>
   );
 
@@ -384,7 +355,8 @@ function ClassroomManager() {
             Streams for {selectedClassroom?.class_name}
           </h3>
           <p className="text-sm text-slate-500 dark:text-slate-400">
-            Manage all streams belonging to this classroom.
+            Total Capacity: <span className="font-medium">{selectedClassroom?.calculatedCapacity || 0} students</span> 
+            <span className="ml-2">({selectedClassroom?.streamCount || 0} streams)</span>
           </p>
         </div>
         <button 
@@ -410,10 +382,19 @@ function ClassroomManager() {
                   <div>
                     <p className="font-medium text-slate-900 dark:text-white">{stream.name}</p>
                     <p className="text-sm text-slate-500 dark:text-slate-400">
+                      Capacity: {stream.capacity || 0} students
+                    </p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
                       Class Teacher: {stream.classTeacher?.user?.name || stream.class_teacher?.name || 'Not Assigned'}
                     </p>
                   </div>
-                  <ChevronRight className="w-5 h-5 text-slate-400" />
+                  <div className="text-right">
+                    <div className="flex items-center gap-1 text-slate-500 dark:text-slate-400">
+                      <Users className="w-4 h-4" />
+                      <span>{stream.capacity || 0}</span>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-slate-400 mt-1" />
+                  </div>
                 </div>
               ))
             ) : (
@@ -486,18 +467,3 @@ function ClassroomManager() {
 }
 
 export default ClassroomManager;
-
-
-
-
-
-
-
-// The Real Issue
-// The problem is likely that you're testing an endpoint that has additional authorization logic beyond just authentication. Let's check your ClassroomController:
-// In tinker, let's create a fresh token and verify:
-// php$user = \App\Models\User::find(2);
-// $freshToken = $user->createToken('postman-test')->plainTextToken;
-// echo "\n=== USE THIS TOKEN IN POSTMAN ===\n";
-// echo $freshToken;
-// echo "\n=================================\n";
