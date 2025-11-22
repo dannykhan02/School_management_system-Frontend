@@ -78,7 +78,7 @@ useEffect(() => {
   };
 
   return (
-    <div className="mx-auto p-6">
+    <div className="w-full p-6">
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-8">
         <div className="flex items-center gap-3">
@@ -88,7 +88,7 @@ useEffect(() => {
           <div>
             <h1 className="text-2xl font-bold text-black dark:text-white">Create New User</h1>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              Add a new user to the system
+              Add a new user to system
             </p>
           </div>
         </div>
@@ -190,7 +190,7 @@ useEffect(() => {
               </div>
 
                 <div>
-                <label className="block text-sm font-medium text-black dark:text-white mb-2">Role *</label>
+                <label className="block text-sm font-medium text-black dark:text-white mb-2">Status *</label>
                 <select
                     name="status" 
                     value={formData.status}
@@ -227,4 +227,4 @@ useEffect(() => {
 }
 
 
-export default UpdateUser
+export default UpdateUser;

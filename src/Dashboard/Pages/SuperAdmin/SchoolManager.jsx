@@ -7,7 +7,7 @@ import {
   Trash2, 
   Loader, 
   Users, 
-  Building2,
+  Building2, 
   Plus, 
   X,
   Eye,
@@ -18,7 +18,8 @@ import {
   CheckCircle,
   XCircle,
   School,
-  Code
+  Code,
+  BookOpen
 } from 'lucide-react';
 import { toast } from "react-toastify";
 
@@ -41,11 +42,10 @@ function SchoolManager() {
     setLoading(true);
     try {
       const response = await apiRequest('schools/all', 'GET');
-      // Handle API response structure: response.data is the array
       setSchools(response?.data || []);
     } catch (error) {
       console.error('Failed to fetch schools:', error);
-      toast.error('Failed to load schools. Please refresh the page.');
+      toast.error('Failed to load schools. Please refresh page.');
     } finally {
       setLoading(false);
     }
@@ -58,7 +58,6 @@ function SchoolManager() {
     setLoading(true);
     try {
       const response = await apiRequest(`schools/${school.id}`, 'GET');
-      // Handle API response structure: response.data contains the school object
       setSchoolDetails(response?.data || null);
     } catch (error) {
       toast.error('Could not fetch school details.');
@@ -102,7 +101,6 @@ function SchoolManager() {
             </div>
           </div>
         </div>
-
         <div className="bg-white dark:bg-background-dark/50 rounded-xl border border-slate-200 dark:border-slate-800 p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -116,7 +114,6 @@ function SchoolManager() {
             </div>
           </div>
         </div>
-
         <div className="bg-white dark:bg-background-dark/50 rounded-xl border border-slate-200 dark:border-slate-800 p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -143,6 +140,7 @@ function SchoolManager() {
                 <tr>
                   <th className="px-6 py-4 font-medium">School Info</th>
                   <th className="px-6 py-4 font-medium">Type</th>
+                  <th className="px-6 py-4 font-medium">Primary Curriculum</th>
                   <th className="px-6 py-4 font-medium">Location</th>
                   <th className="px-6 py-4 font-medium">Contact</th>
                   <th className="px-6 py-4 font-medium">Users</th>
@@ -181,6 +179,11 @@ function SchoolManager() {
                         </span>
                       </td>
                       <td className="px-6 py-4">
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
+                          {school.primary_curriculum || 'Not Set'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
                         <div className="space-y-1 text-slate-500 dark:text-slate-400 text-xs">
                           {school.city && (
                             <div className="flex items-center gap-1">
@@ -214,12 +217,9 @@ function SchoolManager() {
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <Users className="w-4 h-4 text-slate-400" />
-                          <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                            {school.users?.length || 0}
-                          </span>
-                        </div>
+                        <span className="text-slate-500 dark:text-slate-400">
+                          {school.users?.length || 0}
+                        </span>
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end gap-2">
@@ -236,7 +236,7 @@ function SchoolManager() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="6" className="px-6 py-8 text-center text-slate-500 dark:text-slate-400">
+                    <td colSpan="7" className="px-6 py-8 text-center text-slate-500 dark:text-slate-400">
                       No schools found.
                     </td>
                   </tr>
@@ -260,7 +260,7 @@ function SchoolManager() {
     }
 
     return (
-      <div className="max-w-5xl mx-auto">
+      <div className="w-full">
         <div className="mb-6">
           <button 
             onClick={backToList}
@@ -384,6 +384,13 @@ function SchoolManager() {
                     <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{schoolDetails.id}</p>
                   </div>
                 </div>
+                <div className="flex items-start gap-3">
+                  <BookOpen className="w-5 h-5 text-slate-400 mt-0.5" />
+                  <div>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Primary Curriculum</p>
+                    <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{schoolDetails.primary_curriculum || 'Not Set'}</p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -444,8 +451,8 @@ function SchoolManager() {
     );
   };
 
-  return (
-    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+ return (
+    <div className="w-full py-8">
       {authLoading && (
         <div className="flex flex-col items-center justify-center py-16">
           <Loader className="w-12 h-12 text-gray-600 dark:text-gray-400 animate-spin" />

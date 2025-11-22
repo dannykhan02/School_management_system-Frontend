@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { School, User, MapPin, Phone, Mail,ArrowLeft, Save, X, Lock, Upload, Image,AlertCircle } from 'lucide-react';
-import {Link, useNavigate } from 'react-router-dom'
+import { School, User, MapPin, Phone, Mail, ArrowLeft, Save, X, Lock, Upload, Image, AlertCircle } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../utils/api';
+
 function SchoolRegistration({ onClose, onSave }) {
   const [formData, setFormData] = useState({
     // School Information
@@ -12,6 +13,7 @@ function SchoolRegistration({ onClose, onSave }) {
     phone: '',
     email: '',
     code: '',
+    primaryCurriculum: '', // Added primary curriculum field
     
     // Admin Information
     adminName: '',
@@ -23,7 +25,7 @@ function SchoolRegistration({ onClose, onSave }) {
 
   const [logo, setLogo] = useState(null);
   const [logoPreview, setLogoPreview] = useState(null);
-const [errors, setErrors] = useState({});
+  const [errors, setErrors] = useState({});
   const navigate = useNavigate();
   
   const handleChange = (e) => {
@@ -51,84 +53,84 @@ const [errors, setErrors] = useState({});
     setLogoPreview(null);
   };
 
-const handleSubmit = async (e) => {
-  e.preventDefault();
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-  setErrors({});
+    setErrors({});
 
-  try {
-    const formDataToSend = new FormData();
+    try {
+      const formDataToSend = new FormData();
 
-    // 🏫 School Info
-    formDataToSend.append("school[name]", formData.schoolName);
-    formDataToSend.append("school[address]", formData.address);
-    formDataToSend.append("school[school_type]", formData.schoolType);
-    formDataToSend.append("school[city]", formData.city);
-    formDataToSend.append("school[code]", formData.code);
-    formDataToSend.append("school[phone]", formData.phone);
-    formDataToSend.append("school[email]", formData.email);
-    if (logo) formDataToSend.append("school[logo]", logo);
+      // 🏫 School Info
+      formDataToSend.append("school[name]", formData.schoolName);
+      formDataToSend.append("school[address]", formData.address);
+      formDataToSend.append("school[school_type]", formData.schoolType);
+      formDataToSend.append("school[city]", formData.city);
+      formDataToSend.append("school[code]", formData.code);
+      formDataToSend.append("school[phone]", formData.phone);
+      formDataToSend.append("school[email]", formData.email);
+      formDataToSend.append("school[primary_curriculum]", formData.primaryCurriculum); // Added primary curriculum
+      if (logo) formDataToSend.append("school[logo]", logo);
 
-    // 👩‍💼 Admin Info
-    formDataToSend.append("admin[full_name]", formData.adminName);
-    formDataToSend.append("admin[email]", formData.adminEmail);
-    formDataToSend.append("admin[phone]", formData.adminPhone);
-    formDataToSend.append("admin[password]", formData.password);
-    formDataToSend.append("admin[gender]", formData.gender);
+      // 👩‍💼 Admin Info
+      formDataToSend.append("admin[full_name]", formData.adminName);
+      formDataToSend.append("admin[email]", formData.adminEmail);
+      formDataToSend.append("admin[phone]", formData.adminPhone);
+      formDataToSend.append("admin[password]", formData.password);
+      formDataToSend.append("admin[gender]", formData.gender);
 
-    const response = await fetch(`${API_BASE_URL}/schools`, {
-      method: "POST",
-      body: formDataToSend,
-      headers: { Accept: "application/json" },
-    });
+      const response = await fetch(`${API_BASE_URL}/schools`, {
+        method: "POST",
+        body: formDataToSend,
+        headers: { Accept: "application/json" },
+      });
 
-    const data = await response.json();
+      const data = await response.json();
 
-    if (!response.ok) {
-      console.log("Validation errors:", data);
+      if (!response.ok) {
+        console.log("Validation errors:", data);
 
-      if (response.status === 422 && data.errors) {
-        setErrors(data.errors); // Laravel validation errors
-        return;
+        if (response.status === 422 && data.errors) {
+          setErrors(data.errors); // Laravel validation errors
+          return;
+        }
+
+        throw new Error(data.message || "Failed to create school");
       }
+      navigate('/login');
 
-      throw new Error(data.message || "Failed to create school");
+      if (onSave) onSave(data);
+    } catch (error) {
+      setErrors(error.message);
     }
-    navigate('/login')
+  };
 
-    if (onSave) onSave(data);
-  } catch (error) {
-    setErrors(error.message);
-  }
-};
-
-const fieldLabels = {
-  "school.name": "School Name",
-  "school.email": "School Email",
-  "school.phone": "School Phone",
-  "school.address": "School Address",
-  "school.code": "School Code",
-  "school.city": "City",
-  "admin.full_name": "Admin Full Name",
-  "admin.email": "Admin Email",
-  "admin.phone": "Admin Phone",
-  "admin.password": "Admin Password",
-  "admin.gender": "Admin Gender",
-};
-
+  const fieldLabels = {
+    "school.name": "School Name",
+    "school.email": "School Email",
+    "school.phone": "School Phone",
+    "school.address": "School Address",
+    "school.code": "School Code",
+    "school.city": "City",
+    "school.primary_curriculum": "Primary Curriculum", // Added field label
+    "admin.full_name": "Admin Full Name",
+    "admin.email": "Admin Email",
+    "admin.phone": "Admin Phone",
+    "admin.password": "Admin Password",
+    "admin.gender": "Admin Gender",
+  };
 
   return (
-    <div className="max-w-7xl mx-auto p-6  ">
+    <div className="max-w-7xl mx-auto p-6">
       {/* Header */}
-
-       <Link to='/login'>
-         <button
+      <Link to='/login'>
+        <button
           className="flex items-center gap-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 transition-colors mb-4"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Login
         </button>
-       </Link>
+      </Link>
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-8">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-black rounded-lg dark:bg-white">
@@ -153,24 +155,23 @@ const fieldLabels = {
         )}
       </div>
 
-
-{Object.keys(errors).length > 0 && (
-  <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-    <div className="flex items-center gap-2 mb-2">
-      <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
-      <h3 className="text-sm font-medium text-red-800 dark:text-red-300">
-        Please fix the following errors:
-      </h3>
-    </div>
-    <ul className="list-disc list-inside space-y-1 text-sm text-red-700 dark:text-red-400">
-      {Object.entries(errors).map(([field, messages]) => (
-        <li key={field}>
-          <strong>{fieldLabels[field] || field}:</strong> {Array.isArray(messages) ? messages.join(", ") : messages}
-        </li>
-      ))}
-    </ul>
-  </div>
-)}
+      {Object.keys(errors).length > 0 && (
+        <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+          <div className="flex items-center gap-2 mb-2">
+            <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+            <h3 className="text-sm font-medium text-red-800 dark:text-red-300">
+              Please fix the following errors:
+            </h3>
+          </div>
+          <ul className="list-disc list-inside space-y-1 text-sm text-red-700 dark:text-red-400">
+            {Object.entries(errors).map(([field, messages]) => (
+              <li key={field}>
+                <strong>{fieldLabels[field] || field}:</strong> {Array.isArray(messages) ? messages.join(", ") : messages}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit}>
         <div className="space-y-8 border border-gray-300 rounded-sm shadow-md p-3">
@@ -183,9 +184,9 @@ const fieldLabels = {
               <h2 className="text-xl font-semibold text-black dark:text-white">School Logo</h2>
             </div>
 
-            <div className=" gap-6">
+            <div className="gap-6">
               {/* Logo Preview */}
-              <div className=" flex justify-center">
+              <div className="flex justify-center">
                 <div className="w-32 h-32 border-2 border-dashed border-gray-300 dark:border-gray-700 rounded-xl bg-gray-50 dark:bg-gray-900 flex items-center justify-center overflow-hidden">
                   {logoPreview ? (
                     <div className="relative w-full h-full">
@@ -291,6 +292,25 @@ const fieldLabels = {
                   <option value="">Select type</option>
                   <option value="Primary">Primary School</option>
                   <option value="Secondary">Secondary School</option>
+                </select>
+              </div>
+
+              {/* Added Primary Curriculum Field */}
+              <div>
+                <label className="block text-sm font-medium text-black dark:text-white mb-2">
+                  Primary Curriculum *
+                </label>
+                <select
+                  name="primaryCurriculum"
+                  value={formData.primaryCurriculum}
+                  onChange={handleChange}
+                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-black text-black dark:text-white focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent dark:focus:ring-white"
+                  required
+                >
+                  <option value="">Select curriculum</option>
+                  <option value="CBC">CBC</option>
+                  <option value="8-4-4">8-4-4</option>
+                  <option value="Both">Both</option>
                 </select>
               </div>
 

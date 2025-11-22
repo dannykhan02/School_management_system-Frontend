@@ -285,128 +285,149 @@ function ClassroomManager() {
   );
 
   const renderFormView = () => (
-    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-md mx-auto">
-      <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
-        <h3 className="text-xl font-semibold text-slate-900 dark:text-white">
-          {view === 'edit' ? 'Edit Classroom' : 'Create New Classroom'}
-        </h3>
-        <button onClick={backToList} className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors">
-          <X className="w-6 h-6" />
-        </button>
-      </div>
-      <div className="p-6 space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Class Name <span className="text-red-500">*</span>
-          </label>
-          <input 
-            type="text" 
-            name="class_name" 
-            value={formData.class_name} 
-            onChange={handleInputChange} 
-            required
-            placeholder="e.g., Form 1, Grade 5"
-            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white" 
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Capacity
-          </label>
-          <input 
-            type="number" 
-            name="capacity" 
-            value={formData.capacity} 
-            onChange={handleInputChange} 
-            min="1"
-            placeholder="Maximum number of students"
-            className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white" 
-          />
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            Note: For schools with streams, capacity will be calculated from stream capacities.
-          </p>
-        </div>
-        <div className="flex justify-end gap-3 pt-4">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-md border border-slate-200 dark:border-slate-700">
+        <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+          <h3 className="text-xl font-semibold text-slate-900 dark:text-white">
+            {view === 'edit' ? 'Edit Classroom' : 'Create New Classroom'}
+          </h3>
           <button 
-            type="button" 
             onClick={backToList} 
-            className="px-4 py-2 text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg font-medium transition-colors"
+            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
+            aria-label="Close form"
           >
-            Cancel
+            <X className="w-6 h-6" />
           </button>
-          <button 
-            type="button"
-            onClick={handleSubmit} 
-            disabled={loading} 
-            className="px-4 py-2 bg-black text-white rounded-lg font-medium hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {loading ? 'Saving...' : (view === 'edit' ? 'Update' : 'Create')}
-          </button>
+        </div>
+        <div className="p-6 space-y-4">
+          <div>
+            <label htmlFor="class_name" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Class Name <span className="text-red-500">*</span>
+            </label>
+            <input 
+              type="text"
+              id="class_name"
+              name="class_name" 
+              value={formData.class_name} 
+              onChange={handleInputChange} 
+              required
+              placeholder="e.g., Form 1, Grade 5"
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white placeholder:text-slate-400 transition-all" 
+            />
+          </div>
+          <div>
+            <label htmlFor="capacity" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Capacity
+            </label>
+            <input 
+              type="number"
+              id="capacity"
+              name="capacity" 
+              value={formData.capacity} 
+              onChange={handleInputChange} 
+              min="1"
+              placeholder="Maximum number of students"
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white placeholder:text-slate-400 transition-all" 
+            />
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              Note: For schools with streams, capacity will be calculated from stream capacities.
+            </p>
+          </div>
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700 mt-6">
+            <button 
+              type="button" 
+              onClick={backToList} 
+              className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all"
+              disabled={loading}
+            >
+              Cancel
+            </button>
+            <button 
+              type="button"
+              onClick={handleSubmit} 
+              disabled={loading} 
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all min-w-[80px]"
+            >
+              {loading ? (
+                <span className="flex items-center justify-center">
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Saving...
+                </span>
+              ) : (
+                view === 'edit' ? 'Update' : 'Create'
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>
   );
 
   const renderStreamsView = () => (
-    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-4xl mx-auto">
-      <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
-        <div>
-          <h3 className="text-xl font-semibold text-slate-900 dark:text-white">
-            Streams for {selectedClassroom?.class_name}
-          </h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            Total Capacity: <span className="font-medium">{selectedClassroom?.calculatedCapacity || 0} students</span> 
-            <span className="ml-2">({selectedClassroom?.streamCount || 0} streams)</span>
-          </p>
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-4xl border border-slate-200 dark:border-slate-700">
+        <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+          <div>
+            <h3 className="text-xl font-semibold text-slate-900 dark:text-white">
+              Streams for {selectedClassroom?.class_name}
+            </h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Total Capacity: <span className="font-medium">{selectedClassroom?.calculatedCapacity || 0} students</span> 
+              <span className="ml-2">({selectedClassroom?.streamCount || 0} streams)</span>
+            </p>
+          </div>
+          <button 
+            onClick={backToList} 
+            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
+            aria-label="Close"
+          >
+            <X className="w-6 h-6" />
+          </button>
         </div>
-        <button 
-          onClick={backToList} 
-          className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
-        >
-          <X className="w-6 h-6" />
-        </button>
-      </div>
-      <div className="p-6">
-        {loading ? (
-          <div className="flex justify-center py-8">
-            <Loader className="w-8 h-8 animate-spin text-slate-500" />
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {streams.length > 0 ? (
-              streams.map(stream => (
-                <div 
-                  key={stream.id} 
-                  className="flex justify-between items-center p-4 border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
-                >
-                  <div>
-                    <p className="font-medium text-slate-900 dark:text-white">{stream.name}</p>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">
-                      Capacity: {stream.capacity || 0} students
-                    </p>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">
-                      Class Teacher: {stream.classTeacher?.user?.name || stream.class_teacher?.name || 'Not Assigned'}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <div className="flex items-center gap-1 text-slate-500 dark:text-slate-400">
-                      <Users className="w-4 h-4" />
-                      <span>{stream.capacity || 0}</span>
+        <div className="p-6">
+          {loading ? (
+            <div className="flex justify-center py-8">
+              <Loader className="w-8 h-8 animate-spin text-slate-500" />
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {streams.length > 0 ? (
+                streams.map(stream => (
+                  <div 
+                    key={stream.id} 
+                    className="flex justify-between items-center p-4 border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+                  >
+                    <div>
+                      <p className="font-medium text-slate-900 dark:text-white">{stream.name}</p>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        Capacity: {stream.capacity || 0} students
+                      </p>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        Class Teacher: {stream.classTeacher?.user?.name || stream.class_teacher?.name || 'Not Assigned'}
+                      </p>
                     </div>
-                    <ChevronRight className="w-5 h-5 text-slate-400 mt-1" />
+                    <div className="text-right">
+                      <div className="flex items-center gap-1 text-slate-500 dark:text-slate-400">
+                        <Users className="w-4 h-4" />
+                        <span>{stream.capacity || 0}</span>
+                      </div>
+                    </div>
                   </div>
+                ))
+              ) : (
+                <div className="text-center py-8">
+                  <AlertCircle className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                  <p className="text-slate-500 dark:text-slate-400">
+                    No streams found for this classroom.
+                  </p>
                 </div>
-              ))
-            ) : (
-              <div className="text-center py-8">
-                <AlertCircle className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                <p className="text-slate-500 dark:text-slate-400">
-                  No streams found for this classroom.
-                </p>
-              </div>
-            )}
-          </div>
-        )}
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -414,7 +435,7 @@ function ClassroomManager() {
   // Show loading while auth is initializing
   if (authLoading) {
     return (
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+      <div className="w-full py-8">
         <div className="flex flex-col items-center justify-center py-16">
           <Loader className="w-12 h-12 text-gray-600 dark:text-gray-400 animate-spin" />
           <p className="mt-4 text-slate-500 dark:text-slate-400">Initializing...</p>
@@ -426,7 +447,7 @@ function ClassroomManager() {
   // Check if user is authenticated and has schoolId
   if (!user || !schoolId) {
     return (
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+      <div className="w-full py-8">
         <div className="flex flex-col items-center justify-center py-16">
           <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
           <p className="text-slate-900 dark:text-slate-100 text-lg font-semibold mb-2">
@@ -451,7 +472,7 @@ function ClassroomManager() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+    <div className="w-full py-8">
       {loading && view === 'list' && (
         <div className="flex flex-col items-center justify-center py-16">
           <Loader className="w-12 h-12 text-gray-600 dark:text-gray-400 animate-spin" />

@@ -536,119 +536,136 @@ function StreamManager() {
       : getAvailableTeachers();
 
     return (
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-md mx-auto">
-        <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
-          <h3 className="text-xl font-semibold text-slate-900 dark:text-white">
-            {view === 'edit' ? 'Edit Stream' : 'Create New Stream'}
-          </h3>
-          <button 
-            onClick={backToList} 
-            className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Stream Name <span className="text-red-500">*</span>
-            </label>
-            <input 
-              type="text" 
-              name="name" 
-              value={formData.name} 
-              onChange={handleInputChange} 
-              required
-              placeholder="e.g., Stream A, Blue Stream"
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white" 
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Classroom <span className="text-red-500">*</span>
-            </label>
-            <select 
-              name="class_id" 
-              value={formData.class_id} 
-              onChange={handleInputChange} 
-              required
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
-            >
-              <option value="">Select a classroom</option>
-              {Array.isArray(classrooms) && classrooms.map(c => (
-                <option key={c.id} value={c.id}>{c.class_name}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Capacity <span className="text-red-500">*</span>
-            </label>
-            <input 
-              type="number" 
-              name="capacity" 
-              value={formData.capacity} 
-              onChange={handleInputChange} 
-              required
-              min="1"
-              placeholder="Maximum number of students"
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white" 
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Class Teacher
-            </label>
-            <select 
-              name="class_teacher_id" 
-              value={formData.class_teacher_id} 
-              onChange={handleInputChange}
-              disabled={availableTeachers.length === 0}
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <option value="">
-                {availableTeachers.length === 0 ? 'No teachers available' : 'Select a teacher (optional)'}
-              </option>
-              {availableTeachers.map(teacher => (
-                <option key={teacher.id} value={teacher.id}>
-                  {getTeacherName(teacher)}
-                </option>
-              ))}
-            </select>
-            {availableTeachers.length === 0 && teachers.length > 0 && (
-              <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
-                All teachers are already assigned as class teachers
-              </p>
-            )}
-            {teachers.length === 0 && (
-              <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                No teachers found. Please add teachers first.
-              </p>
-            )}
-            {formData.class_teacher_id && (
-              <p className="mt-1 text-xs text-blue-600 dark:text-blue-400">
-                <CheckCircle className="inline-block w-3 h-3 mr-1" />
-                This teacher will be automatically added to the teaching staff
-              </p>
-            )}
-          </div>
-          <div className="flex justify-end gap-3 pt-4">
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-md border border-slate-200 dark:border-slate-700">
+          <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+            <h3 className="text-xl font-semibold text-slate-900 dark:text-white">
+              {view === 'edit' ? 'Edit Stream' : 'Create New Stream'}
+            </h3>
             <button 
-              type="button" 
               onClick={backToList} 
-              className="px-4 py-2 text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg font-medium transition-colors"
+              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
+              aria-label="Close form"
             >
-              Cancel
-            </button>
-            <button 
-              type="submit" 
-              disabled={loading} 
-              className="px-4 py-2 bg-black text-white rounded-lg font-medium hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {loading ? 'Saving...' : (view === 'edit' ? 'Update' : 'Create')}
+              <X className="w-6 h-6" />
             </button>
           </div>
-        </form>
+          <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <div>
+              <label htmlFor="name" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Stream Name <span className="text-red-500">*</span>
+              </label>
+              <input 
+                type="text"
+                id="name"
+                name="name" 
+                value={formData.name} 
+                onChange={handleInputChange} 
+                required
+                placeholder="e.g., Stream A, Blue Stream"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white placeholder:text-slate-400 transition-all" 
+              />
+            </div>
+            <div>
+              <label htmlFor="class_id" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Classroom <span className="text-red-500">*</span>
+              </label>
+              <select
+                id="class_id"
+                name="class_id" 
+                value={formData.class_id} 
+                onChange={handleInputChange} 
+                required
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white transition-all"
+              >
+                <option value="">Select a classroom</option>
+                {Array.isArray(classrooms) && classrooms.map(c => (
+                  <option key={c.id} value={c.id}>{c.class_name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="capacity" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Capacity <span className="text-red-500">*</span>
+              </label>
+              <input 
+                type="number"
+                id="capacity"
+                name="capacity" 
+                value={formData.capacity} 
+                onChange={handleInputChange} 
+                required
+                min="1"
+                placeholder="Maximum number of students"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white placeholder:text-slate-400 transition-all" 
+              />
+            </div>
+            <div>
+              <label htmlFor="class_teacher_id" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Class Teacher
+              </label>
+              <select
+                id="class_teacher_id"
+                name="class_teacher_id" 
+                value={formData.class_teacher_id} 
+                onChange={handleInputChange}
+                disabled={availableTeachers.length === 0}
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              >
+                <option value="">
+                  {availableTeachers.length === 0 ? 'No teachers available' : 'Select a teacher (optional)'}
+                </option>
+                {availableTeachers.map(teacher => (
+                  <option key={teacher.id} value={teacher.id}>
+                    {getTeacherName(teacher)}
+                  </option>
+                ))}
+              </select>
+              {availableTeachers.length === 0 && teachers.length > 0 && (
+                <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                  All teachers are already assigned as class teachers
+                </p>
+              )}
+              {teachers.length === 0 && (
+                <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                  No teachers found. Please add teachers first.
+                </p>
+              )}
+              {formData.class_teacher_id && (
+                <p className="mt-1 text-xs text-blue-600 dark:text-blue-400">
+                  <CheckCircle className="inline-block w-3 h-3 mr-1" />
+                  This teacher will be automatically added to the teaching staff
+                </p>
+              )}
+            </div>
+            <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700 mt-6">
+              <button 
+                type="button" 
+                onClick={backToList} 
+                className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all"
+              >
+                Cancel
+              </button>
+              <button 
+                type="submit" 
+                disabled={loading} 
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all min-w-[80px]"
+              >
+                {loading ? (
+                  <span className="flex items-center justify-center">
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Saving...
+                  </span>
+                ) : (
+                  view === 'edit' ? 'Update' : 'Create'
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
     );
   };
@@ -657,20 +674,221 @@ function StreamManager() {
     const classTeacher = streamDetails?.classTeacher || streamDetails?.class_teacher;
     
     return (
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-2xl mx-auto">
-        <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-2xl border border-slate-200 dark:border-slate-700 max-h-[90vh] overflow-y-auto">
+          <div className="sticky top-0 bg-white dark:bg-slate-800 p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+            <div>
+              <h3 className="text-xl font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                <Users className="w-5 h-5"/>
+                Manage Teaching Staff
+              </h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                {selectedStream?.name} - {selectedStream?.classroom?.class_name}
+              </p>
+            </div>
+            <button 
+              onClick={backToList} 
+              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
+              aria-label="Close"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+          <div className="p-6">
+            {loading ? (
+              <div className="flex justify-center py-8">
+                <Loader className="w-8 h-8 animate-spin text-slate-500" />
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Stream Information */}
+                <div className="p-4 border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-900/30">
+                  <h4 className="font-semibold text-slate-900 dark:text-white mb-3">Stream Information</h4>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <span className="text-slate-500 dark:text-slate-400">Capacity:</span>
+                      <p className="font-medium text-slate-900 dark:text-white">{streamDetails?.capacity || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <span className="text-slate-500 dark:text-slate-400">Class Teacher:</span>
+                      <p className="font-medium text-slate-900 dark:text-white">
+                        {classTeacher ? getTeacherName(classTeacher) : 'Not Assigned'}
+                      </p>
+                    </div>
+                  </div>
+                  {classTeacher && (
+                    <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded text-xs text-blue-700 dark:text-blue-300">
+                      <CheckCircle className="inline-block w-3 h-3 mr-1" />
+                      The class teacher is automatically included in the teaching staff
+                    </div>
+                  )}
+                </div>
+
+                {/* Current Teaching Staff */}
+                <div className="p-4 border border-slate-200 dark:border-slate-600 rounded-lg">
+                  <h4 className="font-semibold text-slate-900 dark:text-white mb-3">
+                    Current Teaching Staff ({streamDetails?.teachers?.length || 0})
+                  </h4>
+                  {streamDetails?.teachers && streamDetails.teachers.length > 0 ? (
+                    <div className="space-y-2">
+                      {streamDetails.teachers.map(teacher => {
+                        const isClassTeacher = streamDetails?.class_teacher_id === teacher.id;
+                        
+                        return (
+                          <div key={teacher.id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded">
+                            <div className="flex items-center gap-3">
+                              <GraduationCap className="w-5 h-5 text-slate-400" />
+                              <div>
+                                <p className="text-slate-900 dark:text-white font-medium">{getTeacherName(teacher)}</p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                  {teacher.qualification || 'Teacher'}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {isClassTeacher && (
+                                <span className="text-xs px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded">
+                                  Class Teacher
+                                </span>
+                              )}
+                              <span className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
+                                Teaching
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="text-center py-6 text-slate-500 dark:text-slate-400">
+                      <AlertCircle className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                      <p>No teachers assigned to this stream yet.</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Assign Teachers Section */}
+                <div className="p-4 border border-slate-200 dark:border-slate-600 rounded-lg">
+                  <h4 className="font-semibold text-slate-900 dark:text-white mb-3">
+                    Assign Teachers to Stream
+                  </h4>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
+                    Select teachers who will teach in this stream
+                  </p>
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {teachers.length > 0 ? (
+                      teachers.map(teacher => {
+                        const isSelected = selectedTeachers.includes(teacher.id);
+                        const isClassTeacher = streamDetails?.class_teacher_id === teacher.id;
+                        
+                        return (
+                          <div 
+                            key={teacher.id} 
+                            className={`flex items-center justify-between p-3 rounded cursor-pointer transition-colors ${
+                              isSelected 
+                                ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800' 
+                                : 'bg-slate-50 dark:bg-slate-700/30 hover:bg-slate-100 dark:hover:bg-slate-700/50'
+                            } ${isClassTeacher ? 'opacity-75 cursor-not-allowed' : ''}`}
+                            onClick={() => !isClassTeacher && handleTeacherToggle(teacher.id)}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                                isSelected 
+                                  ? 'bg-blue-600 border-blue-600' 
+                                  : 'border-slate-300 dark:border-slate-600'
+                              } ${isClassTeacher ? 'bg-purple-600 border-purple-600' : ''}`}>
+                                {(isSelected || isClassTeacher) && <CheckCircle className="w-4 h-4 text-white" />}
+                              </div>
+                              <div>
+                                <p className="text-slate-900 dark:text-white font-medium">
+                                  {getTeacherName(teacher)}
+                                </p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                  {teacher.qualification || 'No qualification specified'}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {isClassTeacher && (
+                                <span className="text-xs px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded">
+                                  Class Teacher
+                                </span>
+                              )}
+                              {isSelected && !isClassTeacher && (
+                                <span className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
+                                  Teaching
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="text-center py-4 text-slate-500 dark:text-slate-400">
+                        <AlertCircle className="w-8 h-8 mx-auto mb-2 text-slate-300" />
+                        <p>No teachers available</p>
+                      </div>
+                    )}
+                  </div>
+                  {streamDetails?.class_teacher_id && (
+                    <div className="mt-3 p-2 bg-amber-50 dark:bg-amber-900/20 rounded text-xs text-amber-700 dark:text-amber-300">
+                      <AlertCircle className="inline-block w-3 h-3 mr-1" />
+                      The class teacher cannot be removed from teaching staff
+                    </div>
+                  )}
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+                  <button 
+                    onClick={backToList} 
+                    className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all"
+                  >
+                    Close
+                  </button>
+                  <button 
+                    onClick={handleSaveTeachingStaff} 
+                    disabled={isSavingTeachers}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
+                  >
+                    {isSavingTeachers ? (
+                      <>
+                        <Loader className="w-4 h-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <UserPlus className="w-4 h-4" />
+                        Save Teaching Staff
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const renderAllClassTeachersView = () => (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-4xl border border-slate-200 dark:border-slate-700 max-h-[90vh] overflow-y-auto">
+        <div className="sticky top-0 bg-white dark:bg-slate-800 p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
           <div>
             <h3 className="text-xl font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-              <Users className="w-5 h-5"/>
-              Manage Teaching Staff
+              <Crown className="w-5 h-5"/>
+              All Class Teachers
             </h3>
             <p className="text-sm text-slate-500 dark:text-slate-400">
-              {selectedStream?.name} - {selectedStream?.classroom?.class_name}
+              View all streams and their assigned class teachers.
             </p>
           </div>
           <button 
             onClick={backToList} 
-            className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
+            aria-label="Close"
           >
             <X className="w-6 h-6" />
           </button>
@@ -681,244 +899,49 @@ function StreamManager() {
               <Loader className="w-8 h-8 animate-spin text-slate-500" />
             </div>
           ) : (
-            <div className="space-y-6">
-              {/* Stream Information */}
-              <div className="p-4 border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-900/30">
-                <h4 className="font-semibold text-slate-900 dark:text-white mb-3">Stream Information</h4>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <span className="text-slate-500 dark:text-slate-400">Capacity:</span>
-                    <p className="font-medium text-slate-900 dark:text-white">{streamDetails?.capacity || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 dark:text-slate-400">Class Teacher:</span>
-                    <p className="font-medium text-slate-900 dark:text-white">
-                      {classTeacher ? getTeacherName(classTeacher) : 'Not Assigned'}
-                    </p>
-                  </div>
-                </div>
-                {classTeacher && (
-                  <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded text-xs text-blue-700 dark:text-blue-300">
-                    <CheckCircle className="inline-block w-3 h-3 mr-1" />
-                    The class teacher is automatically included in the teaching staff
-                  </div>
-                )}
-              </div>
-
-              {/* Current Teaching Staff */}
-              <div className="p-4 border border-slate-200 dark:border-slate-600 rounded-lg">
-                <h4 className="font-semibold text-slate-900 dark:text-white mb-3">
-                  Current Teaching Staff ({streamDetails?.teachers?.length || 0})
-                </h4>
-                {streamDetails?.teachers && streamDetails.teachers.length > 0 ? (
-                  <div className="space-y-2">
-                    {streamDetails.teachers.map(teacher => {
-                      const isClassTeacher = streamDetails?.class_teacher_id === teacher.id;
-                      
-                      return (
-                        <div key={teacher.id} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700/50 rounded">
-                          <div className="flex items-center gap-3">
-                            <GraduationCap className="w-5 h-5 text-slate-400" />
-                            <div>
-                              <p className="text-slate-900 dark:text-white font-medium">{getTeacherName(teacher)}</p>
-                              <p className="text-xs text-slate-500 dark:text-slate-400">
-                                {teacher.qualification || 'Teacher'}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {isClassTeacher && (
-                              <span className="text-xs px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded">
-                                Class Teacher
-                              </span>
-                            )}
-                            <span className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
-                              Teaching
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="text-center py-6 text-slate-500 dark:text-slate-400">
-                    <AlertCircle className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-                    <p>No teachers assigned to this stream yet.</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Assign Teachers Section */}
-              <div className="p-4 border border-slate-200 dark:border-slate-600 rounded-lg">
-                <h4 className="font-semibold text-slate-900 dark:text-white mb-3">
-                  Assign Teachers to Stream
-                </h4>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
-                  Select teachers who will teach in this stream
-                </p>
-                <div className="space-y-2 max-h-64 overflow-y-auto">
-                  {teachers.length > 0 ? (
-                    teachers.map(teacher => {
-                      const isSelected = selectedTeachers.includes(teacher.id);
-                      const isClassTeacher = streamDetails?.class_teacher_id === teacher.id;
-                      
-                      return (
-                        <div 
-                          key={teacher.id} 
-                          className={`flex items-center justify-between p-3 rounded cursor-pointer transition-colors ${
-                            isSelected 
-                              ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800' 
-                              : 'bg-slate-50 dark:bg-slate-700/30 hover:bg-slate-100 dark:hover:bg-slate-700/50'
-                          } ${isClassTeacher ? 'opacity-75 cursor-not-allowed' : ''}`}
-                          onClick={() => !isClassTeacher && handleTeacherToggle(teacher.id)}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
-                              isSelected 
-                                ? 'bg-blue-600 border-blue-600' 
-                                : 'border-slate-300 dark:border-slate-600'
-                            } ${isClassTeacher ? 'bg-purple-600 border-purple-600' : ''}`}>
-                              {(isSelected || isClassTeacher) && <CheckCircle className="w-4 h-4 text-white" />}
-                            </div>
-                            <div>
-                              <p className="text-slate-900 dark:text-white font-medium">
-                                {getTeacherName(teacher)}
-                              </p>
-                              <p className="text-xs text-slate-500 dark:text-slate-400">
-                                {teacher.qualification || 'No qualification specified'}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {isClassTeacher && (
-                              <span className="text-xs px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded">
-                                Class Teacher
-                              </span>
-                            )}
-                            {isSelected && !isClassTeacher && (
-                              <span className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
-                                Teaching
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className="text-center py-4 text-slate-500 dark:text-slate-400">
-                      <AlertCircle className="w-8 h-8 mx-auto mb-2 text-slate-300" />
-                      <p>No teachers available</p>
+            <div className="space-y-3">
+              {allClassTeachers.length > 0 ? (
+                allClassTeachers.map(stream => {
+                  const classTeacher = stream.classTeacher || stream.class_teacher;
+                  
+                  return (
+                    <div 
+                      key={stream.id} 
+                      className="flex justify-between items-center p-4 border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+                    >
+                      <div>
+                        <p className="font-medium text-slate-900 dark:text-white">{stream.name}</p>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">
+                          Classroom: {stream.classroom?.class_name || 'N/A'}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium text-slate-700 dark:text-slate-300">
+                          {classTeacher ? getTeacherName(classTeacher) : 'Not Assigned'}
+                        </p>
+                        <p className="text-xs text-slate-500">Class Teacher</p>
+                      </div>
                     </div>
-                  )}
+                  );
+                })
+              ) : (
+                <div className="text-center py-8">
+                  <AlertCircle className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                  <p className="text-slate-500 dark:text-slate-400">
+                    No class teachers assigned yet.
+                  </p>
                 </div>
-                {streamDetails?.class_teacher_id && (
-                  <div className="mt-3 p-2 bg-amber-50 dark:bg-amber-900/20 rounded text-xs text-amber-700 dark:text-amber-300">
-                    <AlertCircle className="inline-block w-3 h-3 mr-1" />
-                    The class teacher cannot be removed from teaching staff
-                  </div>
-                )}
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
-                <button 
-                  onClick={backToList} 
-                  className="px-4 py-2 text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 rounded-lg font-medium transition-colors"
-                >
-                  Close
-                </button>
-                <button 
-                  onClick={handleSaveTeachingStaff} 
-                  disabled={isSavingTeachers}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-                >
-                  {isSavingTeachers ? (
-                    <>
-                      <Loader className="w-4 h-4 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <UserPlus className="w-4 h-4" />
-                      Save Teaching Staff
-                    </>
-                  )}
-                </button>
-              </div>
+              )}
             </div>
           )}
         </div>
-      </div>
-    );
-  };
-
-  const renderAllClassTeachersView = () => (
-    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl w-full max-w-4xl mx-auto">
-      <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
-        <div>
-          <h3 className="text-xl font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-            <Crown className="w-5 h-5"/>
-            All Class Teachers
-          </h3>
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            View all streams and their assigned class teachers.
-          </p>
-        </div>
-        <button 
-          onClick={backToList} 
-          className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
-        >
-          <X className="w-6 h-6" />
-        </button>
-      </div>
-      <div className="p-6">
-        {loading ? (
-          <div className="flex justify-center py-8">
-            <Loader className="w-8 h-8 animate-spin text-slate-500" />
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {allClassTeachers.length > 0 ? (
-              allClassTeachers.map(stream => {
-                const classTeacher = stream.classTeacher || stream.class_teacher;
-                
-                return (
-                  <div 
-                    key={stream.id} 
-                    className="flex justify-between items-center p-4 border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
-                  >
-                    <div>
-                      <p className="font-medium text-slate-900 dark:text-white">{stream.name}</p>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">
-                        Classroom: {stream.classroom?.class_name || 'N/A'}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-medium text-slate-700 dark:text-slate-300">
-                        {classTeacher ? getTeacherName(classTeacher) : 'Not Assigned'}
-                      </p>
-                      <p className="text-xs text-slate-500">Class Teacher</p>
-                    </div>
-                  </div>
-                );
-              })
-            ) : (
-              <div className="text-center py-8">
-                <AlertCircle className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                <p className="text-slate-500 dark:text-slate-400">
-                  No class teachers assigned yet.
-                </p>
-              </div>
-            )}
-          </div>
-        )}
       </div>
     </div>
   );
 
   if (authLoading) {
     return (
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+      <div className="w-full py-8">
         <div className="flex flex-col items-center justify-center py-16">
           <Loader className="w-12 h-12 text-gray-600 dark:text-gray-400 animate-spin" />
           <p className="mt-4 text-slate-500 dark:text-slate-400">Initializing...</p>
@@ -929,7 +952,7 @@ function StreamManager() {
 
   if (!user || !schoolId) {
     return (
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+      <div className="w-full py-8">
         <div className="flex flex-col items-center justify-center py-16">
           <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
           <p className="text-slate-900 dark:text-slate-100 text-lg font-semibold mb-2">
@@ -944,7 +967,7 @@ function StreamManager() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8">
+    <div className="w-full py-8">
       {loading && view === 'list' && (
         <div className="flex flex-col items-center justify-center py-16">
           <Loader className="w-12 h-12 text-gray-600 dark:text-gray-400 animate-spin" />
