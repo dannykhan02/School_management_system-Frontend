@@ -43,36 +43,32 @@ const Login = () => {
       }
 
       // ✅ FIXED: Backend now returns flat object with token at root level
-      // Check if data has a token property (new format) or user property (old format)
       const token = data.token;
-      
-      // If there's a nested user object, use it; otherwise data itself is the user
-      const userData = data.user || data;
       
       if (!token) {
         throw new Error('No authentication token received');
       }
       
       // Extract role name and normalize it
-      const roleName = userData.role_name || userData.role || 'admin';
+      const roleName = data.role_name || data.role || 'admin';
       const role = roleName.toLowerCase().replace(/[-\s]/g, '_');
       
       // ✅ Construct complete user info object
       const userInfo = {
-        id: userData.id,
-        school_id: userData.school_id,
-        role_id: userData.role_id,
-        name: userData.full_name || userData.name || userData.email,
-        full_name: userData.full_name,
-        email: userData.email,
-        phone: userData.phone,
-        gender: userData.gender,
-        status: userData.status,
+        id: data.id,
+        school_id: data.school_id,
+        role_id: data.role_id,
+        name: data.full_name || data.name || data.email,
+        full_name: data.full_name,
+        email: data.email,
+        phone: data.phone,
+        gender: data.gender,
+        status: data.status,
         role: role,
         role_name: roleName,
         token: token,
-        must_change_password: userData.must_change_password || false,
-        email_verified_at: userData.email_verified_at
+        must_change_password: data.must_change_password || false,
+        email_verified_at: data.email_verified_at
       };
 
       // Save to context and localStorage
@@ -91,10 +87,10 @@ const Login = () => {
   // Show loading screen while checking authentication
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-white dark:bg-black flex items-center justify-center">
+      <div className="min-h-screen bg-white dark:bg-black flex items-center justify-center p-4">
         <div className="text-center">
-          <Loader className="w-8 h-8 animate-spin text-black dark:text-white mx-auto mb-4" />
-          <p className="text-black dark:text-white">Loading...</p>
+          <div className="w-12 h-12 border-4 border-slate-200 dark:border-slate-700 border-t-transparent rounded-full animate-spin"></div>
+          <p className="mt-4 text-slate-500 dark:text-slate-400">Loading...</p>
         </div>
       </div>
     );
@@ -103,158 +99,159 @@ const Login = () => {
   // Don't render login form if user is authenticated (will redirect via useEffect)
   if (user) {
     return (
-      <div className="min-h-screen bg-white dark:bg-black flex items-center justify-center">
+      <div className="min-h-screen bg-white dark:bg-slate-800/50 flex items-center justify-center p-4">
         <div className="text-center">
-          <Loader className="w-8 h-8 animate-spin text-black dark:text-white mx-auto mb-4" />
-          <p className="text-black dark:text-white">Redirecting...</p>
+          <div className="w-12 h-12 border-4 border-slate-200 dark:border-slate-700 border-t-transparent rounded-full animate-spin"></div>
+          <p className="mt-4 text-slate-500 dark:text-slate-400">Redirecting...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-black flex items-center justify-center p-4">
-      <div className="w-full max-w-6xl flex flex-col lg:flex-row rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-800 shadow-2xl">
+    <div className="min-h-screen bg-white dark:bg-black flex items-center justify-center p-3 sm:p-4 md:p-6 lg:p-8">
+      <div className="w-full max-w-sm sm:max-w-md md:max-w-2xl lg:max-w-6xl flex flex-col lg:flex-row rounded-lg sm:rounded-xl lg:rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-lg sm:shadow-xl lg:shadow-2xl">
         {/* Left Side - Login Form */}
-        <div className="w-full lg:w-1/2 bg-white dark:bg-black p-8 lg:p-12">
-          <div className="max-w-md mx-auto">
-            {/* Header */}
-            <div className="text-center mb-8">
-              <div className="flex items-center justify-center gap-3 mb-4">
-                <h1 className="text-3xl font-bold text-black dark:text-white">
-                  Evolve School Manager
-                </h1>
+        <div className="w-full lg:w-1/2 bg-white dark:bg-slate-800/50 p-4 sm:p-6 md:p-8 lg:p-12">
+          {/* Header */}
+          <div className="text-center mb-6 sm:mb-8">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3 mb-4">
+              <div className="p-2 sm:p-3 bg-black dark:bg-white rounded-lg flex-shrink-0">
+                <div className="w-5 sm:w-6 h-5 sm:h-6 text-white dark:text-black font-bold text-sm flex items-center justify-center">E</div>
               </div>
-              <h2 className="text-2xl font-bold text-black dark:text-white mb-2">
-                Welcome Back
-              </h2>
-              <p className="text-gray-600 dark:text-gray-400">
-                Sign in to your account to continue
-              </p>
+              <h1 className="text-2xl sm:text-3xl md:text-4xl font-black leading-tight tracking-[-0.033em] text-[#0d141b] dark:text-white text-center sm:text-left">
+                Evolve School Manager
+              </h1>
+            </div>
+            <h2 className="text-xl sm:text-2xl font-bold text-[#0d141b] dark:text-white mb-2">
+              Welcome Back
+            </h2>
+            <p className="text-sm sm:text-base text-[#4c739a] dark:text-slate-400 font-normal leading-normal px-2 sm:px-0">
+              Sign in to your account to continue
+            </p>
+          </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-start sm:items-center gap-2 text-red-700 dark:text-red-300 text-sm sm:text-base">
+              <AlertCircle className="w-4 sm:w-5 h-4 sm:h-5 flex-shrink-0 mt-0.5 sm:mt-0" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          {/* Login Form */}
+          <form onSubmit={handleLogin} className="space-y-4 sm:space-y-6">
+            {/* Email Field */}
+            <div>
+              <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Email Address
+              </label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 sm:w-5 h-4 sm:h-5 text-slate-400 flex-shrink-0" />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter your email or full name"
+                  className="w-full pl-9 sm:pl-10 pr-4 py-2 sm:py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-[#0d141b] dark:text-white placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-colors text-sm sm:text-base"
+                  required
+                  disabled={isLoading}
+                />
+              </div>
             </div>
 
-            {/* Error Message */}
-            {error && (
-              <div className="mb-6 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg flex items-center gap-2 text-red-700 dark:text-red-400 text-sm">
-                <AlertCircle className="w-4 h-4" />
-                {error}
-              </div>
-            )}
-
-            {/* Login Form */}
-            <form onSubmit={handleLogin} className="space-y-6">
-              {/* Email Field */}
-              <div>
-                <label className="block text-sm font-medium text-black dark:text-white mb-2">
-                  Email Address
-                </label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Enter your email or full name"
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-black text-black dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent dark:focus:ring-white"
-                    required
-                    disabled={isLoading}
-                  />
-                </div>
-              </div>
-
-              {/* Password Field */}
-              <div>
-                <label className="block text-sm font-medium text-black dark:text-white mb-2">
-                  Password
-                </label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter your password"
-                    className="w-full pl-10 pr-12 py-3 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-black text-black dark:text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent dark:focus:ring-white"
-                    required
-                    disabled={isLoading}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                    disabled={isLoading}
-                  >
-                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Submit Button */}
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full py-3 px-4 bg-black text-white rounded-lg font-medium hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed dark:bg-white dark:text-black dark:hover:bg-gray-200 dark:focus:ring-white"
-              >
-                {isLoading ? (
-                  <div className="flex items-center justify-center gap-2">
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin dark:border-black dark:border-t-transparent"></div>
-                    Signing in...
-                  </div>
-                ) : (
-                  'Sign In' 
-                )}
-              </button>
-            </form>
-
-            {/* Additional Links */}
-            <div className="mt-6 text-center">
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Don't have an account?{' '}
-                <a 
-                  href="/school-registration" 
-                  className="text-black dark:text-white font-medium hover:underline"
+            {/* Password Field */}
+            <div>
+              <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Password
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 sm:w-5 h-4 sm:h-5 text-slate-400 flex-shrink-0" />
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  className="w-full pl-9 sm:pl-10 pr-11 sm:pr-12 py-2 sm:py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-[#0d141b] dark:text-white placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-colors text-sm sm:text-base"
+                  required
+                  disabled={isLoading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 flex-shrink-0"
+                  disabled={isLoading}
                 >
-                  Register your school
-                </a>
-              </p>
+                  {showPassword ? <EyeOff className="w-4 sm:w-5 h-4 sm:h-5" /> : <Eye className="w-4 sm:w-5 h-4 sm:h-5" />}
+                </button>
+              </div>
             </div>
 
-            {/* Footer */}
-            <div className="mt-12 text-center">
-              <p className="text-sm text-gray-500 dark:text-gray-500">
-                © 2024 Evolve School Manager. All rights reserved.
-              </p>
-            </div>
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full py-2.5 sm:py-3 px-4 bg-black text-white rounded-lg font-medium hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2 dark:focus:ring-offset-black disabled:opacity-50 disabled:cursor-not-allowed transition-colors dark:bg-white dark:text-black dark:hover:bg-gray-200 flex items-center justify-center gap-2 text-sm sm:text-base"
+            >
+              {isLoading ? (
+                <>
+                  <div className="w-3 sm:w-4 h-3 sm:h-4 border-2 border-white dark:border-black border-t-transparent rounded-full animate-spin"></div>
+                  <span>Signing in...</span>
+                </>
+              ) : (
+                'Sign In'
+              )}
+            </button>
+          </form>
+
+          {/* Additional Links */}
+          <div className="mt-4 sm:mt-6 text-center">
+            <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+              Don't have an account?{' '}
+              <a 
+                href="/school-registration" 
+                className="text-black dark:text-white font-medium hover:underline"
+              >
+                Register your school
+              </a>
+            </p>
+          </div>
+
+          {/* Footer */}
+          <div className="mt-8 sm:mt-12 text-center">
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              © 2024 Evolve School Manager. All rights reserved.
+            </p>
           </div>
         </div>
 
         {/* Right Side - Hero Section */}
-        <div className="w-full lg:w-1/2 bg-gradient-to-br from-gray-900 to-black dark:from-gray-100 dark:to-white p-12 flex items-center justify-center">
-          <div className="text-center text-white dark:text-black max-w-md">
-            <User className="w-16 h-16 mx-auto mb-6 opacity-90" />
-            <h3 className="text-2xl font-bold mb-4">
+        <div className="hidden lg:flex w-full lg:w-1/2 bg-gradient-to-br from-slate-900 to-black dark:from-slate-900 dark:to-black p-8 lg:p-12 items-center justify-center">
+          <div className="text-center text-white dark:text-white max-w-md">
+            <User className="w-12 lg:w-16 h-12 lg:h-16 mx-auto mb-4 lg:mb-6 opacity-90" />
+            <h3 className="text-lg lg:text-2xl font-bold mb-3 lg:mb-4">
               School Management System
             </h3>
-            <p className="text-gray-300 dark:text-gray-700 leading-relaxed">
-              Streamline your school administration with our comprehensive management platform. 
-              Manage students, teachers, classes, and attendance all in one place.
+            <p className="text-sm lg:text-base text-slate-300 dark:text-slate-400 leading-relaxed mb-6 lg:mb-8">
+              Streamline your school administration with our comprehensive management platform. Track students, manage teachers, and monitor attendance all in one place.
             </p>
-            <div className="mt-8 grid grid-cols-2 gap-4 text-sm">
-              <div className="flex items-center gap-2 justify-center">
-                <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                Student Management
+            
+            <div className="grid grid-cols-2 gap-3 lg:gap-4 text-xs lg:text-sm">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-green-400 rounded-full flex-shrink-0"></div>
+                <span>Student Management</span>
               </div>
-              <div className="flex items-center gap-2 justify-center">
-                <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
-                Teacher Portal
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-blue-400 rounded-full flex-shrink-0"></div>
+                <span>Teacher Portal</span>
               </div>
-              <div className="flex items-center gap-2 justify-center">
-                <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
-                Attendance Tracking
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-purple-400 rounded-full flex-shrink-0"></div>
+                <span>Attendance Tracking</span>
               </div>
-              <div className="flex items-center gap-2 justify-center">
-                <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
-                Grade Management
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-yellow-400 rounded-full flex-shrink-0"></div>
+                <span>Grade Management</span>
               </div>
             </div>
           </div>

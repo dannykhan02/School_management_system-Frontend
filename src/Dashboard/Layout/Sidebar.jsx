@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { 
   ChevronLeft, 
@@ -9,32 +9,19 @@ import {
   Moon
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
+import { useTheme } from "../../hooks/useTheme";
 import { getNavigationItems } from "../../config/navigation";
 import { useSidebar } from "../../contexts/SidebarContext";
+import { apiRequest } from "../../utils/api";
 
 const Sidebar = () => {
   const [collapsed, setCollapsed] = useState(false);
-  const [isDarkMode, setIsDarkMode] = useState(
-    document.documentElement.classList.contains("dark")
-  );
+  const [schoolHasStreams, setSchoolHasStreams] = useState(false);
+  const { isDarkMode, toggleDarkMode } = useTheme();
 
   const location = useLocation();
   const { isSidebarOpen, toggleSidebar } = useSidebar();
   const { user, logout } = useAuth();
-
-  const toggleDarkMode = () => {
-    const html = document.documentElement;
-
-    if (isDarkMode) {
-      html.classList.remove("dark");
-      localStorage.setItem("theme", "light");
-    } else {
-      html.classList.add("dark");
-      localStorage.setItem("theme", "dark");
-    }
-
-    setIsDarkMode(!isDarkMode);
-  };
 
   const isActive = (item) => {
     return (
@@ -45,44 +32,75 @@ const Sidebar = () => {
 
   const sidebarItems = getNavigationItems(user?.role);
 
+  // Check if school has streams enabled
+  useEffect(() => {
+    const checkSchoolStreams = async () => {
+      if (user?.school_id) {
+        try {
+          const response = await apiRequest(`schools/${user.school_id}`, 'GET');
+          const schoolData = response?.data || response || {};
+          setSchoolHasStreams(schoolData.has_streams || false);
+        } catch (error) {
+          console.error('Failed to fetch school info:', error);
+          setSchoolHasStreams(false);
+        }
+      }
+    };
+
+    checkSchoolStreams();
+  }, [user?.school_id]);
+
+  // Filter navigation items based on stream availability
+  const filteredSidebarItems = sidebarItems.map(item => {
+    // If item requires streams and school doesn't have streams, hide it
+    if (item.requiresStreams && !schoolHasStreams) {
+      return null;
+    }
+    return item;
+  }).filter(Boolean);
+
   return (
     <>
-      {/* Backdrop with blur for mobile - matches ClassroomManager style */}
+      {/* Backdrop with blur for mobile - z-index below header */}
       {isSidebarOpen && (
         <div
           className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30 lg:hidden transition-opacity"
           onClick={toggleSidebar}
+          style={{ top: '64px' }}
         />
       )}
 
       <div
         className={`
           flex flex-col 
-          bg-card dark:bg-sidebar 
-          border-r border-border
+          bg-white dark:bg-slate-800/50 
+          border-r border-slate-200 dark:border-slate-700
           fixed
-          z-50 h-screen
+          top-0
+          left-0
+          z-40
+          h-screen
           transition-all duration-300 ease-in-out
           ${isSidebarOpen ? "translate-x-0 shadow-lg" : "-translate-x-full lg:translate-x-0"}
           ${collapsed ? "lg:w-16 w-16" : "lg:w-64 w-64"}
         `}
       >
         {/* HEADER - Fixed height 64px to match header */}
-        <div className="flex items-center justify-between p-4 border-b border-border h-16 flex-shrink-0">
+        <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700 h-16 flex-shrink-0">
           {!collapsed ? (
             <>
               <div className="flex items-center space-x-3 flex-1 min-w-0">
-                <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-primary-foreground font-bold text-sm shadow-md flex-shrink-0">
+                <div className="w-8 h-8 bg-black dark:bg-white rounded-lg flex items-center justify-center text-white dark:text-black font-bold text-sm shadow-md flex-shrink-0">
                   {user?.name?.charAt(0).toUpperCase() || "E"}
                 </div>
-                <span className="font-bold text-lg text-foreground truncate">
+                <span className="font-bold text-lg text-[#0d141b] dark:text-white truncate">
                   EduPulse
                 </span>
               </div>
 
               {/* Collapse button - visible on desktop when expanded */}
               <button
-                className="hidden lg:flex p-2 rounded-lg hover:bg-accent transition-all duration-200 text-foreground flex-shrink-0 ml-auto"
+                className="hidden lg:flex p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-slate-600 dark:text-slate-400 flex-shrink-0 ml-auto"
                 onClick={() => setCollapsed(!collapsed)}
                 aria-label="Collapse sidebar"
                 title="Collapse sidebar"
@@ -92,9 +110,10 @@ const Sidebar = () => {
 
               {/* Close button - only visible on mobile */}
               <button
-                className="lg:hidden p-2 rounded-lg hover:bg-accent text-foreground flex-shrink-0 ml-auto"
+                className="lg:hidden p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-slate-600 dark:text-slate-400 flex-shrink-0 ml-auto"
                 onClick={toggleSidebar}
                 aria-label="Close sidebar"
+                title="Close sidebar"
               >
                 <X size={20} />
               </button>
@@ -102,7 +121,7 @@ const Sidebar = () => {
           ) : (
             /* When collapsed - show only expand button centered */
             <button
-              className="hidden lg:flex p-2 rounded-lg hover:bg-accent transition-all duration-200 text-foreground mx-auto"
+              className="hidden lg:flex p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-slate-600 dark:text-slate-400 mx-auto"
               onClick={() => setCollapsed(!collapsed)}
               aria-label="Expand sidebar"
               title="Expand sidebar"
@@ -114,13 +133,13 @@ const Sidebar = () => {
 
         {/* USER INFO */}
         {user && (
-          <div className={`p-4 border-b border-border flex-shrink-0 ${collapsed ? "lg:p-2" : ""}`}>
+          <div className={`p-4 border-b border-slate-200 dark:border-slate-700 flex-shrink-0 ${collapsed ? "lg:p-2" : ""}`}>
             <div className={`flex items-center ${collapsed ? "justify-center" : "gap-3"}`}>
-              <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center overflow-hidden shadow flex-shrink-0">
+              <div className="h-10 w-10 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center overflow-hidden shadow flex-shrink-0">
                 {user.avatar ? (
                   <img src={user.avatar} alt={user.name} className="h-full w-full object-cover" />
                 ) : (
-                  <span className="text-sm font-medium">
+                  <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
                     {user.name?.charAt(0).toUpperCase()}
                   </span>
                 )}
@@ -128,8 +147,8 @@ const Sidebar = () => {
 
               {!collapsed && (
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm truncate">{user.name}</p>
-                  <p className="text-xs text-muted-foreground capitalize">{user.role}</p>
+                  <p className="font-medium text-sm text-[#0d141b] dark:text-white truncate">{user.name}</p>
+                  <p className="text-xs text-[#4c739a] dark:text-slate-400 capitalize">{user.role}</p>
                 </div>
               )}
             </div>
@@ -138,7 +157,7 @@ const Sidebar = () => {
 
         {/* NAVIGATION */}
         <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-1">
-          {sidebarItems.map((item) => {
+          {filteredSidebarItems.map((item) => {
             const active = isActive(item);
             const Icon = item.icon;
 
@@ -155,8 +174,8 @@ const Sidebar = () => {
                   ${collapsed ? "justify-center" : ""}
                   ${
                     active
-                      ? "bg-accent text-accent-foreground"
-                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                      ? "bg-black dark:bg-white text-white dark:text-black"
+                      : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700"
                   }
                 `}
                 title={collapsed ? item.name : ""}
@@ -169,10 +188,10 @@ const Sidebar = () => {
         </nav>
 
         {/* FOOTER BUTTONS - Larger when collapsed */}
-        <div className={`border-t border-border flex-shrink-0 ${collapsed ? "p-2 space-y-2" : "p-4 space-y-2"}`}>
+        <div className={`border-t border-slate-200 dark:border-slate-700 flex-shrink-0 ${collapsed ? "p-2 space-y-2" : "p-4 space-y-2"}`}>
           <button
             onClick={toggleDarkMode}
-            className={`w-full flex items-center gap-3 rounded-lg text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors ${collapsed ? "justify-center p-3" : "px-3 py-2"}`}
+            className={`w-full flex items-center gap-3 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors ${collapsed ? "justify-center p-3" : "px-3 py-2"}`}
             title={isDarkMode ? "Light Mode" : "Dark Mode"}
           >
             {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
@@ -181,7 +200,7 @@ const Sidebar = () => {
 
           <button
             onClick={logout}
-            className={`w-full flex items-center gap-3 rounded-lg text-destructive hover:bg-destructive/10 transition-colors ${collapsed ? "justify-center p-3" : "px-3 py-2"}`}
+            className={`w-full flex items-center gap-3 rounded-lg text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors ${collapsed ? "justify-center p-3" : "px-3 py-2"}`}
             title="Logout"
           >
             <LogOut className="w-5 h-5" />

@@ -6,13 +6,20 @@ const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [mustChangePassword, setMustChangePassword] = useState(false);
 
-  // Function to refresh user data from the API
+  // Function to refresh user data from API
   const refreshUser = async () => {
     try {
       const userData = await apiRequest('auth/user', 'GET');
       setUser(userData);
       localStorage.setItem('user', JSON.stringify(userData));
+      
+      // Check if user must change password
+      if (userData.must_change_password) {
+        setMustChangePassword(true);
+      }
+      
       return userData;
     } catch (error) {
       console.error('Failed to refresh user:', error);
@@ -25,7 +32,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   const login = (userData) => {
-    // Ensure userData has the token extracted
+    // Ensure userData has token extracted
     const token = userData.token;
     
     // Store token separately
@@ -33,12 +40,17 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('auth_token', token);
     }
     
-    // Store user data (without token in the user object for cleaner state)
+    // Store user data (without token in user object for cleaner state)
     const userWithoutToken = { ...userData };
     delete userWithoutToken.token;
     
     setUser(userWithoutToken);
     localStorage.setItem('user', JSON.stringify(userWithoutToken));
+    
+    // Check if user must change password
+    if (userData.must_change_password) {
+      setMustChangePassword(true);
+    }
   };
 
   const logout = async () => {
@@ -50,8 +62,33 @@ export const AuthProvider = ({ children }) => {
     } finally {
       // Always clear local state
       setUser(null);
+      setMustChangePassword(false);
       localStorage.removeItem('user');
       localStorage.removeItem('auth_token');
+    }
+  };
+
+  const changePassword = async (passwordData) => {
+    try {
+      const response = await apiRequest('user/change-password', 'POST', passwordData);
+      
+      // Update user state to reflect password change
+      setUser(prevUser => ({
+        ...prevUser,
+        must_change_password: false,
+        last_password_changed_at: new Date().toISOString()
+      }));
+      
+      setMustChangePassword(false);
+      
+      return { success: true, data: response };
+    } catch (error) {
+      console.error('Failed to change password:', error);
+      return { 
+        success: false, 
+        error: error.data?.message || 'Failed to change password',
+        errors: error.data?.errors || {}
+      };
     }
   };
 
@@ -73,6 +110,11 @@ export const AuthProvider = ({ children }) => {
         if (savedUser && token) {
           const userData = JSON.parse(savedUser);
           setUser(userData);
+          
+          // Check if user must change password
+          if (userData.must_change_password) {
+            setMustChangePassword(true);
+          }
           
           // Optional: Refresh user data on app load
           // This ensures we have the latest user info
@@ -105,8 +147,10 @@ export const AuthProvider = ({ children }) => {
       logout, 
       loading,
       refreshUser,
+      changePassword,
       getAuthHeaders,
-      schoolId // Added for easier access
+      schoolId, // Added for easier access
+      mustChangePassword // Added to track password change requirement
     }}>
       {children}
     </AuthContext.Provider>

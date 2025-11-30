@@ -1,6 +1,5 @@
-// src/Dashboard/Pages/SuperAdmin/EditSchoolProfile.jsx
 import React, { useEffect, useState } from "react";
-import { Save, School, Upload, AlertCircle, X, Eye, EyeOff, History } from "lucide-react";
+import { Save, School, Upload, AlertCircle, X, Eye, EyeOff, History, CheckSquare, Square } from "lucide-react";
 import { useParams, useNavigate } from "react-router-dom";
 import { apiRequest } from "../../../utils/api";
 import { toast } from "react-toastify";
@@ -18,6 +17,7 @@ function EditSchoolProfile() {
     email: "",
     code: "",
     primary_curriculum: "Both",
+    has_streams: false, // Added has_streams field
   });
 
   const [logoFile, setLogoFile] = useState(null);
@@ -44,6 +44,7 @@ function EditSchoolProfile() {
           email: data.email || "",
           code: data.code || "",
           primary_curriculum: data.primary_curriculum || "Both",
+          has_streams: data.has_streams || false, // Added has_streams field
         };
 
         setFormData(schoolData);
@@ -84,8 +85,11 @@ function EditSchoolProfile() {
   }, [hasUnsavedChanges]);
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    setFormData((prev) => ({ 
+      ...prev, 
+      [name]: type === 'checkbox' ? checked : value 
+    }));
     
     // Clear specific field error when user starts typing
     if (errors[name]) {
@@ -142,6 +146,7 @@ function EditSchoolProfile() {
       formDataToSend.append("email", formData.email);
       formDataToSend.append("code", formData.code);
       formDataToSend.append("primary_curriculum", formData.primary_curriculum);
+      formDataToSend.append("has_streams", formData.has_streams ? "1" : "0"); // Added has_streams
 
       if (logoFile) formDataToSend.append("logo", logoFile);
 
@@ -176,6 +181,7 @@ function EditSchoolProfile() {
     code: "School Code",
     logo: "School Logo",
     primary_curriculum: "Primary Curriculum",
+    has_streams: "Enable Streams", // Added field label
   };
 
   return (
@@ -207,7 +213,7 @@ function EditSchoolProfile() {
           <button
             type="button"
             onClick={() => setShowPreview(!showPreview)}
-            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-400 transition-colors"
+            className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 transition-colors"
             title={showPreview ? "Hide preview" : "Show preview"}
           >
             {showPreview ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
@@ -237,12 +243,12 @@ function EditSchoolProfile() {
 
       <form onSubmit={handleSubmit}>
         {/* Main Card Container */}
-        <div className="bg-white dark:bg-background-dark/50 rounded-xl border border-slate-200 dark:border-slate-800 p-6 space-y-8 mb-6">
+        <div className="bg-white dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 p-6 space-y-8 mb-6">
           
           {/* Logo Upload Section */}
           <div className="flex items-center gap-6">
             <div className="relative">
-              <div className="w-32 h-32 bg-slate-100 dark:bg-slate-800/50 border-2 border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden">
+              <div className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 bg-slate-100 dark:bg-slate-700/50 border-2 border-slate-200 dark:border-slate-600 rounded-xl overflow-hidden">
                 {logoPreview && !logoError ? (
                   <img 
                     src={logoPreview} 
@@ -255,7 +261,7 @@ function EditSchoolProfile() {
                   />
                 ) : (
                   <div className="w-full h-full bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/20 flex items-center justify-center">
-                    <School className="w-16 h-16 text-blue-400 dark:text-blue-500" />
+                    <School className="w-10 h-10 sm:w-12 sm:h-12 md:w-16 md:h-16 text-blue-400 dark:text-blue-500" />
                   </div>
                 )}
               </div>
@@ -297,7 +303,7 @@ function EditSchoolProfile() {
           {/* Basic Information */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-medium text-[#0d141b] dark:text-slate-200 mb-2">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                 School Name *
               </label>
               <input
@@ -305,21 +311,21 @@ function EditSchoolProfile() {
                 name="schoolName"
                 value={formData.schoolName}
                 onChange={handleChange}
-                className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-[#0d141b] dark:text-white placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-[#0d141b] dark:text-white focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-colors"
                 placeholder="Enter school name"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-[#0d141b] dark:text-slate-200 mb-2">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                 School Type *
               </label>
               <select
                 name="schoolType"
                 value={formData.schoolType}
                 onChange={handleChange}
-                className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-[#0d141b] dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-[#0d141b] dark:text-white focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-colors"
                 required
               >
                 <option value="">Select type</option>
@@ -329,7 +335,7 @@ function EditSchoolProfile() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-[#0d141b] dark:text-slate-200 mb-2">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                 School Code *
               </label>
               <input
@@ -337,21 +343,21 @@ function EditSchoolProfile() {
                 name="code"
                 value={formData.code}
                 onChange={handleChange}
-                className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-[#0d141b] dark:text-white placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-[#0d141b] dark:text-white focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-colors"
                 placeholder="Enter school code"
                 required
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-[#0d141b] dark:text-slate-200 mb-2">
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                 Primary Curriculum *
               </label>
               <select
                 name="primary_curriculum"
                 value={formData.primary_curriculum}
                 onChange={handleChange}
-                className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-[#0d141b] dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-[#0d141b] dark:text-white focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-colors"
                 required
               >
                 <option value="CBC">CBC</option>
@@ -366,7 +372,7 @@ function EditSchoolProfile() {
             <h3 className="text-lg font-semibold text-[#0d141b] dark:text-white mb-4">Contact Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-[#0d141b] dark:text-slate-200 mb-2">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Address *
                 </label>
                 <input
@@ -374,14 +380,14 @@ function EditSchoolProfile() {
                   name="address"
                   value={formData.address}
                   onChange={handleChange}
-                  className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-[#0d141b] dark:text-white placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                  className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-[#0d141b] dark:text-white focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-colors"
                   placeholder="Enter street address"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-[#0d141b] dark:text-slate-200 mb-2">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   City *
                 </label>
                 <input
@@ -389,14 +395,14 @@ function EditSchoolProfile() {
                   name="city"
                   value={formData.city}
                   onChange={handleChange}
-                  className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-[#0d141b] dark:text-white placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                  className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-[#0d141b] dark:text-white focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-colors"
                   placeholder="Enter city"
                   required
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-[#0d141b] dark:text-slate-200 mb-2">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Phone Number *
                 </label>
                 <input
@@ -404,14 +410,14 @@ function EditSchoolProfile() {
                   name="phone"
                   value={formData.phone}
                   onChange={handleChange}
-                  className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-[#0d141b] dark:text-white placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                  className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-[#0d141b] dark:text-white focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-colors"
                   placeholder="Enter phone number"
                   required
                 />
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-[#0d141b] dark:text-slate-200 mb-2">
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                   Email Address *
                 </label>
                 <input
@@ -419,10 +425,45 @@ function EditSchoolProfile() {
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
-                  className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-[#0d141b] dark:text-white placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                  className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-[#0d141b] dark:text-white focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-colors"
                   placeholder="Enter email address"
                   required
                 />
+              </div>
+            </div>
+          </div>
+
+          {/* Added Has Streams Field */}
+          <div className="pt-6 border-t border-slate-200 dark:border-slate-700">
+            <h3 className="text-lg font-semibold text-[#0d141b] dark:text-white mb-4">Stream Configuration</h3>
+            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <div className="flex items-start gap-3">
+                <div className="pt-1">
+                  <input
+                    type="checkbox"
+                    id="has_streams"
+                    name="has_streams"
+                    checked={formData.has_streams}
+                    onChange={handleChange}
+                    className="w-5 h-5 text-blue-600 bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 focus:ring-2"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label htmlFor="has_streams" className="block text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                    Enable Streams for this School
+                  </label>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    Check this box if your school uses stream-based organization (e.g., Class A, Class B, etc.). 
+                    This will allow you to create streams and assign teachers and students to them.
+                  </p>
+                  {formData.has_streams && (
+                    <div className="mt-2 p-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded">
+                      <p className="text-xs text-green-700 dark:text-green-300">
+                        ✓ Stream functionality is enabled for this school
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -430,13 +471,13 @@ function EditSchoolProfile() {
 
         {/* Preview Section */}
         {showPreview && (
-          <div className="bg-white dark:bg-background-dark/50 rounded-xl border border-slate-200 dark:border-slate-800 p-6 mb-6">
+          <div className="bg-white dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 p-6 mb-6">
             <h3 className="text-lg font-semibold text-[#0d141b] dark:text-white mb-4 flex items-center gap-2">
               <Eye className="w-5 h-5" />
               Profile Preview
             </h3>
-            <div className="flex items-start gap-6">
-              <div className="w-24 h-24 bg-slate-100 dark:bg-slate-800/50 border-2 border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden flex-shrink-0">
+            <div className="flex flex-col sm:flex-row items-start gap-6">
+              <div className="w-20 h-20 sm:w-24 sm:h-24 bg-slate-100 dark:bg-slate-700/50 border-2 border-slate-200 dark:border-slate-600 rounded-xl overflow-hidden flex-shrink-0">
                 {logoPreview && !logoError ? (
                   <img 
                     src={logoPreview} 
@@ -446,15 +487,15 @@ function EditSchoolProfile() {
                   />
                 ) : (
                   <div className="w-full h-full bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/20 flex items-center justify-center">
-                    <School className="w-12 h-12 text-blue-400 dark:text-blue-500" />
+                    <School className="w-8 h-8 sm:w-12 sm:h-12 text-blue-400 dark:text-blue-500" />
                   </div>
                 )}
               </div>
               <div className="flex-1">
-                <h4 className="text-2xl font-bold text-[#0d141b] dark:text-white mb-2">
+                <h4 className="text-xl sm:text-2xl font-bold text-[#0d141b] dark:text-white mb-2">
                   {formData.schoolName || "School Name"}
                 </h4>
-                <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
                   <div>
                     <span className="font-medium text-[#4c739a] dark:text-slate-400">Type:</span>
                     <span className="ml-2 text-[#0d141b] dark:text-white">{formData.schoolType || "N/A"}</span>
@@ -471,6 +512,12 @@ function EditSchoolProfile() {
                     <span className="font-medium text-[#4c739a] dark:text-slate-400">Curriculum:</span>
                     <span className="ml-2 text-[#0d141b] dark:text-white">{formData.primary_curriculum}</span>
                   </div>
+                  <div className="sm:col-span-2">
+                    <span className="font-medium text-[#4c739a] dark:text-slate-400">Streams:</span>
+                    <span className="ml-2 text-[#0d141b] dark:text-white">
+                      {formData.has_streams ? "Enabled" : "Disabled"}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -478,7 +525,7 @@ function EditSchoolProfile() {
         )}
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-end gap-3 p-6 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-background-dark/50 rounded-b-xl">
+        <div className="flex flex-col sm:flex-row items-center justify-end gap-3 p-6 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 rounded-b-xl">
           <button
             type="button"
             onClick={() => {
@@ -491,14 +538,14 @@ function EditSchoolProfile() {
               }
             }}
             disabled={isSubmitting}
-            className="px-6 py-3 rounded-lg font-medium transition-colors bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-white hover:bg-slate-300 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full sm:w-auto px-6 py-3 rounded-lg font-medium transition-colors bg-slate-200 dark:bg-slate-700 text-slate-900 dark:text-white hover:bg-slate-300 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={isSubmitting || !hasUnsavedChanges}
-            className="flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-colors bg-black dark:bg-slate-700 text-white hover:bg-gray-800 dark:hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-medium transition-colors bg-black text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-white dark:text-black dark:hover:bg-gray-200"
           >
             {isSubmitting ? (
               <>

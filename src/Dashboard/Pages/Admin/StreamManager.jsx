@@ -1,4 +1,3 @@
-// src/Dashboard/Pages/Admin/StreamManager.jsx
 import React, { useEffect, useState } from 'react';
 import { apiRequest } from '../../../utils/api';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -14,7 +13,8 @@ import {
   GraduationCap,
   Crown,
   AlertCircle,
-  CheckCircle
+  CheckCircle,
+  Settings
 } from 'lucide-react';
 import { toast } from "react-toastify";
 
@@ -28,6 +28,8 @@ function StreamManager() {
   const [streamDetails, setStreamDetails] = useState(null);
   const [loading, setLoading] = useState(false);
   const [view, setView] = useState('list');
+  const [schoolHasStreams, setSchoolHasStreams] = useState(false);
+  const [schoolInfo, setSchoolInfo] = useState(null);
   
   const [selectedStream, setSelectedStream] = useState(null);
   const [formData, setFormData] = useState({ 
@@ -46,9 +48,29 @@ function StreamManager() {
 
   useEffect(() => {
     if (schoolId) {
-      fetchInitialData();
+      fetchSchoolInfo();
     }
   }, [schoolId]);
+
+  const fetchSchoolInfo = async () => {
+    setLoading(true);
+    try {
+      const response = await apiRequest(`schools/${schoolId}`, 'GET');
+      const schoolData = response?.data || response || {};
+      setSchoolInfo(schoolData);
+      setSchoolHasStreams(schoolData.has_streams || false);
+      
+      if (schoolData.has_streams) {
+        fetchInitialData();
+      }
+    } catch (error) {
+      const errorMessage = error?.response?.data?.message || error?.message || 'Failed to load school information';
+      toast.error(errorMessage);
+      console.error('Fetch school info error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchInitialData = async () => {
     setLoading(true);
@@ -101,18 +123,18 @@ function StreamManager() {
     setSelectedStream(stream);
     setLoading(true);
 
-    // Use the stream object from the list as the base
+    // Use stream object from list as base
     let detailedStream = { ...stream };
 
     try {
-      // Fetch the specific list of teachers assigned to this stream
+      // Fetch specific list of teachers assigned to this stream
       const response = await apiRequest(`streams/${stream.id}/teachers`, 'GET');
       const teachersFromApi = response?.teachers || response?.data?.teachers || [];
 
-      // Update the teachers list on our base stream object
+      // Update teachers list on our base stream object
       detailedStream.teachers = teachersFromApi;
 
-      // Set the selected teachers based on the API response
+      // Set selected teachers based on API response
       setSelectedTeachers(teachersFromApi.map(t => t.id));
 
     } catch (error) {
@@ -383,6 +405,30 @@ function StreamManager() {
     return teachers.filter(t => !assignedTeacherIds.includes(t.id));
   };
 
+  const renderStreamsDisabledView = () => (
+    <div className="flex flex-col items-center justify-center py-16">
+      <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-8 max-w-md text-center">
+        <Settings className="w-16 h-16 text-amber-600 dark:text-amber-400 mx-auto mb-4" />
+        <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-2">
+          Streams Not Enabled
+        </h2>
+        <p className="text-slate-600 dark:text-slate-400 mb-6">
+          Your school does not have streams enabled. Contact your administrator to enable this feature.
+        </p>
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+          <h3 className="font-medium text-blue-900 dark:text-blue-100 mb-2">
+            What are streams?
+          </h3>
+          <p className="text-sm text-blue-800 dark:text-blue-200">
+            Streams allow you to divide students in the same classroom into different groups 
+            for better management and organization. This is commonly used in larger schools 
+            to manage class sizes and provide specialized teaching approaches.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+
   const renderListView = () => (
     <>
       <div className="flex flex-wrap justify-between items-center gap-3 mb-8">
@@ -397,14 +443,14 @@ function StreamManager() {
         <div className="flex gap-3">
           <button 
             onClick={showAllClassTeachersView} 
-            className="bg-slate-700 text-white px-6 py-3 rounded-lg font-medium hover:bg-slate-600 transition-colors"
+            className="bg-slate-700 text-white px-6 py-3 rounded-lg font-medium hover:bg-slate-600 transition-colors dark:bg-white dark:text-black dark:hover:bg-gray-200"
           >
             <Crown className="inline-block w-5 h-5 mr-2" />
             View Class Teachers
           </button>
           <button 
             onClick={showCreateForm} 
-            className="bg-black text-white px-6 py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors"
+            className="bg-black text-white px-6 py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors dark:bg-white dark:text-black dark:hover:bg-gray-200"
           >
             <Plus className="inline-block w-5 h-5 mr-2" />
             New Stream
@@ -421,14 +467,14 @@ function StreamManager() {
         </div>
       )}
 
-      <div className="bg-white dark:bg-background-dark/50 rounded-xl border border-slate-200 dark:border-slate-800 p-6">
+      <div className="bg-white dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
         <h2 className="text-[#0d141b] dark:text-white text-2xl font-bold leading-tight tracking-[-0.015em] mb-6">
           Existing Streams
         </h2>
         <div className="overflow-x-auto">
           <div className="border rounded-lg border-slate-200 dark:border-slate-700">
             <table className="w-full text-sm text-left">
-              <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-300">
+              <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300">
                 <tr>
                   <th className="px-6 py-4 font-medium">Stream Name</th>
                   <th className="px-6 py-4 font-medium">Classroom</th>
@@ -438,15 +484,15 @@ function StreamManager() {
                   <th className="px-6 py-4 font-medium text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                 {streams.length > 0 ? (
                   streams.map((stream) => {
                     const availableTeachers = getAvailableTeachers(stream.id);
                     const classTeacher = stream.classTeacher || stream.class_teacher;
                     
                     return (
-                      <tr key={stream.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/20 transition-colors">
-                        <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
+                      <tr key={stream.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/20 transition-colors">
+                        <td className="px-6 py-4 font-medium text-slate-900 dark:text-white">
                           {stream.name}
                         </td>
                         <td className="px-6 py-4 text-slate-500 dark:text-slate-400">
@@ -498,14 +544,14 @@ function StreamManager() {
                           <div className="flex justify-end gap-2">
                             <button 
                               onClick={() => showEditForm(stream)} 
-                              className="p-2 text-slate-500 hover:text-blue-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                              className="p-2 text-slate-500 hover:text-blue-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                               title="Edit stream"
                             >
                               <Edit className="w-4 h-4" />
                             </button>
                             <button 
                               onClick={() => handleDelete(stream.id)} 
-                              className="p-2 text-slate-500 hover:text-red-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                              className="p-2 text-slate-500 hover:text-red-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                               title="Delete stream"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -634,7 +680,7 @@ function StreamManager() {
               {formData.class_teacher_id && (
                 <p className="mt-1 text-xs text-blue-600 dark:text-blue-400">
                   <CheckCircle className="inline-block w-3 h-3 mr-1" />
-                  This teacher will be automatically added to the teaching staff
+                  This teacher will be automatically added to teaching staff
                 </p>
               )}
             </div>
@@ -702,7 +748,7 @@ function StreamManager() {
             ) : (
               <div className="space-y-6">
                 {/* Stream Information */}
-                <div className="p-4 border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-900/30">
+                <div className="p-4 border border-slate-200 dark:border-slate-600 rounded-lg bg-slate-50 dark:bg-slate-700/50">
                   <h4 className="font-semibold text-slate-900 dark:text-white mb-3">Stream Information</h4>
                   <div className="grid grid-cols-2 gap-3 text-sm">
                     <div>
@@ -719,7 +765,7 @@ function StreamManager() {
                   {classTeacher && (
                     <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded text-xs text-blue-700 dark:text-blue-300">
                       <CheckCircle className="inline-block w-3 h-3 mr-1" />
-                      The class teacher is automatically included in the teaching staff
+                      The class teacher is automatically included in teaching staff
                     </div>
                   )}
                 </div>
@@ -787,7 +833,7 @@ function StreamManager() {
                             className={`flex items-center justify-between p-3 rounded cursor-pointer transition-colors ${
                               isSelected 
                                 ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800' 
-                                : 'bg-slate-50 dark:bg-slate-700/30 hover:bg-slate-100 dark:hover:bg-slate-700/50'
+                                : 'bg-slate-50 dark:bg-slate-700/50 hover:bg-slate-100 dark:hover:bg-slate-700/50'
                             } ${isClassTeacher ? 'opacity-75 cursor-not-allowed' : ''}`}
                             onClick={() => !isClassTeacher && handleTeacherToggle(teacher.id)}
                           >
@@ -962,6 +1008,25 @@ function StreamManager() {
             {!user ? 'Please log in to continue.' : 'Your account is missing school information.'}
           </p>
         </div>
+      </div>
+    );
+  }
+
+  // Show streams disabled view if school doesn't have streams enabled
+  if (!loading && !schoolHasStreams) {
+    return (
+      <div className="w-full py-8">
+        <div className="flex flex-wrap justify-between items-center gap-3 mb-8">
+          <div className="flex flex-col gap-2">
+            <h1 className="text-[#0d141b] dark:text-white text-4xl font-black leading-tight tracking-[-0.033em]">
+              Stream Management
+            </h1>
+            <p className="text-[#4c739a] dark:text-slate-400 text-base font-normal leading-normal">
+              Manage streams, assign class teachers, and manage teaching staff.
+            </p>
+          </div>
+        </div>
+        {renderStreamsDisabledView()}
       </div>
     );
   }

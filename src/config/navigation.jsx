@@ -46,7 +46,8 @@ export const NAVIGATION_ITEMS = {
     { 
       name: "Streams", 
       icon: Waves,
-      href: "/admin/streams" 
+      href: "/admin/streams",
+      requiresStreams: true // This item requires streams to be enabled
     },
     { 
       name: "Subjects", 
@@ -76,6 +77,12 @@ export const NAVIGATION_ITEMS = {
       href: "/teacher/classes" 
     },
     { 
+      name: "Streams", 
+      icon: Waves,
+      href: "/teacher/streams",
+      requiresStreams: true // This item requires streams to be enabled
+    },
+    { 
       name: "Attendance", 
       icon: Calendar,
       href: "/teacher/attendance" 
@@ -101,6 +108,28 @@ export const NAVIGATION_ITEMS = {
       name: "Grades", 
       icon: FileText,
       href: "/student/grades" 
+    },
+  ],
+  parent: [
+    { 
+      name: "Dashboard", 
+      icon: Home,
+      href: "/parent/dashboard" 
+    },
+    { 
+      name: "My Children", 
+      icon: Users,
+      href: "/parent/children" 
+    },
+    { 
+      name: "Events", 
+      icon: Calendar,
+      href: "/parent/events" 
+    },
+    { 
+      name: "Reports", 
+      icon: FileText,
+      href: "/parent/reports" 
     },
   ],
 };

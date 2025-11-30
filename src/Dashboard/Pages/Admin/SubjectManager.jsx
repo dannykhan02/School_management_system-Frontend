@@ -25,11 +25,11 @@ function SubjectManager() {
   const { schoolId, loading: authLoading } = useAuth();
   
   // --- State Management ---
-  const [subjects, setSubjects] = useState([]);
-  const [teachers, setTeachers] = useState([]);
-  const [streams, setStreams] = useState([]);
-  const [academicYears, setAcademicYears] = useState([]);
-  const [assignments, setAssignments] = useState([]);
+  const [subjects, setSubjects] = useState([]); // Initialize as empty array
+  const [teachers, setTeachers] = useState([]); // Initialize as empty array
+  const [streams, setStreams] = useState([]); // Initialize as empty array
+  const [academicYears, setAcademicYears] = useState([]); // Initialize as empty array
+  const [assignments, setAssignments] = useState([]); // Initialize as empty array
   const [loading, setLoading] = useState(false);
   const [view, setView] = useState('list'); // 'list', 'create', 'edit', 'manage-assignments'
   
@@ -39,6 +39,7 @@ function SubjectManager() {
   const [filterCategory, setFilterCategory] = useState('all');
   const [filterCoreStatus, setFilterCoreStatus] = useState('all');
   const [school, setSchool] = useState(null); // New state for school information
+  const [hasStreams, setHasStreams] = useState(false); // New state to track if school has streams
   
   const [formData, setFormData] = useState({
     name: '',
@@ -87,15 +88,23 @@ function SubjectManager() {
   // --- Data Fetching ---
   useEffect(() => {
     if (schoolId) {
-      fetchInitialData();
-      fetchSchoolInfo(); // Fetch school information
+      fetchSchoolInfo(); // Fetch school information first
     }
   }, [schoolId]);
+
+  // This effect will run after school info is fetched
+  useEffect(() => {
+    if (school !== null) {
+      fetchInitialData();
+    }
+  }, [school]);
 
   const fetchSchoolInfo = async () => {
     try {
       const response = await apiRequest('schools', 'GET');
-      setSchool(response.data || response);
+      const schoolData = response.data || response;
+      setSchool(schoolData);
+      setHasStreams(schoolData?.has_streams || false);
     } catch (error) {
       console.error('Failed to fetch school information:', error);
       toast.error('Failed to fetch school information');
@@ -105,16 +114,35 @@ function SubjectManager() {
   const fetchInitialData = async () => {
     setLoading(true);
     try {
-      const [subjectsResponse, teachersResponse, streamsResponse, academicYearsResponse] = await Promise.all([
+      // Prepare requests array
+      const requests = [
         apiRequest(`subjects`, 'GET'),
         apiRequest(`teachers/school/${schoolId}`, 'GET'),
-        apiRequest(`streams`, 'GET'),
         apiRequest(`academic-years`, 'GET')
-      ]);
-      setSubjects(subjectsResponse || []);
-      setTeachers(teachersResponse?.teachers || []);
-      setStreams(streamsResponse || []);
-      setAcademicYears(academicYearsResponse || []);
+      ];
+      
+      // Only fetch streams if the school has streams enabled
+      if (hasStreams) {
+        requests.push(apiRequest(`streams`, 'GET'));
+      }
+      
+      const responses = await Promise.all(requests);
+      
+      // Process responses - ensure we extract the array correctly
+      const subjectsResponse = responses[0];
+      const teachersResponse = responses[1];
+      const academicYearsResponse = responses[2];
+      
+      // Extract the array from response (handle both direct array and nested data)
+      setSubjects(Array.isArray(subjectsResponse) ? subjectsResponse : (subjectsResponse?.data || []));
+      setTeachers(Array.isArray(teachersResponse) ? teachersResponse : (teachersResponse?.teachers || []));
+      setAcademicYears(Array.isArray(academicYearsResponse) ? academicYearsResponse : (academicYearsResponse?.data || []));
+      
+      // Set streams if they were fetched (index 3 in the responses array)
+      if (hasStreams && responses[3]) {
+        const streamsResponse = responses[3];
+        setStreams(Array.isArray(streamsResponse) ? streamsResponse : (streamsResponse?.data || []));
+      }
     } catch (error) {
       console.error('Failed to fetch data:', error);
       toast.error('Failed to load data. Please refresh the page.');
@@ -127,7 +155,7 @@ function SubjectManager() {
     setLoading(true);
     try {
       const response = await apiRequest(`subject-assignments?subject_id=${subjectId}`, 'GET');
-      setAssignments(response || []);
+      setAssignments(Array.isArray(response) ? response : (response?.data || []));
     } catch (error) {
       toast.error('Could not fetch assignments for this subject.');
       setAssignments([]);
@@ -313,20 +341,30 @@ function SubjectManager() {
               }`}>
                 {school.primary_curriculum}
               </span>
+              <span className="text-sm text-slate-600 dark:text-slate-400 ml-2">
+                Streams:
+              </span>
+              <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                hasStreams 
+                  ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                  : 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
+              }`}>
+                {hasStreams ? 'Enabled' : 'Disabled'}
+              </span>
             </div>
           )}
         </div>
         <button 
           onClick={showCreateForm} 
           disabled={!school}
-          className="bg-black text-white px-6 py-3 rounded-lg font-medium hover:bg-gray-800 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="bg-black text-white px-6 py-3 rounded-lg font-medium hover:bg-gray-800 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-white dark:text-black dark:hover:bg-gray-200"
         >
           <Plus className="w-5 h-5" />New Subject
         </button>
       </div>
 
       {/* Filters Section */}
-      <div className="bg-white dark:bg-background-dark/50 rounded-xl border border-slate-200 dark:border-slate-800 p-6 mb-6">
+      <div className="bg-white dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 p-6 mb-6">
         <div className="flex items-center gap-2 mb-4">
           <Filter className="w-5 h-5 text-slate-600 dark:text-slate-400" />
           <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Filters & Search</h3>
@@ -377,11 +415,11 @@ function SubjectManager() {
       </div>
 
       {/* Subjects Table */}
-      <div className="bg-white dark:bg-background-dark/50 rounded-xl border border-slate-200 dark:border-slate-800 p-6">
+      <div className="bg-white dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
         <div className="overflow-x-auto">
           <div className="border rounded-lg border-slate-200 dark:border-slate-700">
             <table className="w-full text-sm text-left">
-              <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-300">
+              <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300">
                 <tr>
                   <th className="px-6 py-4 font-medium">Subject</th>
                   <th className="px-6 py-4 font-medium">Code</th>
@@ -393,14 +431,14 @@ function SubjectManager() {
                   <th className="px-6 py-4 font-medium text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                 {filteredSubjects.length > 0 ? (
                   filteredSubjects.map((subject) => (
-                    <tr key={subject.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/20 transition-colors">
+                    <tr key={subject.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/20 transition-colors">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
                           <BookOpen className="w-4 h-4 text-slate-400" />
-                          <span className="font-medium text-slate-900 dark:text-slate-100">{subject.name}</span>
+                          <span className="font-medium text-slate-900 dark:text-white">{subject.name}</span>
                         </div>
                       </td>
                       <td className="px-6 py-4 text-slate-500 dark:text-slate-400 font-mono text-xs">{subject.code}</td>
@@ -440,10 +478,10 @@ function SubjectManager() {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end gap-2">
-                          <button onClick={() => showEditForm(subject)} className="p-2 text-slate-500 hover:text-blue-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
+                          <button onClick={() => showEditForm(subject)} className="p-2 text-slate-500 hover:text-blue-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700">
                             <Edit className="w-4 h-4" />
                           </button>
-                          <button onClick={() => handleDelete(subject.id)} className="p-2 text-slate-500 hover:text-red-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">
+                          <button onClick={() => handleDelete(subject.id)} className="p-2 text-slate-500 hover:text-red-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700">
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
@@ -673,6 +711,9 @@ function SubjectManager() {
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
               Subject: <span className="font-medium">{selectedSubject?.name}</span> ({selectedSubject?.code})
             </p>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+              School: <span className="font-medium">{hasStreams ? 'Streams Enabled' : 'Direct Teacher Assignment'}</span>
+            </p>
           </div>
           <button 
             onClick={backToList} 
@@ -705,24 +746,53 @@ function SubjectManager() {
                 ))}
               </select>
             </div>
-            <div>
-              <label htmlFor="stream_id" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Stream/Class *</label>
-              <select
-                id="stream_id"
-                name="stream_id"
-                value={assignmentFormData.stream_id}
-                onChange={handleAssignmentInputChange}
-                required
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
-              >
-                <option value="">Select stream</option>
-                {streams.map(stream => (
-                  <option key={stream.id} value={stream.id}>
-                    {stream.classroom?.name} - {stream.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            
+            {/* Conditional rendering based on whether school has streams */}
+            {hasStreams ? (
+              <div>
+                <label htmlFor="stream_id" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Stream/Class *</label>
+                <select
+                  id="stream_id"
+                  name="stream_id"
+                  value={assignmentFormData.stream_id}
+                  onChange={handleAssignmentInputChange}
+                  required
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                >
+                  <option value="">Select stream</option>
+                  {streams.map(stream => (
+                    <option key={stream.id} value={stream.id}>
+                      {stream.classroom?.name} - {stream.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div>
+                <label htmlFor="classroom_id" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Classroom *</label>
+                <select
+                  id="classroom_id"
+                  name="classroom_id"
+                  value={assignmentFormData.classroom_id || ''}
+                  onChange={handleAssignmentInputChange}
+                  required
+                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+                >
+                  <option value="">Select classroom</option>
+                  {/* Assuming classrooms are part of streams data for schools without streams */}
+                  {streams.length > 0 && streams[0].classroom ? (
+                    [...new Set(streams.map(s => s.classroom))].map(classroom => (
+                      <option key={classroom.id} value={classroom.id}>
+                        {classroom.name}
+                      </option>
+                    ))
+                  ) : (
+                    <option disabled>No classrooms available</option>
+                  )}
+                </select>
+              </div>
+            )}
+            
             <div>
               <label htmlFor="academic_year_id" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Academic Year *</label>
               <select
@@ -817,9 +887,14 @@ function SubjectManager() {
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Stream</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                        {hasStreams ? 'Stream' : 'Classroom'}
+                      </p>
                       <p className="font-medium text-slate-900 dark:text-white">
-                        {assignment.stream?.classroom?.name} - {assignment.stream?.name}
+                        {hasStreams 
+                          ? `${assignment.stream?.classroom?.name} - ${assignment.stream?.name}`
+                          : assignment.classroom?.name || 'Unknown'
+                        }
                       </p>
                     </div>
                     <div>

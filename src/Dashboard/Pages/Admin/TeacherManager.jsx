@@ -1,4 +1,4 @@
-// src/Dashboard/Pages/Admin/TeacherManager.jsx
+                            // src/Dashboard/Pages/Admin/TeacherManager.jsx
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { apiRequest } from '../../../utils/api';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -11,18 +11,11 @@ import {
   Plus, 
   X,
   GraduationCap,
-  MapPin,
-  Crown,
   Search,
   AlertCircle,
   Filter,
-  Download,
   ChevronDown,
-  Upload,
-  FileText,
   CheckCircle,
-  XCircle,
-  Calendar,
   BarChart3
 } from 'lucide-react';
 import { toast } from "react-toastify";
@@ -113,7 +106,7 @@ const FilterPanel = ({ filters, setFilters, curriculumOptions, specializationOpt
       </button>
 
       {showFilters && (
-        <div className="mt-4 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="mt-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700 grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
               Curriculum Specialization
@@ -163,24 +156,9 @@ const FilterPanel = ({ filters, setFilters, curriculumOptions, specializationOpt
             </select>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Status
-            </label>
-            <select
-              value={filters.status}
-              onChange={(e) => setFilters({ ...filters, status: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white"
-            >
-              <option value="">All Status</option>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
-          </div>
-
           <button
             onClick={onClearFilters}
-            className="col-span-1 md:col-span-4 px-4 py-2 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
+            className="col-span-1 md:col-span-3 px-4 py-2 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
           >
             Clear All Filters
           </button>
@@ -190,280 +168,10 @@ const FilterPanel = ({ filters, setFilters, curriculumOptions, specializationOpt
   );
 };
 
-// Bulk Actions Component
-const BulkActions = ({ selectedTeachers, onBulkAction, onSelectAll, allSelected, totalTeachers }) => {
-  const [showActions, setShowActions] = useState(false);
-
-  if (selectedTeachers.length === 0) return null;
-
-  return (
-    <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <span className="text-blue-700 dark:text-blue-300 font-medium">
-            {selectedTeachers.length} teacher{selectedTeachers.length !== 1 ? 's' : ''} selected
-          </span>
-          <button
-            onClick={onSelectAll}
-            className="text-blue-600 dark:text-blue-400 hover:underline text-sm"
-          >
-            {allSelected ? 'Deselect all' : `Select all ${totalTeachers} teachers`}
-          </button>
-        </div>
-        
-        <div className="relative">
-          <button
-            onClick={() => setShowActions(!showActions)}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Bulk Actions
-            <ChevronDown className="w-4 h-4" />
-          </button>
-          
-          {showActions && (
-            <div className="absolute right-0 top-full mt-1 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg shadow-lg z-10 min-w-48">
-              <button
-                onClick={() => {
-                  onBulkAction('activate');
-                  setShowActions(false);
-                }}
-                className="w-full px-4 py-2 text-left hover:bg-slate-100 dark:hover:bg-slate-700 text-green-600 dark:text-green-400"
-              >
-                Activate Selected
-              </button>
-              <button
-                onClick={() => {
-                  onBulkAction('deactivate');
-                  setShowActions(false);
-                }}
-                className="w-full px-4 py-2 text-left hover:bg-slate-100 dark:hover:bg-slate-700 text-orange-600 dark:text-orange-400"
-              >
-                Deactivate Selected
-              </button>
-              <button
-                onClick={() => {
-                  onBulkAction('export');
-                  setShowActions(false);
-                }}
-                className="w-full px-4 py-2 text-left hover:bg-slate-100 dark:hover:bg-slate-700 text-blue-600 dark:text-blue-400"
-              >
-                Export Selected
-              </button>
-              <hr className="border-slate-200 dark:border-slate-600" />
-              <button
-                onClick={() => {
-                  onBulkAction('delete');
-                  setShowActions(false);
-                }}
-                className="w-full px-4 py-2 text-left hover:bg-slate-100 dark:hover:bg-slate-700 text-red-600 dark:text-red-400"
-              >
-                Delete Selected
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Import Teachers Component
-const ImportTeachers = ({ onImportComplete, onClose }) => {
-  const [file, setFile] = useState(null);
-  const [importing, setImporting] = useState(false);
-  const [preview, setPreview] = useState([]);
-  const [errors, setErrors] = useState([]);
-
-  const handleFileSelect = (e) => {
-    const selectedFile = e.target.files[0];
-    if (!selectedFile) return;
-
-    if (!selectedFile.name.endsWith('.csv')) {
-      toast.error('Please select a CSV file');
-      return;
-    }
-
-    setFile(selectedFile);
-    parseCSV(selectedFile);
-  };
-
-  const parseCSV = (file) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const csv = e.target.result;
-      const lines = csv.split('\n').filter(line => line.trim());
-      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-      
-      // Validate required headers
-      const requiredHeaders = ['email', 'full_name', 'qualification'];
-      const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
-      
-      if (missingHeaders.length > 0) {
-        setErrors([`Missing required headers: ${missingHeaders.join(', ')}`]);
-        setPreview([]);
-        return;
-      }
-
-      const previewData = lines.slice(1, 6).map(line => {
-        const values = line.split(',').map(v => v.trim());
-        const row = {};
-        headers.forEach((header, index) => {
-          row[header] = values[index] || '';
-        });
-        return row;
-      });
-
-      setPreview(previewData);
-      setErrors([]);
-    };
-    reader.readAsText(file);
-  };
-
-  const handleImport = async () => {
-    if (!file) return;
-
-    setImporting(true);
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const response = await apiRequest('teachers/import', 'POST', formData, true);
-      
-      if (response.success) {
-        toast.success(`Successfully imported ${response.imported} teachers`);
-        if (response.failed > 0) {
-          toast.warning(`${response.failed} teachers failed to import`);
-        }
-        onImportComplete();
-        onClose();
-      } else {
-        throw new Error(response.message || 'Import failed');
-      }
-    } catch (error) {
-      console.error('Import error:', error);
-      toast.error(error.response?.data?.message || 'Failed to import teachers');
-    } finally {
-      setImporting(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
-        <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
-          <h3 className="text-xl font-semibold text-slate-900 dark:text-white">
-            Import Teachers
-          </h3>
-          <button 
-            onClick={onClose} 
-            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
-            aria-label="Close form"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-
-        <div className="p-6 space-y-4 overflow-y-auto">
-          <div className="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg p-6 text-center">
-            <Upload className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-            <input
-              type="file"
-              accept=".csv"
-              onChange={handleFileSelect}
-              className="hidden"
-              id="csv-upload"
-            />
-            <label
-              htmlFor="csv-upload"
-              className="cursor-pointer bg-black text-white px-6 py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors inline-block"
-            >
-              Choose CSV File
-            </label>
-            <p className="text-slate-500 dark:text-slate-400 mt-2 text-sm">
-              {file ? file.name : 'No file selected'}
-            </p>
-            <p className="text-slate-400 dark:text-slate-500 text-xs mt-2">
-              Required columns: email, full_name, qualification. Optional: specialization, employment_type, tsc_number
-            </p>
-          </div>
-
-          {errors.length > 0 && (
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-              <h4 className="text-red-800 dark:text-red-300 font-medium mb-2">Validation Errors:</h4>
-              <ul className="text-red-700 dark:text-red-400 text-sm list-disc list-inside">
-                {errors.map((error, index) => (
-                  <li key={index}>{error}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {preview.length > 0 && (
-            <div>
-              <h4 className="font-medium text-slate-700 dark:text-slate-300 mb-2">Preview (first 5 rows):</h4>
-              <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-slate-50 dark:bg-slate-800">
-                    <tr>
-                      {Object.keys(preview[0] || {}).map(header => (
-                        <th key={header} className="px-3 py-2 text-left font-medium text-slate-700 dark:text-slate-300 border-b">
-                          {header}
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {preview.map((row, index) => (
-                      <tr key={index} className="border-b border-slate-200 dark:border-slate-700 last:border-b-0">
-                        {Object.values(row).map((value, cellIndex) => (
-                          <td key={cellIndex} className="px-3 py-2 text-slate-600 dark:text-slate-400">
-                            {value}
-                          </td>
-                        ))}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          <div className="flex justify-end gap-3 pt-4">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleImport}
-              disabled={!file || importing || errors.length > 0}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-            >
-              {importing ? (
-                <>
-                  <Loader className="w-4 h-4 animate-spin" />
-                  Importing...
-                </>
-              ) : (
-                <>
-                  <Upload className="w-4 h-4" />
-                  Import Teachers
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 // Teacher Statistics Component
 const TeacherStatistics = ({ teachers, subjects, streams }) => {
   const stats = useMemo(() => {
     const totalTeachers = teachers.length;
-    const activeTeachers = teachers.filter(t => t.status !== 'inactive').length;
     const teachersWithSubjects = teachers.filter(t => t.subjects && t.subjects.length > 0).length;
     const avgSubjectsPerTeacher = teachersWithSubjects > 0 
       ? (teachers.reduce((sum, t) => sum + (t.subjects?.length || 0), 0) / teachersWithSubjects).toFixed(1)
@@ -483,7 +191,6 @@ const TeacherStatistics = ({ teachers, subjects, streams }) => {
 
     return {
       totalTeachers,
-      activeTeachers,
       teachersWithSubjects,
       avgSubjectsPerTeacher,
       specializationCount,
@@ -493,7 +200,7 @@ const TeacherStatistics = ({ teachers, subjects, streams }) => {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
+      <div className="bg-white dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Total Teachers</p>
@@ -501,13 +208,9 @@ const TeacherStatistics = ({ teachers, subjects, streams }) => {
           </div>
           <Users className="w-8 h-8 text-blue-500" />
         </div>
-        <div className="mt-4 flex items-center text-sm">
-          <CheckCircle className="w-4 h-4 text-green-500 mr-1" />
-          <span className="text-slate-600 dark:text-slate-400">{stats.activeTeachers} active</span>
-        </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
+      <div className="bg-white dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Subject Coverage</p>
@@ -520,7 +223,7 @@ const TeacherStatistics = ({ teachers, subjects, streams }) => {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
+      <div className="bg-white dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Specializations</p>
@@ -535,7 +238,7 @@ const TeacherStatistics = ({ teachers, subjects, streams }) => {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
+      <div className="bg-white dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Full-time Staff</p>
@@ -559,21 +262,18 @@ function TeacherManager() {
   // --- State Management ---
   const [teachers, setTeachers] = useState([]);
   const [users, setUsers] = useState([]);
-  const [classrooms, setClassrooms] = useState([]);
-  const [streams, setStreams] = useState([]);
   const [subjects, setSubjects] = useState([]);
+  const [academicYears, setAcademicYears] = useState([]);
+  const [filteredAcademicYears, setFilteredAcademicYears] = useState([]);
+  const [streams, setStreams] = useState([]);
   const [loading, setLoading] = useState(false);
   const [view, setView] = useState('list');
   const [searchTerm, setSearchTerm] = useState('');
   const [filters, setFilters] = useState({
     curriculum_specialization: '',
     specialization: '',
-    employment_type: '',
-    status: ''
+    employment_type: ''
   });
-  const [selectedTeachers, setSelectedTeachers] = useState([]);
-  const [showImport, setShowImport] = useState(false);
-  const [exporting, setExporting] = useState(false);
   
   const [selectedTeacher, setSelectedTeacher] = useState(null);
   const [formData, setFormData] = useState({
@@ -582,27 +282,32 @@ function TeacherManager() {
     employment_type: '',
     tsc_number: '',
     specialization: '',
-    curriculum_specialization: '', // Removed default value
+    curriculum_specialization: '',
     max_subjects: '',
-    max_classes: '',
-    status: 'active'
+    max_classes: ''
   });
   const [assignmentData, setAssignmentData] = useState({ 
     subject_ids: [], 
-    stream_id: '' 
+    stream_id: '',
+    academic_year_id: '',
+    weekly_periods: 5,
+    assignment_type: 'main_teacher'
   });
   
   // Add school state
   const [school, setSchool] = useState(null);
+  const [hasStreams, setHasStreams] = useState(false);
 
   const curriculumOptions = ['CBC', '8-4-4', 'Both'];
   const specializationOptions = ['Sciences', 'Languages', 'Mathematics', 'Social Studies', 'Technical', 'Arts'];
 
-  // Fetch school information to get primary curriculum
+  // Fetch school information to get primary curriculum and stream setting
   const fetchSchoolInfo = useCallback(async () => {
     try {
       const response = await apiRequest('schools', 'GET');
-      setSchool(response.data || response);
+      const schoolData = response?.data || response;
+      setSchool(schoolData);
+      // Don't set hasStreams here - it comes from teachers endpoint
     } catch (error) {
       console.error('Failed to fetch school information:', error);
       toast.error('Failed to fetch school information');
@@ -615,16 +320,28 @@ function TeacherManager() {
       fetchInitialData();
       fetchSchoolInfo();
     }
-  }, [schoolId, fetchSchoolInfo]);
+  }, [schoolId]);
 
+  // Fetch initial data including school information
   const fetchInitialData = async () => {
     setLoading(true);
     try {
-      const teachersResponse = await apiRequest(`teachers/school/${schoolId}`, 'GET');
-      const teachersData = teachersResponse?.data || teachersResponse?.teachers || [];
-      setTeachers(Array.isArray(teachersData) ? teachersData : []);
+      const [teachersResponse, rolesResponse, subjectsResponse, academicYearsResponse] = await Promise.all([
+        apiRequest(`teachers/school/${schoolId}`, 'GET'),
+        apiRequest('roles', 'GET'),
+        apiRequest(`subjects`, 'GET'),
+        apiRequest(`academic-years`, 'GET')
+      ]);
+
+      // Handle new response structure from backend
+      const teachersData = teachersResponse?.data || [];
+      const hasStreamsFromAPI = teachersResponse?.has_streams || false;
       
-      const rolesResponse = await apiRequest('roles', 'GET');
+      setSubjects(Array.isArray(subjectsResponse) ? subjectsResponse : (subjectsResponse?.data || []));
+      setAcademicYears(Array.isArray(academicYearsResponse) ? academicYearsResponse : (academicYearsResponse?.data || []));
+      setFilteredAcademicYears(Array.isArray(academicYearsResponse) ? academicYearsResponse : (academicYearsResponse?.data || []));
+      setHasStreams(hasStreamsFromAPI);
+      
       const teacherRole = Array.isArray(rolesResponse) 
         ? rolesResponse.find(role => role.name === 'Teacher' || role.name === 'teacher')
         : null;
@@ -634,28 +351,42 @@ function TeacherManager() {
         setUsers(Array.isArray(usersResponse) ? usersResponse : []);
       }
       
-      const [classroomsResponse, streamsResponse, subjectsResponse] = await Promise.all([
-        apiRequest('classrooms', 'GET'),
-        apiRequest('streams', 'GET'),
-        apiRequest(`subjects`, 'GET')
-      ]);
+      // Enrich teachers with appropriate relationships based on school type
+      let enrichedTeachers = Array.isArray(teachersData) ? teachersData : [];
+
+      if (hasStreamsFromAPI) {
+        // For stream schools, teachers already have streams loaded
+        enrichedTeachers = enrichedTeachers.map(teacher => ({
+          ...teacher,
+          streamCount: teacher.teachingStreams?.length || 0,
+          classTeacherStreamCount: teacher.classTeacherStreams?.length || 0
+        }));
+      } else {
+        // For non-stream schools, teachers already have classrooms loaded
+        enrichedTeachers = enrichedTeachers.map(teacher => {
+          const teacherClassrooms = teacher.classrooms || [];
+          const classTeacherClassroom = teacherClassrooms.find(c => 
+            c.pivot?.is_class_teacher === true
+          );
+          return {
+            ...teacher,
+            classroomCount: teacherClassrooms.length,
+            classTeacherClassroom
+          };
+        });
+      }
       
-      const classroomsData = Array.isArray(classroomsResponse) 
-        ? classroomsResponse 
-        : (classroomsResponse?.data || []);
+      setTeachers(enrichedTeachers);
       
-      const streamsData = Array.isArray(streamsResponse) 
-        ? streamsResponse 
-        : (streamsResponse?.data || []);
-        
-      const subjectsData = Array.isArray(subjectsResponse) ? subjectsResponse : (subjectsResponse?.data || []);
-      
-      const filteredClassrooms = classroomsData.filter(c => c.school_id === schoolId);
-      const filteredStreams = streamsData.filter(s => s.school_id === schoolId);
-      
-      setClassrooms(filteredClassrooms);
-      setStreams(filteredStreams);
-      setSubjects(subjectsData);
+      // Fetch streams if school has streams
+      if (hasStreamsFromAPI) {
+        try {
+          const streamsResponse = await apiRequest('streams', 'GET');
+          setStreams(Array.isArray(streamsResponse) ? streamsResponse : (streamsResponse?.data || []));
+        } catch (error) {
+          console.error('Failed to fetch streams:', error);
+        }
+      }
     } catch (error) {
       console.error('Failed to fetch data:', error);
       toast.error('Failed to load data. Please refresh page.');
@@ -663,6 +394,48 @@ function TeacherManager() {
       setLoading(false);
     }
   };
+
+  // New function to fetch academic years by curriculum
+  const fetchAcademicYearsByCurriculum = useCallback(async (curriculum) => {
+    if (!curriculum || curriculum === 'Both') {
+      // If curriculum is 'Both' or not specified, use all academic years
+      setFilteredAcademicYears(academicYears);
+      return;
+    }
+
+    // Normalize curriculum value to ensure it matches expected values
+    const normalizedCurriculum = curriculum.trim().toUpperCase();
+    
+    // Validate curriculum value before making API call
+    if (!['CBC', '8-4-4'].includes(normalizedCurriculum)) {
+      console.error('Invalid curriculum value:', curriculum);
+      toast.error(`Invalid curriculum type: ${curriculum}. Expected 'CBC' or '8-4-4'.`);
+      setFilteredAcademicYears(academicYears);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await apiRequest(`academic-years/by-curriculum/${normalizedCurriculum}`, 'GET');
+      const curriculumAcademicYears = Array.isArray(response) ? response : (response?.data || []);
+      setFilteredAcademicYears(curriculumAcademicYears);
+      
+      // Reset academic year selection if current selection is not in the filtered list
+      if (assignmentData.academic_year_id && !curriculumAcademicYears.find(ay => ay.id === assignmentData.academic_year_id)) {
+        setAssignmentData(prev => ({
+          ...prev,
+          academic_year_id: ''
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to fetch academic years by curriculum:', error);
+      toast.error('Failed to load academic years for curriculum');
+      // Fallback to all academic years
+      setFilteredAcademicYears(academicYears);
+    } finally {
+      setLoading(false);
+    }
+  }, [academicYears, assignmentData.academic_year_id]);
 
   // --- Filtered Teachers ---
   const filteredTeachers = useMemo(() => {
@@ -681,94 +454,15 @@ function TeacherManager() {
       const matchesEmployment = !filters.employment_type || 
         teacher.employment_type === filters.employment_type;
       
-      const matchesStatus = !filters.status || 
-        teacher.status === filters.status;
-      
-      return matchesSearch && matchesCurriculum && matchesSpecialization && matchesEmployment && matchesStatus;
+      return matchesSearch && matchesCurriculum && matchesSpecialization && matchesEmployment;
     });
   }, [teachers, searchTerm, filters]);
-
-  // --- Selection Management ---
-  const toggleTeacherSelection = (teacherId) => {
-    setSelectedTeachers(prev =>
-      prev.includes(teacherId)
-        ? prev.filter(id => id !== teacherId)
-        : [...prev, teacherId]
-    );
-  };
-
-  const toggleSelectAll = () => {
-    if (selectedTeachers.length === filteredTeachers.length) {
-      setSelectedTeachers([]);
-    } else {
-      setSelectedTeachers(filteredTeachers.map(t => t.id));
-    }
-  };
-
-  // --- Bulk Operations ---
-  const handleBulkAction = async (action) => {
-    if (selectedTeachers.length === 0) return;
-
-    try {
-      setLoading(true);
-      
-      switch (action) {
-        case 'activate':
-          await apiRequest('teachers/bulk-activate', 'PUT', { teacher_ids: selectedTeachers });
-          toast.success(`Activated ${selectedTeachers.length} teachers`);
-          break;
-        case 'deactivate':
-          await apiRequest('teachers/bulk-deactivate', 'PUT', { teacher_ids: selectedTeachers });
-          toast.success(`Deactivated ${selectedTeachers.length} teachers`);
-          break;
-        case 'export':
-          await handleExport(selectedTeachers);
-          break;
-        case 'delete':
-          if (window.confirm(`Are you sure you want to delete ${selectedTeachers.length} teachers? This action cannot be undone.`)) {
-            await apiRequest('teachers/bulk-delete', 'DELETE', { teacher_ids: selectedTeachers });
-            toast.success(`Deleted ${selectedTeachers.length} teachers`);
-          }
-          break;
-      }
-      
-      fetchInitialData();
-      setSelectedTeachers([]);
-    } catch (error) {
-      toast.error(`Failed to perform bulk action: ${error.message}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // --- Export Functionality ---
-  const handleExport = async (teacherIds = null) => {
-    setExporting(true);
-    try {
-      const endpoint = teacherIds ? 'teachers/export-selected' : 'teachers/export';
-      const payload = teacherIds ? { teacher_ids: teacherIds } : { school_id: schoolId };
-      
-      const response = await apiRequest(endpoint, 'POST', payload);
-      
-      if (response.download_url) {
-        window.open(response.download_url, '_blank');
-        toast.success('Export completed successfully');
-      } else {
-        throw new Error('No download URL received');
-      }
-    } catch (error) {
-      toast.error('Failed to export teachers data');
-    } finally {
-      setExporting(false);
-    }
-  };
 
   // --- View Handlers ---
   const showCreateForm = () => {
     setView('create');
     setSelectedTeacher(null);
     
-    // Set default curriculum based on school's primary curriculum
     let defaultCurriculum = '';
     if (school && school.primary_curriculum !== 'Both') {
       defaultCurriculum = school.primary_curriculum;
@@ -782,8 +476,7 @@ function TeacherManager() {
       specialization: '',
       curriculum_specialization: defaultCurriculum,
       max_subjects: '',
-      max_classes: '',
-      status: 'active'
+      max_classes: ''
     });
   };
 
@@ -798,22 +491,79 @@ function TeacherManager() {
       specialization: teacher.specialization || '',
       curriculum_specialization: teacher.curriculum_specialization || '',
       max_subjects: teacher.max_subjects || '',
-      max_classes: teacher.max_classes || '',
-      status: teacher.status || 'active'
+      max_classes: teacher.max_classes || ''
     });
   };
 
-  const showManageSubjectsView = (teacher) => {
+  const showManageSubjectsView = async (teacher) => {
     setView('manage-subjects');
     setSelectedTeacher(teacher);
     const subjectIds = teacher.subjects?.map(s => s.id) || [];
-    setAssignmentData({ subject_ids: subjectIds, stream_id: '' });
+    
+    // Set default academic year to current academic year
+    const currentAcademicYear = academicYears.find(ay => ay.is_active);
+    
+    setAssignmentData({ 
+      subject_ids: subjectIds, 
+      stream_id: '',
+      academic_year_id: currentAcademicYear?.id || '',
+      weekly_periods: 5,
+      assignment_type: 'main_teacher'
+    });
+    
+    // Fetch academic years based on teacher's curriculum specialization
+    // Normalize the curriculum value before passing it
+    const curriculum = teacher.curriculum_specialization?.trim().toUpperCase();
+    await fetchAcademicYearsByCurriculum(curriculum);
+  };
+
+  const showClassroomsView = async (teacher) => {
+    setView('classrooms');
+    setSelectedTeacher(teacher);
+    setLoading(true);
+    try {
+      const response = await apiRequest(`teachers/${teacher.id}/classrooms`, 'GET');
+      const teacherClassrooms = response?.data || [];
+      
+      setSelectedTeacher(prev => ({
+        ...prev,
+        classrooms: teacherClassrooms,
+        classroomCount: teacherClassrooms.length
+      }));
+    } catch (error) {
+      const errorMessage = error?.response?.data?.message || 'Could not load classrooms';
+      toast.error(errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const showStreamsView = async (teacher) => {
+    setView('streams');
+    setSelectedTeacher(teacher);
+    setLoading(true);
+    try {
+      const response = await apiRequest(`teachers/${teacher.id}`, 'GET');
+      const teacherData = response?.data || response;
+      
+      setSelectedTeacher(prev => ({
+        ...prev,
+        classTeacherStreams: teacherData.classTeacherStreams || [],
+        teachingStreams: teacherData.teachingStreams || [],
+        streamCount: teacherData.teachingStreams?.length || 0,
+        classTeacherStreamCount: teacherData.classTeacherStreams?.length || 0
+      }));
+    } catch (error) {
+      const errorMessage = error?.response?.data?.message || 'Could not load streams';
+      toast.error(errorMessage);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const backToList = () => {
     setView('list');
     setSelectedTeacher(null);
-    setSelectedTeachers([]);
     fetchInitialData();
   };
 
@@ -846,16 +596,17 @@ function TeacherManager() {
         max_classes: formData.max_classes ? parseInt(formData.max_classes) : null
       };
       
-      // Only include curriculum_specialization if it's needed
+      // Only send curriculum_specialization if school requires it
       if (school && school.primary_curriculum !== 'Both') {
         delete payload.curriculum_specialization;
       }
       
+      let response;
       if (view === 'edit') {
-        await apiRequest(`teachers/${selectedTeacher.id}`, 'PUT', payload);
+        response = await apiRequest(`teachers/${selectedTeacher.id}`, 'PUT', payload);
         toast.success('Teacher updated successfully');
       } else {
-        await apiRequest('teachers', 'POST', payload);
+        response = await apiRequest('teachers', 'POST', payload);
         toast.success('Teacher created successfully');
       }
       
@@ -895,18 +646,98 @@ function TeacherManager() {
     }
   };
 
+  // Updated handleSaveSubjectAssignments function with proper academic year validation
   const handleSaveSubjectAssignments = async () => {
     setLoading(true);
     try {
-      await apiRequest(`subject-assignments`, 'POST', {
-        teacher_id: selectedTeacher.id,
-        subject_ids: assignmentData.subject_ids
-      });
+      // Get current academic year if not selected
+      const currentAcademicYear = filteredAcademicYears.find(ay => ay.is_active);
+      const academicYearId = assignmentData.academic_year_id || currentAcademicYear?.id;
+      
+      // Validate academic year is selected
+      if (!academicYearId) {
+        toast.error('Please select an academic year');
+        setLoading(false);
+        return;
+      }
+      
+      if (hasStreams) {
+        // For schools with streams, create assignments for each subject-stream combination
+        const assignments = [];
+        
+        for (const subjectId of assignmentData.subject_ids) {
+          // If stream_id is selected, create assignment for that specific stream
+          if (assignmentData.stream_id) {
+            assignments.push({
+              teacher_id: selectedTeacher.id,
+              subject_id: subjectId,
+              academic_year_id: academicYearId,
+              stream_id: assignmentData.stream_id,
+              weekly_periods: assignmentData.weekly_periods,
+              assignment_type: assignmentData.assignment_type
+            });
+          } else {
+            // If no stream selected, we need to get all streams for this teacher's school
+            // and create assignments for each stream
+            const streamAssignments = streams.map(stream => ({
+              teacher_id: selectedTeacher.id,
+              subject_id: subjectId,
+              academic_year_id: academicYearId,
+              stream_id: stream.id,
+              weekly_periods: assignmentData.weekly_periods,
+              assignment_type: assignmentData.assignment_type
+            }));
+            
+            assignments.push(...streamAssignments);
+          }
+        }
+        
+        // Send all assignments in a batch
+        await apiRequest(`subject-assignments/batch`, 'POST', {
+          assignments: assignments
+        });
+      } else {
+        // For schools without streams, create assignments without stream_id
+        const assignments = assignmentData.subject_ids.map(subjectId => ({
+          teacher_id: selectedTeacher.id,
+          subject_id: subjectId,
+          academic_year_id: academicYearId,
+          weekly_periods: assignmentData.weekly_periods,
+          assignment_type: assignmentData.assignment_type
+          // Note: stream_id is not included for schools without streams
+        }));
+        
+        // Send all assignments in a batch
+        await apiRequest(`subject-assignments/batch`, 'POST', {
+          assignments: assignments
+        });
+      }
+      
       toast.success('Subject assignments updated successfully');
       backToList();
     } catch (error) {
       console.error('Error:', error);
-      toast.error('Failed to update subject assignments.');
+      const errorMessage = error?.response?.data?.message || error?.message || 'Failed to update subject assignments.';
+      const validationErrors = error?.response?.data?.errors;
+      
+      if (validationErrors) {
+        // Handle array of errors
+        if (Array.isArray(validationErrors)) {
+          validationErrors.forEach(err => {
+            toast.error(err);
+          });
+        } else {
+          // Handle object of errors
+          Object.keys(validationErrors).forEach(key => {
+            const messages = Array.isArray(validationErrors[key]) 
+              ? validationErrors[key].join(', ') 
+              : validationErrors[key];
+            toast.error(`${key}: ${messages}`);
+          });
+        }
+      } else {
+        toast.error(errorMessage);
+      }
     } finally {
       setLoading(false);
     }
@@ -916,8 +747,7 @@ function TeacherManager() {
     setFilters({
       curriculum_specialization: '',
       specialization: '',
-      employment_type: '',
-      status: ''
+      employment_type: ''
     });
     setSearchTerm('');
   };
@@ -939,34 +769,23 @@ function TeacherManager() {
           {school && (
             <div className="flex items-center gap-2 mt-2">
               <span className="text-sm text-slate-600 dark:text-slate-400">
-                School Primary Curriculum:
+                School Type:
               </span>
-              <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getCurriculumBadgeColor(school.primary_curriculum)}`}>
-                {school.primary_curriculum}
+              <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                hasStreams 
+                  ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' 
+                  : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+              }`}>
+                {hasStreams ? 'Streams Enabled' : 'Direct Classroom Assignment'}
               </span>
             </div>
           )}
         </div>
         <div className="flex flex-wrap gap-3">
           <button 
-            onClick={() => setShowImport(true)} 
-            className="bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-4 py-3 rounded-lg font-medium hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors border border-slate-300 dark:border-slate-600 flex items-center gap-2"
-          >
-            <Upload className="w-4 h-4" />
-            Import
-          </button>
-          <button 
-            onClick={() => handleExport()} 
-            disabled={exporting}
-            className="bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-300 px-4 py-3 rounded-lg font-medium hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors border border-slate-300 dark:border-slate-600 flex items-center gap-2 disabled:opacity-50"
-          >
-            {exporting ? <Loader className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-            Export
-          </button>
-          <button 
             onClick={showCreateForm} 
             disabled={!school}
-            className="bg-black text-white px-6 py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors flex items-center gap-2 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-black text-white px-6 py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors flex items-center gap-2 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed dark:bg-white dark:text-black dark:hover:bg-gray-200"
             title={!school ? "Loading school information..." : "Create new teacher"}
           >
             <Plus className="w-5 h-5" />
@@ -985,14 +804,6 @@ function TeacherManager() {
         onClearFilters={clearAllFilters}
       />
 
-      <BulkActions
-        selectedTeachers={selectedTeachers}
-        onBulkAction={handleBulkAction}
-        onSelectAll={toggleSelectAll}
-        allSelected={selectedTeachers.length === filteredTeachers.length && filteredTeachers.length > 0}
-        totalTeachers={filteredTeachers.length}
-      />
-
       <div className="mb-4">
         <div className="relative">
           <Search className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
@@ -1006,63 +817,35 @@ function TeacherManager() {
         </div>
       </div>
 
-      <div className="bg-white dark:bg-background-dark/50 rounded-xl border border-slate-200 dark:border-slate-800 p-6">
+      <div className="bg-white dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-[#0d141b] dark:text-white text-2xl font-bold leading-tight tracking-[-0.015em]">
             Existing Teachers ({filteredTeachers.length})
           </h2>
-          {selectedTeachers.length > 0 && (
-            <span className="text-sm text-slate-500 dark:text-slate-400">
-              {selectedTeachers.length} selected
-            </span>
-          )}
         </div>
         
         <div className="overflow-x-auto">
           <div className="border rounded-lg border-slate-200 dark:border-slate-700">
             <table className="w-full text-sm text-left">
-              <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-300">
+              <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300">
                 <tr>
-                  <th className="px-6 py-4 font-medium w-8">
-                    <input
-                      type="checkbox"
-                      checked={selectedTeachers.length === filteredTeachers.length && filteredTeachers.length > 0}
-                      onChange={toggleSelectAll}
-                      className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                    />
-                  </th>
                   <th className="px-6 py-4 font-medium">Name</th>
                   <th className="px-6 py-4 font-medium">Email</th>
                   <th className="px-6 py-4 font-medium">Qualification</th>
                   <th className="px-6 py-4 font-medium">Specialization</th>
                   <th className="px-6 py-4 font-medium">Curriculum</th>
                   <th className="px-6 py-4 font-medium">Employment</th>
-                  <th className="px-6 py-4 font-medium">Status</th>
-                  <th className="px-6 py-4 font-medium">Max Load</th>
+                  <th className="px-6 py-4 font-medium">{hasStreams ? 'Streams' : 'Classrooms'}</th>
+                  <th className="px-6 py-4 font-medium">Class Teacher</th>
                   <th className="px-6 py-4 font-medium text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                 {filteredTeachers.length > 0 ? (
                   filteredTeachers.map((teacher) => (
-                    <tr key={teacher.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/20 transition-colors">
-                      <td className="px-6 py-4">
-                        <input
-                          type="checkbox"
-                          checked={selectedTeachers.includes(teacher.id)}
-                          onChange={() => toggleTeacherSelection(teacher.id)}
-                          className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                        />
-                      </td>
+                    <tr key={teacher.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/20 transition-colors">
                       <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
-                        <div className="flex items-center gap-2">
-                          {teacher.user?.full_name || teacher.user?.name || 'Unknown'}
-                          {teacher.status === 'inactive' && (
-                            <span className="px-2 py-1 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 rounded text-xs">
-                              Inactive
-                            </span>
-                          )}
-                        </div>
+                        {teacher.user?.full_name || teacher.user?.name || 'Unknown'}
                       </td>
                       <td className="px-6 py-4 text-slate-500 dark:text-slate-400 text-xs">
                         {teacher.user?.email || '-'}
@@ -1081,7 +864,7 @@ function TeacherManager() {
                             ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
                             : teacher.curriculum_specialization === '8-4-4'
                             ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
-                            : 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-300'
+                            : 'bg-purple-100 dark:bg-purple-900/30 dark:text-purple-300'
                         }`}>
                           {teacher.curriculum_specialization}
                         </span>
@@ -1089,39 +872,46 @@ function TeacherManager() {
                       <td className="px-6 py-4 text-slate-500 dark:text-slate-400 text-xs">
                         {teacher.employment_type || '-'}
                       </td>
-                      <td className="px-6 py-4">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          teacher.status === 'active' 
-                            ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-                            : 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-300'
-                        }`}>
-                          {teacher.status === 'active' ? 'Active' : 'Inactive'}
-                        </span>
+                      <td className="px-6 py-4 text-slate-500 dark:text-slate-400">
+                        {hasStreams ? (
+                          <span>{teacher.streamCount || 0} Stream(s)</span>
+                        ) : (
+                          <span>{teacher.classroomCount || 0} Classroom(s)</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-slate-500 dark:text-slate-400">
-                        <span className="text-xs">
-                          {teacher.max_subjects || '—'} / {teacher.max_classes || '—'}
-                        </span>
+                        {hasStreams ? (
+                          <span>{teacher.classTeacherStreamCount > 0 ? 'Yes' : 'No'}</span>
+                        ) : (
+                          <span>{teacher.classTeacherClassroom ? 'Yes' : 'No'}</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end gap-2">
                           <button 
                             onClick={() => showManageSubjectsView(teacher)} 
-                            className="p-2 text-slate-500 hover:text-green-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                            className="p-2 text-slate-500 hover:text-green-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                             title="Manage Subjects"
                           >
                             <BookOpen className="w-4 h-4" />
                           </button>
                           <button 
+                            onClick={() => hasStreams ? showStreamsView(teacher) : showClassroomsView(teacher)} 
+                            className="p-2 text-slate-500 hover:text-purple-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                            title={hasStreams ? "View Streams" : "View Classrooms"}
+                          >
+                            <Users className="w-4 h-4" />
+                          </button>
+                          <button 
                             onClick={() => showEditForm(teacher)} 
-                            className="p-2 text-slate-500 hover:text-blue-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                            className="p-2 text-slate-500 hover:text-blue-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                             title="Edit Teacher"
                           >
                             <Edit className="w-4 h-4" />
                           </button>
                           <button 
                             onClick={() => handleDelete(teacher.id)} 
-                            className="p-2 text-slate-500 hover:text-red-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                            className="p-2 text-slate-500 hover:text-red-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                             title="Delete Teacher"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -1132,7 +922,7 @@ function TeacherManager() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="10" className="px-6 py-8 text-center text-slate-500 dark:text-slate-400">
+                    <td colSpan="9" className="px-6 py-8 text-center text-slate-500 dark:text-slate-400">
                       {searchTerm || Object.values(filters).some(v => v) 
                         ? 'No teachers match your filters.' 
                         : 'No teachers found.'}
@@ -1299,22 +1089,6 @@ function TeacherManager() {
                 className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white" 
               />
             </div>
-
-            <div>
-              <label htmlFor="status" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                Status
-              </label>
-              <select 
-                id="status"
-                name="status" 
-                value={formData.status} 
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
-              >
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-              </select>
-            </div>
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700 mt-6">
@@ -1359,6 +1133,18 @@ function TeacherManager() {
             <p className="text-sm text-slate-500 dark:text-slate-400">
               {selectedTeacher?.user?.full_name || selectedTeacher?.user?.name}
             </p>
+            {selectedTeacher?.curriculum_specialization && (
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-xs text-slate-500 dark:text-slate-400">Curriculum:</span>
+                <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                  selectedTeacher.curriculum_specialization === 'CBC' 
+                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' 
+                    : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
+                }`}>
+                  {selectedTeacher.curriculum_specialization}
+                </span>
+              </div>
+            )}
           </div>
           <button 
             onClick={backToList} 
@@ -1373,10 +1159,10 @@ function TeacherManager() {
             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
               Select Subjects ({assignmentData.subject_ids.length} selected)
             </label>
-            <div className="space-y-2 max-h-96 overflow-y-auto border rounded-lg border-slate-300 dark:border-slate-600 p-4 bg-slate-50 dark:bg-slate-900/20">
+            <div className="space-y-2 max-h-96 overflow-y-auto border rounded-lg border-slate-300 dark:border-slate-600 p-4 bg-slate-50 dark:bg-slate-700/50">
               {subjects.length > 0 ? (
                 subjects.map(subject => (
-                  <label key={subject.id} className="flex items-center space-x-3 p-3 hover:bg-white dark:hover:bg-slate-800 rounded cursor-pointer transition-colors">
+                  <label key={subject.id} className="flex items-center space-x-3 p-3 hover:bg-white dark:hover:bg-slate-700 rounded cursor-pointer transition-colors">
                     <input
                       type="checkbox"
                       value={subject.id}
@@ -1405,6 +1191,15 @@ function TeacherManager() {
                           ({subject.code})
                         </span>
                       )}
+                      {subject.curriculum_type && (
+                        <span className={`ml-2 px-2 py-0.5 text-xs rounded-full ${
+                          subject.curriculum_type === 'CBC' 
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                            : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
+                        }`}>
+                          {subject.curriculum_type}
+                        </span>
+                      )}
                     </div>
                   </label>
                 ))
@@ -1413,6 +1208,94 @@ function TeacherManager() {
               )}
             </div>
           </div>
+          
+          {/* Additional assignment fields */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div>
+              <label htmlFor="academic_year_id" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Academic Year <span className="text-red-500">*</span>
+              </label>
+              <select
+                id="academic_year_id"
+                name="academic_year_id"
+                value={assignmentData.academic_year_id}
+                onChange={handleAssignmentChange}
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+              >
+                <option value="">Select academic year</option>
+                {filteredAcademicYears.map(year => (
+                  <option key={year.id} value={year.id}>
+                    {year.year} - {year.term} {year.is_active ? '(Active)' : ''}
+                  </option>
+                ))}
+              </select>
+              {selectedTeacher?.curriculum_specialization && selectedTeacher?.curriculum_specialization !== 'Both' && (
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Showing academic years for {selectedTeacher.curriculum_specialization} curriculum
+                </p>
+              )}
+            </div>
+            
+            <div>
+              <label htmlFor="weekly_periods" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Weekly Periods
+              </label>
+              <input
+                id="weekly_periods"
+                type="number"
+                name="weekly_periods"
+                value={assignmentData.weekly_periods}
+                onChange={handleAssignmentChange}
+                min="1"
+                max="40"
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+              />
+            </div>
+            
+            <div>
+              <label htmlFor="assignment_type" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Assignment Type
+              </label>
+              <select
+                id="assignment_type"
+                name="assignment_type"
+                value={assignmentData.assignment_type}
+                onChange={handleAssignmentChange}
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+              >
+                <option value="main_teacher">Main Teacher</option>
+                <option value="assistant_teacher">Assistant Teacher</option>
+                <option value="substitute">Substitute</option>
+              </select>
+            </div>
+          </div>
+          
+          {/* Stream selection for schools with streams */}
+          {hasStreams && (
+            <div className="mb-6">
+              <label htmlFor="stream_id" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Stream (Optional)
+              </label>
+              <select
+                id="stream_id"
+                name="stream_id"
+                value={assignmentData.stream_id}
+                onChange={handleAssignmentChange}
+                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+              >
+                <option value="">Select stream (optional)</option>
+                {streams.map(stream => (
+                  <option key={stream.id} value={stream.id}>
+                    {stream.classroom?.name} - {stream.name}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Leave empty to assign to all streams or select a specific stream
+              </p>
+            </div>
+          )}
+          
           <div className="flex justify-end gap-3 pt-4">
             <button 
               type="button" 
@@ -1423,7 +1306,7 @@ function TeacherManager() {
             </button>
             <button 
               onClick={handleSaveSubjectAssignments} 
-              disabled={loading} 
+              disabled={loading || assignmentData.subject_ids.length === 0} 
               className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center gap-2"
             >
               {loading ? (
@@ -1436,6 +1319,192 @@ function TeacherManager() {
               )}
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+  
+  // New view for showing classrooms assigned to a teacher (for non-stream schools)
+  const renderClassroomsView = () => (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-4xl border border-slate-200 dark:border-slate-700">
+        <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+          <div>
+            <h3 className="text-lg sm:text-xl font-semibold text-slate-900 dark:text-white">
+              Classrooms for {selectedTeacher?.user?.full_name || selectedTeacher?.user?.name}
+            </h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Total Classrooms: <span className="font-medium">{selectedTeacher?.classroomCount || 0}</span>
+            </p>
+          </div>
+          <button 
+            onClick={backToList} 
+            className="text-slate-400 hover:text-slate-600 dark:hover:bg-slate-700 transition-colors p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
+            aria-label="Close"
+          >
+            <X className="w-5 h-5 sm:w-6 sm:h-6" />
+          </button>
+        </div>
+        <div className="p-4 sm:p-6">
+          {loading ? (
+            <div className="flex justify-center py-8">
+              <Loader className="w-8 h-8 animate-spin text-slate-500" />
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {selectedTeacher?.classrooms && selectedTeacher.classrooms.length > 0 ? (
+                selectedTeacher.classrooms.map(classroom => (
+                  <div 
+                    key={classroom.id} 
+                    className="flex justify-between items-center p-4 border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-slate-900 dark:text-white truncate">{classroom.class_name}</p>
+                        {classroom.pivot?.is_class_teacher && (
+                          <span className="px-2 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 rounded-full text-xs font-medium">
+                            Class Teacher
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        Capacity: {classroom.capacity || 0} students
+                      </p>
+                    </div>
+                    <div className="text-right ml-4 flex-shrink-0">
+                      <div className="flex items-center gap-1 text-slate-500 dark:text-slate-400">
+                        <Users className="w-4 h-4" />
+                        <span>{classroom.capacity || 0}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8">
+                  <AlertCircle className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                  <p className="text-slate-500 dark:text-slate-400">
+                    No classrooms found for this teacher.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  // New view for showing streams assigned to a teacher (for stream schools)
+  const renderStreamsView = () => (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-4xl border border-slate-200 dark:border-slate-700">
+        <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+          <div>
+            <h3 className="text-lg sm:text-xl font-semibold text-slate-900 dark:text-white">
+              Streams for {selectedTeacher?.user?.full_name || selectedTeacher?.user?.name}
+            </h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Teaching: <span className="font-medium">{selectedTeacher?.streamCount || 0}</span> streams | 
+              Class Teacher: <span className="font-medium">{selectedTeacher?.classTeacherStreamCount || 0}</span> streams
+            </p>
+          </div>
+          <button 
+            onClick={backToList} 
+            className="text-slate-400 hover:text-slate-600 dark:hover:bg-slate-700 transition-colors p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
+            aria-label="Close"
+          >
+            <X className="w-5 h-5 sm:w-6 sm:h-6" />
+          </button>
+        </div>
+        <div className="p-4 sm:p-6">
+          {loading ? (
+            <div className="flex justify-center py-8">
+              <Loader className="w-8 h-8 animate-spin text-slate-500" />
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* Teaching Streams */}
+              <div>
+                <h4 className="text-md font-medium text-slate-900 dark:text-white mb-3">Teaching Streams</h4>
+                <div className="space-y-3">
+                  {selectedTeacher?.teachingStreams && selectedTeacher.teachingStreams.length > 0 ? (
+                    selectedTeacher.teachingStreams.map(stream => (
+                      <div 
+                        key={stream.id} 
+                        className="flex justify-between items-center p-4 border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-slate-900 dark:text-white truncate">{stream.name}</p>
+                            <span className="px-2 py-1 bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300 rounded-full text-xs font-medium">
+                              {stream.classroom?.class_name || 'Unknown Classroom'}
+                            </span>
+                          </div>
+                          <p className="text-sm text-slate-500 dark:text-slate-400">
+                            Capacity: {stream.capacity || 0} students
+                          </p>
+                        </div>
+                        <div className="text-right ml-4 flex-shrink-0">
+                          <div className="flex items-center gap-1 text-slate-500 dark:text-slate-400">
+                            <Users className="w-4 h-4" />
+                            <span>{stream.capacity || 0}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-4 border border-slate-200 dark:border-slate-600 rounded-lg">
+                      <p className="text-slate-500 dark:text-slate-400">
+                        No teaching streams assigned.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Class Teacher Streams */}
+              <div>
+                <h4 className="text-md font-medium text-slate-900 dark:text-white mb-3">Class Teacher Streams</h4>
+                <div className="space-y-3">
+                  {selectedTeacher?.classTeacherStreams && selectedTeacher.classTeacherStreams.length > 0 ? (
+                    selectedTeacher.classTeacherStreams.map(stream => (
+                      <div 
+                        key={stream.id} 
+                        className="flex justify-between items-center p-4 border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-slate-900 dark:text-white truncate">{stream.name}</p>
+                            <span className="px-2 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 rounded-full text-xs font-medium">
+                              Class Teacher
+                            </span>
+                            <span className="px-2 py-1 bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300 rounded-full text-xs font-medium">
+                              {stream.classroom?.class_name || 'Unknown Classroom'}
+                            </span>
+                          </div>
+                          <p className="text-sm text-slate-500 dark:text-slate-400">
+                            Capacity: {stream.capacity || 0} students
+                          </p>
+                        </div>
+                        <div className="text-right ml-4 flex-shrink-0">
+                          <div className="flex items-center gap-1 text-slate-500 dark:text-slate-400">
+                            <Users className="w-4 h-4" />
+                            <span>{stream.capacity || 0}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-4 border border-slate-200 dark:border-slate-600 rounded-lg">
+                      <p className="text-slate-500 dark:text-slate-400">
+                        No class teacher streams assigned.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -1472,13 +1541,6 @@ function TeacherManager() {
 
   return (
     <div className="w-full py-8">
-      {showImport && (
-        <ImportTeachers 
-          onImportComplete={fetchInitialData}
-          onClose={() => setShowImport(false)}
-        />
-      )}
-      
       {loading && view === 'list' && (
         <div className="flex flex-col items-center justify-center py-16">
           <Loader className="w-12 h-12 text-gray-600 dark:text-gray-400 animate-spin" />
@@ -1489,6 +1551,8 @@ function TeacherManager() {
       {!loading && view === 'list' && renderListView()}
       {(view === 'create' || view === 'edit') && renderFormView()}
       {view === 'manage-subjects' && renderManageSubjectsView()}
+      {view === 'classrooms' && renderClassroomsView()}
+      {view === 'streams' && renderStreamsView()}
     </div>
   );
 }

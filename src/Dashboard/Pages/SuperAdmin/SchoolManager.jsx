@@ -1,4 +1,4 @@
-// src/Dashboard/Pages/SuperAdmin/SchoolManager.jsx
+// SchoolManager.jsx
 import React, { useEffect, useState } from 'react';
 import { apiRequest } from '../../../utils/api';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -19,7 +19,9 @@ import {
   XCircle,
   School,
   Code,
-  BookOpen
+  BookOpen,
+  CheckSquare,
+  Square
 } from 'lucide-react';
 import { toast } from "react-toastify";
 
@@ -83,14 +85,14 @@ function SchoolManager() {
             School Management
           </h1>
           <p className="text-[#4c739a] dark:text-slate-400 text-base font-normal leading-normal">
-            View and manage all registered schools in the system.
+            View and manage all registered schools in system.
           </p>
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white dark:bg-background-dark/50 rounded-xl border border-slate-200 dark:border-slate-800 p-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="bg-white dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Total Schools</p>
@@ -101,7 +103,7 @@ function SchoolManager() {
             </div>
           </div>
         </div>
-        <div className="bg-white dark:bg-background-dark/50 rounded-xl border border-slate-200 dark:border-slate-800 p-6">
+        <div className="bg-white dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Secondary Schools</p>
@@ -114,7 +116,20 @@ function SchoolManager() {
             </div>
           </div>
         </div>
-        <div className="bg-white dark:bg-background-dark/50 rounded-xl border border-slate-200 dark:border-slate-800 p-6">
+        <div className="bg-white dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Schools with Streams</p>
+              <p className="text-3xl font-bold text-slate-900 dark:text-white mt-2">
+                {schools.filter(s => s.has_streams === true).length}
+              </p>
+            </div>
+            <div className="bg-purple-100 dark:bg-purple-900/30 p-3 rounded-lg">
+              <CheckSquare className="w-8 h-8 text-purple-600 dark:text-purple-400" />
+            </div>
+          </div>
+        </div>
+        <div className="bg-white dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Total Users</p>
@@ -122,35 +137,36 @@ function SchoolManager() {
                 {schools.reduce((acc, school) => acc + (school.users?.length || 0), 0)}
               </p>
             </div>
-            <div className="bg-purple-100 dark:bg-purple-900/30 p-3 rounded-lg">
-              <Users className="w-8 h-8 text-purple-600 dark:text-purple-400" />
+            <div className="bg-amber-100 dark:bg-amber-900/30 p-3 rounded-lg">
+              <Users className="w-8 h-8 text-amber-600 dark:text-amber-400" />
             </div>
           </div>
         </div>
       </div>
 
-      <div className="bg-white dark:bg-background-dark/50 rounded-xl border border-slate-200 dark:border-slate-800 p-6">
+      <div className="bg-white dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
         <h2 className="text-[#0d141b] dark:text-white text-2xl font-bold leading-tight tracking-[-0.015em] mb-6">
           All Schools
         </h2>
         <div className="overflow-x-auto">
           <div className="border rounded-lg border-slate-200 dark:border-slate-700">
             <table className="w-full text-sm text-left">
-              <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-300">
+              <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300">
                 <tr>
                   <th className="px-6 py-4 font-medium">School Info</th>
                   <th className="px-6 py-4 font-medium">Type</th>
                   <th className="px-6 py-4 font-medium">Primary Curriculum</th>
+                  <th className="px-6 py-4 font-medium">Streams</th>
                   <th className="px-6 py-4 font-medium">Location</th>
                   <th className="px-6 py-4 font-medium">Contact</th>
                   <th className="px-6 py-4 font-medium">Users</th>
                   <th className="px-6 py-4 font-medium text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                 {schools.length > 0 ? (
                   schools.map((school) => (
-                    <tr key={school.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/20 transition-colors">
+                    <tr key={school.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/20 transition-colors">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
                           {school.logo ? (
@@ -182,6 +198,21 @@ function SchoolManager() {
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
                           {school.primary_curriculum || 'Not Set'}
                         </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-1">
+                          {school.has_streams ? (
+                            <>
+                              <CheckSquare className="w-4 h-4 text-green-600 dark:text-green-400" />
+                              <span className="text-xs font-medium text-green-700 dark:text-green-400">Enabled</span>
+                            </>
+                          ) : (
+                            <>
+                              <Square className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                              <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Disabled</span>
+                            </>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="space-y-1 text-slate-500 dark:text-slate-400 text-xs">
@@ -225,7 +256,7 @@ function SchoolManager() {
                         <div className="flex justify-end gap-2">
                           <button 
                             onClick={() => showSchoolDetails(school)} 
-                            className="p-2 text-slate-500 hover:text-blue-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+                            className="p-2 text-slate-500 hover:text-blue-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
                             title="View Details"
                           >
                             <Eye className="w-4 h-4" />
@@ -236,7 +267,7 @@ function SchoolManager() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="7" className="px-6 py-8 text-center text-slate-500 dark:text-slate-400">
+                    <td colSpan="8" className="px-6 py-8 text-center text-slate-500 dark:text-slate-400">
                       No schools found.
                     </td>
                   </tr>
@@ -275,7 +306,7 @@ function SchoolManager() {
         </div>
 
         {/* Main Info Card */}
-        <div className="bg-white dark:bg-background-dark/50 rounded-xl border border-slate-200 dark:border-slate-800 p-8 mb-6">
+        <div className="bg-white dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 p-8 mb-6">
           <div className="flex items-start justify-between mb-6">
             <div className="flex items-center gap-4">
               {schoolDetails.logo ? (
@@ -396,9 +427,43 @@ function SchoolManager() {
           </div>
         </div>
 
+        {/* Stream Configuration Section */}
+        <div className="bg-white dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 p-6 mb-6">
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+            <CheckSquare className="w-5 h-5" />
+            Stream Configuration
+          </h3>
+          <div className="flex items-start gap-3">
+            <div className="pt-1">
+              {schoolDetails.has_streams ? (
+                <CheckSquare className="w-5 h-5 text-green-600 dark:text-green-400" />
+              ) : (
+                <Square className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+              )}
+            </div>
+            <div className="flex-1">
+              <p className="text-base font-medium text-slate-900 dark:text-white">
+                Streams are {schoolDetails.has_streams ? 'enabled' : 'disabled'} for this school
+              </p>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                {schoolDetails.has_streams 
+                  ? "This school can create and manage streams for classrooms." 
+                  : "This school does not use stream-based organization."}
+              </p>
+              {schoolDetails.has_streams && (
+                <div className="mt-3 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                  <p className="text-sm text-green-700 dark:text-green-300">
+                    ✓ Stream functionality is enabled for this school
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
         {/* Users Section */}
         {selectedSchool?.users && selectedSchool.users.length > 0 && (
-          <div className="bg-white dark:bg-background-dark/50 rounded-xl border border-slate-200 dark:border-slate-800 p-6">
+          <div className="bg-white dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
             <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
               <Users className="w-5 h-5" />
               Registered Users ({selectedSchool.users.length})
@@ -406,7 +471,7 @@ function SchoolManager() {
             <div className="overflow-x-auto">
               <div className="border rounded-lg border-slate-200 dark:border-slate-700">
                 <table className="w-full text-sm">
-                  <thead className="bg-slate-50 dark:bg-slate-800/50 text-slate-600 dark:text-slate-300">
+                  <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300">
                     <tr>
                       <th className="px-4 py-3 text-left font-medium">Name</th>
                       <th className="px-4 py-3 text-left font-medium">Email</th>
@@ -415,9 +480,9 @@ function SchoolManager() {
                       <th className="px-4 py-3 text-left font-medium">Status</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                  <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
                     {selectedSchool.users.map((user) => (
-                      <tr key={user.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/20">
+                      <tr key={user.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/20">
                         <td className="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">
                           {user.full_name}
                         </td>

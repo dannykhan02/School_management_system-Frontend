@@ -1,3 +1,4 @@
+// Roles.jsx
 import React, { useEffect, useState } from 'react';
 import { Plus, Shield, Loader } from 'lucide-react';
 import RoleForm from '../../../components/RoleForm';
@@ -25,8 +26,8 @@ function Roles() {
   }, []);
 
   return (
-    <main className="flex-1 p-6">
-      <div className="w-full">
+    <div className="w-full py-8">
+      <div className="px-6">
         {/* Header Section */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-8">
           <div className="flex items-center gap-3">
@@ -34,9 +35,9 @@ function Roles() {
               <Shield className="w-6 h-6 text-white dark:text-black" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-black dark:text-white">Role Management</h1>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Manage user roles and permissions across the system
+              <h1 className="text-[#0d141b] dark:text-white text-4xl font-black leading-tight tracking-[-0.033em]">Role Management</h1>
+              <p className="text-[#4c739a] dark:text-slate-400 text-base font-normal leading-normal">
+                Manage user roles and permissions across system
               </p>
             </div>
           </div>
@@ -51,46 +52,44 @@ function Roles() {
         </div>
 
         {/* Roles Table */}
-        <div className="bg-white dark:bg-black rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
+        <div className="bg-white dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
           {loading ? (
             <div className="flex flex-col items-center justify-center py-16">
               <Loader className="w-12 h-12 text-gray-600 dark:text-gray-400 animate-spin" />
             </div>
           ) : roles.length > 0 ? (
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 dark:bg-gray-900">
-                  <tr>
-                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
-                      Role Details
-                    </th>
-                    <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">
-                      Role Name
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 dark:divide-gray-800">
-                  {roles.map((role) => (
-                    <tr key={role.id} className="hover:bg-gray-50 dark:hover:bg-gray-900 transition-colors">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <p className="font-semibold text-black dark:text-white">{role.id}</p>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3 justify-end">
-                          <p className="font-semibold text-black dark:text-white">{role.name}</p>
-                        </div>
-                      </td>
+              <div className="border rounded-lg border-slate-200 dark:border-slate-700">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300">
+                    <tr>
+                      <th className="px-6 py-4 font-medium">Role Details</th>
+                      <th className="px-6 py-4 font-medium text-right">Role Name</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                    {roles.map((role) => (
+                      <tr key={role.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/20 transition-colors">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <p className="font-semibold text-[#0d141b] dark:text-white">{role.id}</p>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3 justify-end">
+                            <p className="font-semibold text-[#0d141b] dark:text-white">{role.name}</p>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           ) : (
             <div className="text-center py-16">
-              <p className="text-lg font-medium text-black dark:text-white mb-2">No roles found</p>
-              <p className="text-gray-600 dark:text-gray-400 text-sm">No roles available in the system</p>
+              <p className="text-lg font-medium text-[#0d141b] dark:text-white mb-2">No roles found</p>
+              <p className="text-[#4c739a] dark:text-slate-400 text-sm">No roles available in system</p>
             </div>
           )}
         </div>
@@ -98,7 +97,7 @@ function Roles() {
         {/* Form Modal */}
         {showForm && <RoleForm onClose={() => setShowForm(false)} />}
       </div>
-    </main>
+    </div>
   );
 }
 
