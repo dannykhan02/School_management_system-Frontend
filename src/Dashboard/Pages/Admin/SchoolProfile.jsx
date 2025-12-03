@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Edit, MapPin, Phone, Mail, School, BookOpen, CheckSquare, Square } from 'lucide-react';
+import { Edit, MapPin, Phone, Mail, School, BookOpen, CheckSquare, Square, GraduationCap, Award } from 'lucide-react';
 import { apiRequest } from '../../../utils/api';
 import { Link } from 'react-router-dom';
 
@@ -36,6 +36,32 @@ function SchoolProfile() {
       </div>
     );
   }
+
+  const getCurriculumLevels = () => {
+    const levels = [];
+    
+    if (schoolData.has_pre_primary) levels.push('Pre-Primary');
+    if (schoolData.has_primary) levels.push('Primary');
+    if (schoolData.has_junior_secondary) levels.push('Junior Secondary');
+    if (schoolData.has_senior_secondary) levels.push('Senior Secondary');
+    if (schoolData.has_secondary) levels.push('Secondary');
+    
+    return levels;
+  };
+
+  const getCurriculumType = () => {
+    if (schoolData.primary_curriculum === 'Both') return 'Both CBC & 8-4-4';
+    return schoolData.primary_curriculum || 'Not Set';
+  };
+
+  const getPathwayLabel = (pathway) => {
+    switch(pathway) {
+      case 'STEM': return 'STEM (Science, Technology, Engineering, Mathematics)';
+      case 'Arts': return 'Arts & Sports Science';
+      case 'Social Sciences': return 'Social Sciences';
+      default: return pathway;
+    }
+  };
 
   return (
     <div className="w-full space-y-4 sm:space-y-6 p-3 sm:p-4 md:p-6 lg:p-8">
@@ -139,10 +165,10 @@ function SchoolProfile() {
 
             <div className="border-b border-slate-200 dark:border-slate-700 pb-3 sm:pb-4">
               <label className="block text-xs font-semibold text-[#4c739a] dark:text-slate-400 mb-1 sm:mb-2 uppercase tracking-wide">
-                Primary Curriculum
+                Curriculum Type
               </label>
               <p className="text-base sm:text-lg text-[#0d141b] dark:text-white font-semibold">
-                {schoolData.primary_curriculum || 'Not Set'}
+                {getCurriculumType()}
               </p>
             </div>
 
@@ -222,6 +248,55 @@ function SchoolProfile() {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Curriculum Levels Section */}
+      <div className="bg-white dark:bg-slate-800/50 rounded-lg sm:rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
+        <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-700">
+          <h2 className="text-base sm:text-lg md:text-xl font-bold text-[#0d141b] dark:text-white mb-1 flex items-center gap-2">
+            <GraduationCap className="w-5 h-5" />
+            Curriculum Levels
+          </h2>
+          <p className="text-xs sm:text-sm text-[#4c739a] dark:text-slate-400">
+            Educational levels offered by this school
+          </p>
+        </div>
+
+        <div className="p-4 sm:p-6">
+          {getCurriculumLevels().length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {getCurriculumLevels().map((level, index) => (
+                <div key={index} className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckSquare className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                    <h3 className="text-base sm:text-lg font-semibold text-[#0d141b] dark:text-white">
+                      {level}
+                    </h3>
+                  </div>
+                  {level === 'Senior Secondary' && schoolData.senior_secondary_pathways && (
+                    <div className="mt-3 space-y-2">
+                      <p className="text-xs font-medium text-slate-600 dark:text-slate-400">Pathways:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {schoolData.senior_secondary_pathways.map((pathway, idx) => (
+                          <span key={idx} className="px-2 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-xs rounded-full flex items-center gap-1">
+                            <Award className="w-3 h-3" />
+                            {pathway}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="p-6 text-center">
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                No curriculum levels have been set up for this school yet.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>
