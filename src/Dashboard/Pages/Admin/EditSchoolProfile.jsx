@@ -25,7 +25,42 @@ function EditSchoolProfile() {
     has_senior_secondary: false,
     has_secondary: false,
     senior_secondary_pathways: [],
+    grade_levels: [],
   });
+
+  // Define grade levels for CBC
+  const cbcGradeLevels = [
+    { id: 'PP1', name: 'PP1', curriculum: 'CBC', level: 'Pre-Primary' },
+    { id: 'PP2', name: 'PP2', curriculum: 'CBC', level: 'Pre-Primary' },
+    { id: 'Grade 1', name: 'Grade 1', curriculum: 'CBC', level: 'Primary' },
+    { id: 'Grade 2', name: 'Grade 2', curriculum: 'CBC', level: 'Primary' },
+    { id: 'Grade 3', name: 'Grade 3', curriculum: 'CBC', level: 'Primary' },
+    { id: 'Grade 4', name: 'Grade 4', curriculum: 'CBC', level: 'Primary' },
+    { id: 'Grade 5', name: 'Grade 5', curriculum: 'CBC', level: 'Primary' },
+    { id: 'Grade 6', name: 'Grade 6', curriculum: 'CBC', level: 'Primary' },
+    { id: 'Grade 7', name: 'Grade 7', curriculum: 'CBC', level: 'Junior Secondary' },
+    { id: 'Grade 8', name: 'Grade 8', curriculum: 'CBC', level: 'Junior Secondary' },
+    { id: 'Grade 9', name: 'Grade 9', curriculum: 'CBC', level: 'Junior Secondary' },
+    { id: 'Grade 10', name: 'Grade 10', curriculum: 'CBC', level: 'Senior Secondary' },
+    { id: 'Grade 11', name: 'Grade 11', curriculum: 'CBC', level: 'Senior Secondary' },
+    { id: 'Grade 12', name: 'Grade 12', curriculum: 'CBC', level: 'Senior Secondary' },
+  ];
+  
+  // Define class levels for 8-4-4
+  const classLevels = [
+    { id: 'Standard 1', name: 'Standard 1', curriculum: '8-4-4', level: 'Primary' },
+    { id: 'Standard 2', name: 'Standard 2', curriculum: '8-4-4', level: 'Primary' },
+    { id: 'Standard 3', name: 'Standard 3', curriculum: '8-4-4', level: 'Primary' },
+    { id: 'Standard 4', name: 'Standard 4', curriculum: '8-4-4', level: 'Primary' },
+    { id: 'Standard 5', name: 'Standard 5', curriculum: '8-4-4', level: 'Primary' },
+    { id: 'Standard 6', name: 'Standard 6', curriculum: '8-4-4', level: 'Primary' },
+    { id: 'Standard 7', name: 'Standard 7', curriculum: '8-4-4', level: 'Primary' },
+    { id: 'Standard 8', name: 'Standard 8', curriculum: '8-4-4', level: 'Primary' },
+    { id: 'Form 1', name: 'Form 1', curriculum: '8-4-4', level: 'Secondary' },
+    { id: 'Form 2', name: 'Form 2', curriculum: '8-4-4', level: 'Secondary' },
+    { id: 'Form 3', name: 'Form 3', curriculum: '8-4-4', level: 'Secondary' },
+    { id: 'Form 4', name: 'Form 4', curriculum: '8-4-4', level: 'Secondary' },
+  ];
 
   const [logoFile, setLogoFile] = useState(null);
   const [logoPreview, setLogoPreview] = useState(null);
@@ -36,6 +71,7 @@ function EditSchoolProfile() {
   const [originalData, setOriginalData] = useState(null);
   const [logoError, setLogoError] = useState(false);
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
+  const [isLocked, setIsLocked] = useState(false);   // ← NEW
 
   useEffect(() => {
     const fetchSchool = async () => {
@@ -60,10 +96,12 @@ function EditSchoolProfile() {
           has_senior_secondary: data.has_senior_secondary || false,
           has_secondary: data.has_secondary || false,
           senior_secondary_pathways: data.senior_secondary_pathways || [],
+          grade_levels: data.grade_levels || [],
         };
 
         setFormData(schoolData);
         setOriginalData(schoolData);
+        setIsLocked(!!data.id);   // ← NEW
 
         if (data.logo) {
           setLogoPreview(data.logo);
@@ -77,6 +115,9 @@ function EditSchoolProfile() {
 
     fetchSchool();
   }, [id]);
+
+  // returns true when the control must be disabled
+  const lock = (field) => isLocked && originalData?.[field];   // ← NEW
 
   // Update secondary curriculum when primary curriculum changes
   useEffect(() => {
@@ -92,14 +133,14 @@ function EditSchoolProfile() {
     if (formData.primary_curriculum === 'CBC') {
       setFormData(prev => ({
         ...prev,
-        has_secondary: false // Reset 8-4-4 secondary when CBC is selected
+        has_secondary: false
       }));
     } else if (formData.primary_curriculum === '8-4-4') {
       setFormData(prev => ({
         ...prev,
-        has_pre_primary: false, // Reset CBC pre-primary when 8-4-4 is selected
-        has_junior_secondary: false, // Reset CBC junior secondary when 8-4-4 is selected
-        has_senior_secondary: false, // Reset CBC senior secondary when 8-4-4 is selected
+        has_pre_primary: false,
+        has_junior_secondary: false,
+        has_senior_secondary: false,
       }));
     }
   }, [formData.primary_curriculum]);
@@ -110,6 +151,88 @@ function EditSchoolProfile() {
       setFormData(prev => ({ ...prev, senior_secondary_pathways: [] }));
     }
   }, [formData.has_senior_secondary]);
+
+  // Auto-select grade levels when level checkboxes change
+  useEffect(() => {
+    let selectedLevels = [];
+    
+    if (formData.primary_curriculum === 'CBC') {
+      if (formData.has_pre_primary) {
+        selectedLevels.push(...cbcGradeLevels.filter(level => level.level === 'Pre-Primary').map(level => level.id));
+      }
+      if (formData.has_primary) {
+        selectedLevels.push(...cbcGradeLevels.filter(level => level.level === 'Primary').map(level => level.id));
+      }
+      if (formData.has_junior_secondary) {
+        selectedLevels.push(...cbcGradeLevels.filter(level => level.level === 'Junior Secondary').map(level => level.id));
+      }
+      if (formData.has_senior_secondary) {
+        selectedLevels.push(...cbcGradeLevels.filter(level => level.level === 'Senior Secondary').map(level => level.id));
+      }
+    } else if (formData.primary_curriculum === '8-4-4') {
+      if (formData.has_primary) {
+        selectedLevels.push(...classLevels.filter(level => level.level === 'Primary').map(level => level.id));
+      }
+      if (formData.has_secondary) {
+        selectedLevels.push(...classLevels.filter(level => level.level === 'Secondary').map(level => level.id));
+      }
+    } else if (formData.primary_curriculum === 'Both') {
+      if (formData.has_pre_primary) {
+        selectedLevels.push(...cbcGradeLevels.filter(level => level.level === 'Pre-Primary').map(level => level.id));
+      }
+      if (formData.has_primary) {
+        selectedLevels.push(...cbcGradeLevels.filter(level => level.level === 'Primary').map(level => level.id));
+        selectedLevels.push(...classLevels.filter(level => level.level === 'Primary').map(level => level.id));
+      }
+      if (formData.has_junior_secondary) {
+        selectedLevels.push(...cbcGradeLevels.filter(level => level.level === 'Junior Secondary').map(level => level.id));
+      }
+      if (formData.has_senior_secondary) {
+        selectedLevels.push(...cbcGradeLevels.filter(level => level.level === 'Senior Secondary').map(level => level.id));
+      }
+      if (formData.has_secondary) {
+        selectedLevels.push(...classLevels.filter(level => level.level === 'Secondary').map(level => level.id));
+      }
+    }
+    
+    selectedLevels = [...new Set(selectedLevels)];
+    
+    setFormData(prev => ({ ...prev, grade_levels: selectedLevels }));
+  }, [
+    formData.has_pre_primary,
+    formData.has_primary,
+    formData.has_junior_secondary,
+    formData.has_senior_secondary,
+    formData.has_secondary,
+    formData.primary_curriculum
+  ]);
+
+  // Update curriculum options based on school type
+  useEffect(() => {
+    if (formData.schoolType === 'Primary') {
+      setFormData(prev => ({
+        ...prev,
+        primary_curriculum: 'CBC',
+        secondary_curriculum: '',
+        has_senior_secondary: false,
+        has_secondary: false
+      }));
+    } else if (formData.schoolType === 'Secondary') {
+      setFormData(prev => ({
+        ...prev,
+        primary_curriculum: '',
+        has_pre_primary: false,
+        has_primary: false,
+        has_junior_secondary: false
+      }));
+    } else if (formData.schoolType === 'Mixed') {
+      setFormData(prev => ({
+        ...prev,
+        primary_curriculum: prev.primary_curriculum || 'Both',
+        secondary_curriculum: prev.secondary_curriculum || 'Both'
+      }));
+    }
+  }, [formData.schoolType]);
 
   // Track unsaved changes
   useEffect(() => {
@@ -139,7 +262,6 @@ function EditSchoolProfile() {
       [name]: type === 'checkbox' ? checked : value 
     }));
     
-    // Clear specific field error when user starts typing
     if (errors[name]) {
       setErrors((prev) => {
         const newErrors = { ...prev };
@@ -147,6 +269,17 @@ function EditSchoolProfile() {
         return newErrors;
       });
     }
+  };
+
+  const handleGradeLevelChange = (levelId) => {
+    setFormData(prev => {
+      const gradeLevels = [...prev.grade_levels];
+      if (gradeLevels.includes(levelId)) {
+        return { ...prev, grade_levels: gradeLevels.filter(id => id !== levelId) };
+      } else {
+        return { ...prev, grade_levels: [...gradeLevels, levelId] };
+      }
+    });
   };
 
   const handlePathwayChange = (pathway) => {
@@ -163,13 +296,10 @@ function EditSchoolProfile() {
   const handleLogoChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Validate file size (max 2MB)
       if (file.size > 2 * 1024 * 1024) {
         toast.error("Logo file size should not exceed 2MB");
         return;
       }
-
-      // Validate file type
       if (!file.type.startsWith("image/")) {
         toast.error("Please upload a valid image file");
         return;
@@ -208,14 +338,18 @@ function EditSchoolProfile() {
       formDataToSend.append("secondary_curriculum", formData.secondary_curriculum);
       formDataToSend.append("has_streams", formData.has_streams ? "1" : "0");
       
-      // Curriculum Levels
       formDataToSend.append("has_pre_primary", formData.has_pre_primary ? "1" : "0");
       formDataToSend.append("has_primary", formData.has_primary ? "1" : "0");
       formDataToSend.append("has_junior_secondary", formData.has_junior_secondary ? "1" : "0");
       formDataToSend.append("has_senior_secondary", formData.has_senior_secondary ? "1" : "0");
       formDataToSend.append("has_secondary", formData.has_secondary ? "1" : "0");
       
-      // Senior Secondary Pathways
+      if (formData.grade_levels.length > 0) {
+        formData.grade_levels.forEach(level => {
+          formDataToSend.append("grade_levels[]", level);
+        });
+      }
+      
       if (formData.senior_secondary_pathways.length > 0) {
         formData.senior_secondary_pathways.forEach(pathway => {
           formDataToSend.append("senior_secondary_pathways[]", pathway);
@@ -223,14 +357,11 @@ function EditSchoolProfile() {
       }
 
       if (logoFile) formDataToSend.append("logo", logoFile);
-
       formDataToSend.append("_method", "PUT");
 
       const response = await apiRequest(`schools/${id}`, "POST", formDataToSend);
       toast.success("Updated school successfully");
       setHasUnsavedChanges(false);
-      
-      // Navigate after a short delay to show success message
       setTimeout(() => navigate("/schools"), 1500);
     } catch (err) {
       if (err.status === 422) {
@@ -263,6 +394,7 @@ function EditSchoolProfile() {
     has_senior_secondary: "Senior Secondary Level",
     has_secondary: "Secondary Level (8-4-4)",
     senior_secondary_pathways: "Senior Secondary Pathways",
+    grade_levels: "Grade Levels",
   };
 
   const curriculumOptions = [
@@ -277,9 +409,31 @@ function EditSchoolProfile() {
     { value: 'Social Sciences', label: 'Social Sciences' }
   ];
 
+  const getGradeLevels = () => {
+    if (formData.primary_curriculum === 'CBC') return cbcGradeLevels;
+    if (formData.primary_curriculum === '8-4-4') return classLevels;
+    if (formData.primary_curriculum === 'Both') return [...cbcGradeLevels, ...classLevels];
+    return [];
+  };
+
+  const getFilteredCurriculumOptions = (isPrimary) => {
+    if (formData.schoolType === 'Primary') {
+      return isPrimary 
+        ? curriculumOptions.filter(option => option.value === 'CBC')
+        : [{ value: '', label: 'Not applicable for primary schools' }];
+    } else if (formData.schoolType === 'Secondary') {
+      return isPrimary 
+        ? [{ value: '', label: 'Not applicable for secondary schools' }]
+        : curriculumOptions;
+    } else if (formData.schoolType === 'Mixed') {
+      return curriculumOptions;
+    } else {
+      return curriculumOptions;
+    }
+  };
+
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-      {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-slate-700 dark:bg-slate-700 rounded-lg">
@@ -295,7 +449,6 @@ function EditSchoolProfile() {
           </div>
         </div>
         
-        {/* Action Buttons */}
         <div className="flex items-center gap-2">
           {hasUnsavedChanges && (
             <span className="px-3 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-sm font-medium rounded-full flex items-center gap-1">
@@ -314,7 +467,6 @@ function EditSchoolProfile() {
         </div>
       </div>
 
-      {/* Error Alert */}
       {Object.keys(errors).length > 0 && (
         <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
           <div className="flex items-center gap-2 mb-2">
@@ -335,10 +487,7 @@ function EditSchoolProfile() {
       )}
 
       <form onSubmit={handleSubmit}>
-        {/* Main Card Container */}
         <div className="bg-white dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 p-6 space-y-8 mb-6">
-          
-          {/* Logo Upload Section */}
           <div className="flex items-center gap-6">
             <div className="relative">
               <div className="w-24 h-24 sm:w-28 sm:h-28 md:w-32 md:h-32 bg-slate-100 dark:bg-slate-700/50 border-2 border-slate-200 dark:border-slate-600 rounded-xl overflow-hidden">
@@ -393,7 +542,6 @@ function EditSchoolProfile() {
             </div>
           </div>
 
-          {/* Basic Information */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
@@ -453,12 +601,28 @@ function EditSchoolProfile() {
                 onChange={handleChange}
                 className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-[#0d141b] dark:text-white focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-colors"
                 required
+                disabled={formData.schoolType === 'Secondary' || lock('primary_curriculum')}
               >
                 <option value="">Select curriculum</option>
-                {curriculumOptions.map(option => (
+                {getFilteredCurriculumOptions(true).map(option => (
                   <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
               </select>
+              {formData.schoolType === 'Primary' && (
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Primary schools use CBC curriculum by default
+                </p>
+              )}
+              {formData.schoolType === 'Secondary' && (
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Primary curriculum is not applicable for secondary schools
+                </p>
+              )}
+              {lock('primary_curriculum') && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                  Curriculum cannot be changed once saved.
+                </p>
+              )}
             </div>
 
             <div>
@@ -471,24 +635,31 @@ function EditSchoolProfile() {
                 onChange={handleChange}
                 className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-[#0d141b] dark:text-white focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-colors"
                 required
-                disabled={formData.primary_curriculum === 'Both'}
+                disabled={formData.schoolType === 'Primary' || lock('secondary_curriculum')}
               >
                 <option value="">Select curriculum</option>
-                {curriculumOptions.map(option => (
-                  <option key={option.value} value={option.value} disabled={formData.primary_curriculum === 'Both' && option.value !== 'Both'}>
-                    {option.label}
-                  </option>
+                {getFilteredCurriculumOptions(false).map(option => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
               </select>
-              {formData.primary_curriculum === 'Both' && (
+              {formData.schoolType === 'Secondary' && (
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  Secondary curriculum is automatically set to "Both" when primary curriculum is "Both"
+                  Secondary schools can choose between CBC (for senior secondary with STEM pathways) and 8-4-4
+                </p>
+              )}
+              {formData.schoolType === 'Primary' && (
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Secondary curriculum is not applicable for primary schools
+                </p>
+              )}
+              {lock('secondary_curriculum') && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                  Curriculum cannot be changed once saved.
                 </p>
               )}
             </div>
           </div>
 
-          {/* Contact Information Section */}
           <div className="pt-6 border-t border-slate-200 dark:border-slate-700">
             <h3 className="text-lg font-semibold text-[#0d141b] dark:text-white mb-4">Contact Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -554,7 +725,6 @@ function EditSchoolProfile() {
             </div>
           </div>
 
-          {/* Has Streams Field */}
           <div className="pt-6 border-t border-slate-200 dark:border-slate-700">
             <h3 className="text-lg font-semibold text-[#0d141b] dark:text-white mb-4">Stream Configuration</h3>
             <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
@@ -566,6 +736,7 @@ function EditSchoolProfile() {
                     name="has_streams"
                     checked={formData.has_streams}
                     onChange={handleChange}
+                    disabled={lock('has_streams')}
                     className="w-5 h-5 text-blue-600 bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 focus:ring-2"
                   />
                 </div>
@@ -584,12 +755,16 @@ function EditSchoolProfile() {
                       </p>
                     </div>
                   )}
+                  {lock('has_streams') && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                      Stream setting cannot be changed once saved.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Curriculum Levels Section */}
           <div className="pt-6 border-t border-slate-200 dark:border-slate-700">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
@@ -618,182 +793,417 @@ function EditSchoolProfile() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* CBC Levels */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium text-[#0d141b] dark:text-white mb-4">CBC Levels</h3>
-                
-                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                  <div className="flex items-start gap-3">
-                    <div className="pt-1">
-                      <input
-                        type="checkbox"
-                        id="has_pre_primary"
-                        name="has_pre_primary"
-                        checked={formData.has_pre_primary}
-                        onChange={handleChange}
-                        disabled={formData.primary_curriculum === '8-4-4'}
-                        className="w-5 h-5 text-blue-600 bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 focus:ring-2"
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <label htmlFor="has_pre_primary" className="block text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
-                        Pre-Primary (PP1-PP2)
-                      </label>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                        Early childhood education for ages 4-6
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                  <div className="flex items-start gap-3">
-                    <div className="pt-1">
-                      <input
-                        type="checkbox"
-                        id="has_primary"
-                        name="has_primary"
-                        checked={formData.has_primary}
-                        onChange={handleChange}
-                        className="w-5 h-5 text-blue-600 bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 focus:ring-2"
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <label htmlFor="has_primary" className="block text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
-                        Primary (Grade 1-6)
-                      </label>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                        Primary education for ages 6-12
-                      </p>
+              {(formData.primary_curriculum === 'CBC' || formData.primary_curriculum === 'Both' || formData.secondary_curriculum === 'CBC') && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium text-[#0d141b] dark:text-white mb-4">CBC Levels</h3>
+                  
+                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <div className="pt-1">
+                        <input
+                          type="checkbox"
+                          id="has_pre_primary"
+                          name="has_pre_primary"
+                          checked={formData.has_pre_primary}
+                          onChange={handleChange}
+                          disabled={formData.primary_curriculum === '8-4-4' || formData.schoolType === 'Secondary' || lock('has_pre_primary')}
+                          className="w-5 h-5 text-blue-600 bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 focus:ring-2"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label htmlFor="has_pre_primary" className="block text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                          Pre-Primary (PP1-PP2)
+                        </label>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                          Early childhood education for ages 4-6
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                  <div className="flex items-start gap-3">
-                    <div className="pt-1">
-                      <input
-                        type="checkbox"
-                        id="has_junior_secondary"
-                        name="has_junior_secondary"
-                        checked={formData.has_junior_secondary}
-                        onChange={handleChange}
-                        disabled={formData.primary_curriculum === '8-4-4'}
-                        className="w-5 h-5 text-blue-600 bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 focus:ring-2"
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <label htmlFor="has_junior_secondary" className="block text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
-                        Junior Secondary (Grade 7-9)
-                      </label>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                        Lower secondary education for ages 12-15
-                      </p>
+                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <div className="pt-1">
+                        <input
+                          type="checkbox"
+                          id="has_primary"
+                          name="has_primary"
+                          checked={formData.has_primary}
+                          onChange={handleChange}
+                          disabled={formData.schoolType === 'Secondary' || lock('has_primary')}
+                          className="w-5 h-5 text-blue-600 bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 focus:ring-2"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label htmlFor="has_primary" className="block text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                          Primary (Grade 1-6)
+                        </label>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                          Primary education for ages 6-12
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                  <div className="flex items-start gap-3">
-                    <div className="pt-1">
-                      <input
-                        type="checkbox"
-                        id="has_senior_secondary"
-                        name="has_senior_secondary"
-                        checked={formData.has_senior_secondary}
-                        onChange={handleChange}
-                        disabled={formData.primary_curriculum === '8-4-4'}
-                        className="w-5 h-5 text-blue-600 bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 focus:ring-2"
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <label htmlFor="has_senior_secondary" className="block text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
-                        Senior Secondary (Grade 10-12)
-                      </label>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                        Upper secondary education for ages 15-18
-                      </p>
+                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <div className="pt-1">
+                        <input
+                          type="checkbox"
+                          id="has_junior_secondary"
+                          name="has_junior_secondary"
+                          checked={formData.has_junior_secondary}
+                          onChange={handleChange}
+                          disabled={formData.primary_curriculum === '8-4-4' || formData.schoolType === 'Secondary' || lock('has_junior_secondary')}
+                          className="w-5 h-5 text-blue-600 bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 focus:ring-2"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label htmlFor="has_junior_secondary" className="block text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                          Junior Secondary (Grade 7-9)
+                        </label>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                          Lower secondary education for ages 12-15
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Senior Secondary Pathways */}
-                {formData.has_senior_secondary && (
-                  <div className="p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
-                    <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
-                      Senior Secondary Pathways
-                    </h4>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
-                      Select the pathways your school offers for Senior Secondary students
-                    </p>
-                    <div className="space-y-2">
-                      {pathwayOptions.map(option => (
-                        <div key={option.value} className="flex items-start gap-3">
-                          <div className="pt-1">
-                            <input
-                              type="checkbox"
-                              id={`pathway_${option.value}`}
-                              checked={formData.senior_secondary_pathways.includes(option.value)}
-                              onChange={() => handlePathwayChange(option.value)}
-                              className="w-5 h-5 text-purple-600 bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-purple-500 dark:focus:ring-purple-600 focus:ring-2"
-                            />
-                          </div>
-                          <div className="flex-1">
-                            <label htmlFor={`pathway_${option.value}`} className="block text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
-                              {option.label}
-                            </label>
-                          </div>
+                  {(formData.schoolType === 'Secondary' || formData.schoolType === 'Mixed') && (
+                    <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                      <div className="flex items-start gap-3">
+                        <div className="pt-1">
+                          <input
+                            type="checkbox"
+                            id="has_senior_secondary"
+                            name="has_senior_secondary"
+                            checked={formData.has_senior_secondary}
+                            onChange={handleChange}
+                            disabled={formData.primary_curriculum === '8-4-4' || lock('has_senior_secondary')}
+                            className="w-5 h-5 text-blue-600 bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 focus:ring-2"
+                          />
                         </div>
-                      ))}
+                        <div className="flex-1">
+                          <label htmlFor="has_senior_secondary" className="block text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                            Senior Secondary (Grade 10-12)
+                          </label>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                            Upper secondary education for ages 15-18 with STEM pathways
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {formData.has_senior_secondary && (
+                    <div className="p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
+                      <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
+                        Senior Secondary Pathways
+                      </h4>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+                        Select the pathways your school offers for Senior Secondary students
+                      </p>
+                      <div className="space-y-2">
+                        {pathwayOptions.map(option => (
+                          <div key={option.value} className="flex items-start gap-3">
+                            <div className="pt-1">
+                              <input
+                                type="checkbox"
+                                id={`pathway_${option.value}`}
+                                checked={formData.senior_secondary_pathways.includes(option.value)}
+                                onChange={() => handlePathwayChange(option.value)}
+                                disabled={lock('senior_secondary_pathways')}
+                                className="w-5 h-5 text-purple-600 bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-purple-500 dark:focus:ring-purple-600 focus:ring-2"
+                              />
+                            </div>
+                            <div className="flex-1">
+                              <label htmlFor={`pathway_${option.value}`} className="block text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                                {option.label}
+                              </label>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      {lock('senior_secondary_pathways') && (
+                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
+                          Pathways cannot be changed once saved.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {(formData.primary_curriculum === '8-4-4' || formData.primary_curriculum === 'Both' || formData.secondary_curriculum === '8-4-4') && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium text-[#0d141b] dark:text-white mb-4">8-4-4 Levels</h3>
+                  
+                  <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <div className="pt-1">
+                        <input
+                          type="checkbox"
+                          id="has_secondary"
+                          name="has_secondary"
+                          checked={formData.has_secondary}
+                          onChange={handleChange}
+                          disabled={formData.primary_curriculum === 'CBC' || formData.schoolType === 'Primary' || lock('has_secondary')}
+                          className="w-5 h-5 text-green-600 bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-green-500 dark:focus:ring-green-600 focus:ring-2"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label htmlFor="has_secondary" className="block text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                          Secondary (Form 1-4)
+                        </label>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                          Secondary education for ages 13-17
+                        </p>
+                      </div>
                     </div>
                   </div>
-                )}
-              </div>
 
-              {/* 8-4-4 Levels */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-medium text-[#0d141b] dark:text-white mb-4">8-4-4 Levels</h3>
-                
-                <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                  <div className="flex items-start gap-3">
-                    <div className="pt-1">
-                      <input
-                        type="checkbox"
-                        id="has_secondary"
-                        name="has_secondary"
-                        checked={formData.has_secondary}
-                        onChange={handleChange}
-                        disabled={formData.primary_curriculum === 'CBC'}
-                        className="w-5 h-5 text-green-600 bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-green-500 dark:focus:ring-green-600 focus:ring-2"
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <label htmlFor="has_secondary" className="block text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
-                        Secondary (Form 1-4)
-                      </label>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                        Secondary education for ages 13-17
+                  {showAdvancedOptions && (
+                    <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                      <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
+                        Advanced Options
+                      </h4>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
+                        Additional settings for curriculum configuration will be available here in future updates.
                       </p>
                     </div>
-                  </div>
+                  )}
                 </div>
-
-                {showAdvancedOptions && (
-                  <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-                    <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
-                      Advanced Options
-                    </h4>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Additional settings for curriculum configuration will be available here in future updates.
-                    </p>
-                  </div>
-                )}
-              </div>
+              )}
             </div>
           </div>
+
+          {formData.primary_curriculum && (
+            <div className="pt-6 border-t border-slate-200 dark:border-slate-700">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-2 bg-black dark:bg-white rounded-lg">
+                  <Award className="w-5 h-5 text-white dark:text-black" />
+                </div>
+                <h3 className="text-lg font-semibold text-[#0d141b] dark:text-white">
+                  {formData.primary_curriculum === '8-4-4' ? 'Class Levels' : 'Grade Levels'}
+                </h3>
+              </div>
+
+              <div className="space-y-4">
+                {formData.primary_curriculum === 'CBC' && (
+                  <div className="space-y-4">
+                    {['Pre-Primary', 'Primary', 'Junior Secondary'].map(level => {
+                      const levelGrades = cbcGradeLevels.filter(g => g.level === level);
+                      if (levelGrades.length === 0) return null;
+                      
+                      const isLevelSelected = level === 'Pre-Primary' ? formData.has_pre_primary :
+                                            level === 'Primary' ? formData.has_primary :
+                                            formData.has_junior_secondary;
+                      
+                      return (
+                        <div key={level} className={`p-4 ${isLevelSelected ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' : 'bg-gray-50 dark:bg-gray-900/20 border-gray-200 dark:border-gray-800'} border rounded-lg`}>
+                          <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">{level}</h3>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                            {levelGrades.map(grade => (
+                              <div key={grade.id} className="flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  id={`grade_${grade.id}`}
+                                  checked={formData.grade_levels.includes(grade.id)}
+                                  onChange={() => handleGradeLevelChange(grade.id)}
+                                  disabled={!isLevelSelected || lock('grade_levels')}
+                                  className="w-4 h-4 text-blue-600 bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 focus:ring-2"
+                                />
+                                <label htmlFor={`grade_${grade.id}`} className="text-sm text-slate-700 dark:text-slate-300">
+                                  {grade.name}
+                                </label>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    
+                    {(formData.schoolType === 'Secondary' || formData.schoolType === 'Mixed') && formData.has_senior_secondary && (
+                      <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                        <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">Senior Secondary</h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+                          These grade levels are automatically selected and managed when you enable the Senior Secondary level.
+                        </p>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                          {cbcGradeLevels.filter(g => g.level === 'Senior Secondary').map(grade => (
+                            <div key={grade.id} className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                id={`grade_${grade.id}`}
+                                checked={formData.grade_levels.includes(grade.id)}
+                                onChange={() => handleGradeLevelChange(grade.id)}
+                                disabled={lock('grade_levels')}
+                                className="w-4 h-4 text-blue-600 bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 focus:ring-2"
+                              />
+                              <label htmlFor={`grade_${grade.id}`} className="text-sm text-slate-700 dark:text-slate-300">
+                                {grade.name}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {formData.primary_curriculum === '8-4-4' && (
+                  <div className="space-y-4">
+                    {['Primary', 'Secondary'].map(level => {
+                      const levelClasses = classLevels.filter(c => c.level === level);
+                      if (levelClasses.length === 0) return null;
+                      
+                      const isLevelSelected = level === 'Primary' ? formData.has_primary :
+                                            formData.has_secondary;
+                      
+                      if (level === 'Primary' && formData.schoolType === 'Secondary') return null;
+                      
+                      return (
+                        <div key={level} className={`p-4 ${isLevelSelected ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-gray-50 dark:bg-gray-900/20 border-gray-200 dark:border-gray-800'} border rounded-lg`}>
+                          <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">{level}</h3>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                            {levelClasses.map(cls => (
+                              <div key={cls.id} className="flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  id={`class_${cls.id}`}
+                                  checked={formData.grade_levels.includes(cls.id)}
+                                  onChange={() => handleGradeLevelChange(cls.id)}
+                                  disabled={!isLevelSelected || lock('grade_levels')}
+                                  className="w-4 h-4 text-green-600 bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-green-500 dark:focus:ring-green-600 focus:ring-2"
+                                />
+                                <label htmlFor={`class_${cls.id}`} className="text-sm text-slate-700 dark:text-slate-300">
+                                  {cls.name}
+                                </label>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {formData.primary_curriculum === 'Both' && (
+                  <div className="space-y-4">
+                    <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                      <p className="text-sm text-slate-700 dark:text-slate-300">
+                        You have selected to offer both CBC and 8-4-4 curricula. Please select grade levels for CBC and class levels for 8-4-4 that your school offers.
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-medium text-blue-700 dark:text-blue-300">CBC Grade Levels</h3>
+                      {['Pre-Primary', 'Primary', 'Junior Secondary'].map(level => {
+                        const levelGrades = cbcGradeLevels.filter(g => g.level === level);
+                        if (levelGrades.length === 0) return null;
+                        
+                        const isLevelSelected = level === 'Pre-Primary' ? formData.has_pre_primary :
+                                              level === 'Primary' ? formData.has_primary :
+                                              formData.has_junior_secondary;
+                        
+                        return (
+                          <div key={`cbc_${level}`} className={`p-4 ${isLevelSelected ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' : 'bg-gray-50 dark:bg-gray-900/20 border-gray-200 dark:border-gray-800'} border rounded-lg`}>
+                            <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">{level}</h4>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                              {levelGrades.map(grade => (
+                                <div key={grade.id} className="flex items-center gap-2">
+                                  <input
+                                    type="checkbox"
+                                    id={`cbc_grade_${grade.id}`}
+                                    checked={formData.grade_levels.includes(grade.id)}
+                                    onChange={() => handleGradeLevelChange(grade.id)}
+                                    disabled={!isLevelSelected || lock('grade_levels')}
+                                    className="w-4 h-4 text-blue-600 bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 focus:ring-2"
+                                  />
+                                  <label htmlFor={`cbc_grade_${grade.id}`} className="text-sm text-slate-700 dark:text-slate-300">
+                                    {grade.name}
+                                  </label>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      
+                      {(formData.schoolType === 'Secondary' || formData.schoolType === 'Mixed') && formData.has_senior_secondary && (
+                        <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                          <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">Senior Secondary</h4>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+                            These grade levels are automatically selected and managed when you enable the Senior Secondary level.
+                          </p>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                            {cbcGradeLevels.filter(g => g.level === 'Senior Secondary').map(grade => (
+                              <div key={grade.id} className="flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  id={`cbc_grade_${grade.id}`}
+                                  checked={formData.grade_levels.includes(grade.id)}
+                                  onChange={() => handleGradeLevelChange(grade.id)}
+                                  disabled={lock('grade_levels')}
+                                  className="w-4 h-4 text-blue-600 bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 focus:ring-2"
+                                />
+                                <label htmlFor={`cbc_grade_${grade.id}`} className="text-sm text-slate-700 dark:text-slate-300">
+                                  {grade.name}
+                                </label>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-medium text-green-700 dark:text-green-300">8-4-4 Class Levels</h3>
+                      {['Primary', 'Secondary'].map(level => {
+                        const levelClasses = classLevels.filter(c => c.level === level);
+                        if (levelClasses.length === 0) return null;
+                        
+                        const isLevelSelected = level === 'Primary' ? formData.has_primary :
+                                              formData.has_secondary;
+                        
+                        if (level === 'Primary' && formData.schoolType === 'Secondary') return null;
+                        
+                        return (
+                          <div key={`844_${level}`} className={`p-4 ${isLevelSelected ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-gray-50 dark:bg-gray-900/20 border-gray-200 dark:border-gray-800'} border rounded-lg`}>
+                            <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">{level}</h4>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                              {levelClasses.map(cls => (
+                                <div key={cls.id} className="flex items-center gap-2">
+                                  <input
+                                    type="checkbox"
+                                    id={`844_class_${cls.id}`}
+                                    checked={formData.grade_levels.includes(cls.id)}
+                                    onChange={() => handleGradeLevelChange(cls.id)}
+                                    disabled={!isLevelSelected || lock('grade_levels')}
+                                    className="w-4 h-4 text-green-600 bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-green-500 dark:focus:ring-green-600 focus:ring-2"
+                                  />
+                                  <label htmlFor={`844_class_${cls.id}`} className="text-sm text-slate-700 dark:text-slate-300">
+                                    {cls.name}
+                                  </label>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+              {lock('grade_levels') && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
+                  Grade / Class levels cannot be changed once saved.
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Preview Section */}
         {showPreview && (
           <div className="bg-white dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 p-6 mb-6">
             <h3 className="text-lg font-semibold text-[#0d141b] dark:text-white mb-4 flex items-center gap-2">
@@ -862,13 +1272,24 @@ function EditSchoolProfile() {
                       )}
                     </div>
                   </div>
+                  {formData.grade_levels && formData.grade_levels.length > 0 && (
+                    <div className="sm:col-span-2">
+                      <span className="font-medium text-[#4c739a] dark:text-slate-400">Grade/Class Levels:</span>
+                      <div className="ml-2 flex flex-wrap gap-1 mt-1">
+                        {formData.grade_levels.map((level, index) => (
+                          <span key={index} className="px-2 py-1 bg-gray-100 dark:bg-gray-900/30 text-gray-700 dark:text-gray-300 text-xs rounded-full">
+                            {level}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* Footer Actions */}
         <div className="flex flex-col sm:flex-row items-center justify-end gap-3 p-6 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 rounded-b-xl">
           <button
             type="button"

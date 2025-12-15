@@ -22,12 +22,20 @@ import {
   AlertCircle,
   RefreshCw,
   XCircle,
-  CheckCircle
+  CheckCircle,
+  School,
+  Building,
+  User,
+  Bookmark,
+  Layers,
+  UserCheck,
+  Book
 } from 'lucide-react';
 import { toast } from "react-toastify";
+import ManageAssignments from '../../../components/ManageAssignments';
 
 function SubjectManager() {
-  const { schoolId, loading: authLoading } = useAuth();
+  const { schoolId, loading: authLoading } = useAuth();  
   
   // --- State Management ---
   const [subjects, setSubjects] = useState([]);
@@ -42,12 +50,41 @@ function SubjectManager() {
   
   const [selectedSubject, setSelectedSubject] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterCurriculum, setFilterCurriculum] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
   const [filterCoreStatus, setFilterCoreStatus] = useState('all');
   const [school, setSchool] = useState(null);
   const [hasStreams, setHasStreams] = useState(false);
+  const [schoolLevels, setSchoolLevels] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
+  const [filtersInitialized, setFiltersInitialized] = useState(false);
+  const [gradeLevels, setGradeLevels] = useState([]);
+  
+  // Academic setup state
+  const [academicSetup, setAcademicSetup] = useState(null);
+  const [selectedAcademicYear, setSelectedAcademicYear] = useState(null);
+  const [selectedAcademicYearInfo, setSelectedAcademicYearInfo] = useState(null);
+  
+  // Teacher and classroom/stream selection state
+  const [selectedTeacher, setSelectedTeacher] = useState(null);
+  const [teacherClassrooms, setTeacherClassrooms] = useState([]);
+  const [teacherStreams, setTeacherStreams] = useState([]);
+  
+  // Constants from API
+  const [constants, setConstants] = useState({
+    curriculum_types: [],
+    educational_levels: [],
+    cbc_grade_levels: [],
+    legacy_grade_levels: [],
+    senior_secondary_pathways: [],
+    categories: []
+  });
+  const [constantsLoading, setConstantsLoading] = useState(true);
+  
+  // Subject search state
+  const [subjectSearchResults, setSubjectSearchResults] = useState([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [showSubjectSuggestions, setShowSubjectSuggestions] = useState(false);
+  const [subjectExists, setSubjectExists] = useState(false);
   
   // Delete modal state
   const [deleteModal, setDeleteModal] = useState({
@@ -72,57 +109,130 @@ function SubjectManager() {
   const [formData, setFormData] = useState({
     name: '',
     code: '',
-    curriculum_type: '',
-    grade_level: '',
     category: '',
     is_core: false,
   });
 
   const [assignmentFormData, setAssignmentFormData] = useState({
     teacher_id: '',
+    classroom_id: '',
     stream_id: '',
     academic_year_id: '',
+    term_id: '',
     weekly_periods: 5,
     assignment_type: 'main_teacher',
   });
 
-  // --- Constants ---
-  const CURRICULUM_TYPES = ['CBC', '8-4-4'];
-  const CBC_GRADE_LEVELS = [
-    'Grade 1-3 (Lower Primary)',
-    'Grade 4-6 (Upper Primary)',
-    'Grade 7-9 (Junior Secondary)'
-  ];
-  const LEGACY_GRADE_LEVELS = [
-    'Standard 1-4',
-    'Standard 5-8',
-    'Form 1-4'
-  ];
-  const CATEGORIES = [
-    'Languages',
-    'Mathematics',
-    'Sciences',
-    'Humanities',
-    'Technical',
-    'Creative Arts',
-    'Physical Ed'
-  ];
-  const ASSIGNMENT_TYPES = [
-    { value: 'main_teacher', label: 'Main Teacher' },
-    { value: 'assistant_teacher', label: 'Assistant Teacher' },
-    { value: 'substitute', label: 'Substitute' }
-  ];
-
   // --- Data Fetching ---
+  const fetchConstants = useCallback(async () => {
+    try {
+      const response = await apiRequest('subjects/constants', 'GET');
+      setConstants(response.data || {});
+    } catch (error) {
+      console.error('Failed to fetch constants:', error);
+      toast.error('Failed to fetch constants');
+    } finally {
+      setConstantsLoading(false);
+    }
+  }, []);
+
   const fetchSchoolInfo = useCallback(async () => {
     try {
       const response = await apiRequest('schools', 'GET');
       const schoolData = response.data || response;
       setSchool(schoolData);
       setHasStreams(schoolData?.has_streams || false);
+      setGradeLevels(schoolData?.grade_levels || []);
+      
+      // Get school levels based on school configuration
+      const levels = [];
+      if (schoolData?.has_pre_primary) levels.push('Pre-Primary');
+      if (schoolData?.has_primary) levels.push('Primary');
+      if (schoolData?.has_junior_secondary) levels.push('Junior Secondary');
+      if (schoolData?.has_senior_secondary) levels.push('Senior Secondary');
+      if (schoolData?.has_secondary && !schoolData?.has_junior_secondary && !schoolData?.has_senior_secondary) {
+        levels.push('Secondary');
+      }
+      setSchoolLevels(levels);
+      
+      setFiltersInitialized(true);
     } catch (error) {
       console.error('Failed to fetch school information:', error);
       toast.error('Failed to fetch school information');
+    }
+  }, []);
+
+  const fetchAcademicYears = useCallback(async () => {
+    try {
+      const response = await apiRequest('academic-years', 'GET');
+      const years = Array.isArray(response) ? response : (response?.data || []);
+      
+      // Transform academic years to simple format
+      const transformedYears = years.map(year => ({
+        id: year.id,
+        name: `${year.year} - ${year.term}`,
+        year: year.year,
+        term: year.term,
+        is_current: year.is_current,
+        curriculum_type: year.curriculum_type
+      }));
+      
+      setAcademicYears(transformedYears);
+      
+      // Set current academic year if available
+      const currentYear = transformedYears.find(year => year.is_current);
+      if (currentYear) {
+        setSelectedAcademicYear(currentYear.id);
+        setSelectedAcademicYearInfo(currentYear);
+        setAssignmentFormData(prev => ({
+          ...prev,
+          academic_year_id: currentYear.id,
+          term_id: currentYear.term_id || ''
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to fetch academic years:', error);
+      toast.error('Failed to fetch academic years');
+    }
+  }, []);
+
+  const fetchTeachersWithAssignments = useCallback(async () => {
+    try {
+      // Use the new API endpoint to get teachers with their assignments
+      const response = await apiRequest('teachers/with-assignments', 'GET');
+      const teachersData = response.data || [];
+      
+      // Transform data for easier access - FIXED: Use curriculum_specialization from backend
+      const transformedTeachers = teachersData.map(teacher => ({
+        id: teacher.id,
+        name: teacher.name || teacher.user?.name || 'N/A',
+        email: teacher.email || teacher.user?.email || 'N/A',
+        is_class_teacher: hasStreams 
+          ? (teacher.class_teacher_streams?.length > 0)
+          : (teacher.class_teacher_classrooms?.length > 0),
+        // FIXED: Use curriculum_specialization from backend response
+        curriculum_specialization: teacher.curriculum_specialization || 'N/A',
+        // Add specialization field as well
+        specialization: teacher.specialization || 'N/A',
+        // Store assignments for later use
+        assignments: teacher
+      }));
+      
+      setTeachers(transformedTeachers);
+    } catch (error) {
+      console.error('Failed to fetch teachers with assignments:', error);
+      toast.error('Failed to fetch teachers');
+    }
+  }, [hasStreams]);
+
+  const fetchStreams = useCallback(async () => {
+    try {
+      const response = await apiRequest('streams', 'GET');
+      const streamsData = Array.isArray(response) ? response : (response?.data || []);
+      setStreams(streamsData);
+    } catch (error) {
+      console.error('Failed to fetch streams:', error);
+      toast.error('Failed to fetch streams');
     }
   }, []);
 
@@ -130,32 +240,158 @@ function SubjectManager() {
     setLoading(true);
     try {
       const requests = [
-        apiRequest(`subjects`, 'GET'),
-        apiRequest(`teachers/school/${schoolId}`, 'GET'),
-        apiRequest(`academic-years`, 'GET')
+        apiRequest('subjects', 'GET'),
+        fetchTeachersWithAssignments(),
+        fetchAcademicYears()
       ];
       
       if (hasStreams) {
-        requests.push(apiRequest(`streams`, 'GET'));
+        requests.push(fetchStreams());
       }
       
-      const responses = await Promise.all(requests);
+      await Promise.all(requests);
       
-      setSubjects(Array.isArray(responses[0]) ? responses[0] : (responses[0]?.data || []));
-      setTeachers(Array.isArray(responses[1]) ? responses[1] : (responses[1]?.teachers || []));
-      setAcademicYears(Array.isArray(responses[2]) ? responses[2] : (responses[2]?.data || []));
+      // Fetch subjects separately
+      const subjectsResponse = await apiRequest('subjects', 'GET');
+      setSubjects(Array.isArray(subjectsResponse) ? subjectsResponse : (subjectsResponse?.data || []));
       
-      if (hasStreams && responses[3]) {
-        const streamsResponse = responses[3];
-        setStreams(Array.isArray(streamsResponse) ? streamsResponse : (streamsResponse?.data || []));
-      }
     } catch (error) {
       console.error('Failed to fetch data:', error);
-      toast.error('Failed to load data. Please refresh the page.');
+      toast.error('Failed to load data. Please refresh page.');
     } finally {
       setLoading(false);
     }
-  }, [schoolId, hasStreams]);
+  }, [schoolId, hasStreams, fetchTeachersWithAssignments, fetchAcademicYears, fetchStreams]);
+
+  // Search for subjects by name
+  const searchSubjects = useCallback(async (name) => {
+    if (name.length < 2) {
+      setSubjectSearchResults([]);
+      setShowSubjectSuggestions(false);
+      setSubjectExists(false);
+      return;
+    }
+
+    setSearchLoading(true);
+    try {
+      let url = `subjects/search?name=${encodeURIComponent(name)}`;
+      
+      // Include school's primary curriculum in search
+      if (school?.primary_curriculum) {
+        url += `&curriculum_type=${encodeURIComponent(school.primary_curriculum)}`;
+      }
+      
+      const response = await apiRequest(url, 'GET');
+      setSubjectSearchResults(response.data || []);
+      setShowSubjectSuggestions(true);
+      
+      // Check if subject exists in database
+      if (response.data && response.data.length > 0) {
+        setSubjectExists(true);
+      } else {
+        setSubjectExists(false);
+      }
+    } catch (error) {
+      console.error('Failed to search subjects:', error);
+      toast.error('Failed to search subjects');
+      setSubjectSearchResults([]);
+      setShowSubjectSuggestions(false);
+      setSubjectExists(false);
+    } finally {
+      setSearchLoading(false);
+    }
+  }, [school?.primary_curriculum]);
+
+  // Auto-fill form data when a subject is selected
+  const selectSubject = useCallback((subject) => {
+    setFormData(prev => ({
+      ...prev,
+      name: subject.name,
+      code: subject.codes[0] || '',
+      category: subject.categories[0] || ''
+    }));
+    setShowSubjectSuggestions(false);
+    setSubjectExists(true);
+  }, []);
+
+  // Fetch academic setup
+  const fetchAcademicSetup = useCallback(async () => {
+    try {
+      const response = await apiRequest('academic-setup', 'GET');
+      setAcademicSetup(response.data || null);
+    } catch (error) {
+      console.error('Failed to fetch academic setup:', error);
+    }
+  }, []);
+
+  // Handle teacher selection
+  const handleTeacherSelection = (teacherId) => {
+    setSelectedTeacher(teacherId);
+    setAssignmentFormData(prev => ({ ...prev, teacher_id: teacherId }));
+    
+    // Clear previous classroom/stream selection
+    setAssignmentFormData(prev => ({ 
+      ...prev, 
+      classroom_id: '',
+      stream_id: ''
+    }));
+    
+    // Find the selected teacher
+    const teacher = teachers.find(t => t.id === parseInt(teacherId));
+    if (teacher) {
+      setSelectedTeacher(teacher);
+      
+      if (hasStreams) {
+        // For schools with streams
+        const classTeacherStreams = teacher.assignments?.class_teacher_streams || [];
+        const teachingStreams = teacher.assignments?.teaching_streams || [];
+        const allStreams = [...classTeacherStreams, ...teachingStreams];
+        
+        // Get unique streams
+        const uniqueStreams = [];
+        const seenStreams = new Set();
+        allStreams.forEach(stream => {
+          if (stream.stream_id && !seenStreams.has(stream.stream_id)) {
+            seenStreams.add(stream.stream_id);
+            uniqueStreams.push({
+              id: stream.stream_id,
+              name: stream.full_name,
+              is_class_teacher: classTeacherStreams.some(s => s.stream_id === stream.stream_id)
+            });
+          }
+        });
+        
+        setTeacherStreams(uniqueStreams);
+        setTeacherClassrooms([]);
+      } else {
+        // For schools without streams
+        const classrooms = teacher.assignments?.classrooms || [];
+        setTeacherClassrooms(classrooms.map(cls => ({
+          id: cls.classroom_id,
+          name: cls.classroom_name,
+          is_class_teacher: cls.is_class_teacher
+        })));
+        setTeacherStreams([]);
+      }
+    }
+  };
+
+  // Handle academic year change - SIMPLIFIED
+  const handleAcademicYearChange = (yearId) => {
+    const year = academicYears.find(ay => ay.id === yearId);
+    setSelectedAcademicYear(yearId);
+    setSelectedAcademicYearInfo(year);
+    setAssignmentFormData(prev => ({
+      ...prev,
+      academic_year_id: yearId,
+      term_id: year?.term_id || ''
+    }));
+  };
+
+  useEffect(() => {
+    fetchConstants();
+    fetchAcademicSetup();
+  }, [fetchConstants, fetchAcademicSetup]);
 
   useEffect(() => {
     if (schoolId) {
@@ -180,8 +416,26 @@ function SubjectManager() {
       );
     }
     
-    if (filterCurriculum !== 'all') {
-      filtered = filtered.filter(subject => subject.curriculum_type === filterCurriculum);
+    // Filter by school's curriculum
+    if (school?.primary_curriculum) {
+      filtered = filtered.filter(subject => subject.curriculum_type === school.primary_curriculum);
+    }
+    
+    // Filter by school's levels
+    if (schoolLevels && schoolLevels.length > 0) {
+      filtered = filtered.filter(subject => 
+        schoolLevels.includes(subject.level)
+      );
+    }
+    
+    // Filter by school's pathways (if applicable)
+    if (school?.senior_secondary_pathways && school.senior_secondary_pathways.length > 0) {
+      filtered = filtered.filter(subject => {
+        if (subject.level === 'Senior Secondary') {
+          return school.senior_secondary_pathways.includes(subject.pathway);
+        }
+        return true;
+      });
     }
     
     if (filterCategory !== 'all') {
@@ -196,7 +450,7 @@ function SubjectManager() {
     }
     
     setFilteredSubjects(filtered);
-  }, [subjects, searchTerm, filterCurriculum, filterCategory, filterCoreStatus]);
+  }, [subjects, searchTerm, filterCategory, filterCoreStatus, school, schoolLevels]);
 
   const fetchAssignments = async (subjectId) => {
     setLoading(true);
@@ -216,23 +470,13 @@ function SubjectManager() {
     setView('create');
     setSelectedSubject(null);
     
-    let defaultCurriculum = '';
-    if (school) {
-      if (school.primary_curriculum === 'CBC') {
-        defaultCurriculum = 'CBC';
-      } else if (school.primary_curriculum === '8-4-4') {
-        defaultCurriculum = '8-4-4';
-      }
-    }
-    
     setFormData({
       name: '',
       code: '',
-      curriculum_type: defaultCurriculum,
-      grade_level: '',
       category: '',
-      is_core: false,
+      is_core: false
     });
+    setSubjectExists(false);
   };
 
   const showEditForm = (subject) => {
@@ -241,10 +485,8 @@ function SubjectManager() {
     setFormData({
       name: subject.name,
       code: subject.code,
-      curriculum_type: subject.curriculum_type,
-      grade_level: subject.grade_level,
       category: subject.category,
-      is_core: subject.is_core,
+      is_core: subject.is_core
     });
   };
 
@@ -252,10 +494,22 @@ function SubjectManager() {
     setView('manage-assignments');
     setSelectedSubject(subject);
     await fetchAssignments(subject.id);
+    
+    // Reset form state
+    setSelectedTeacher(null);
+    setTeacherClassrooms([]);
+    setTeacherStreams([]);
+    
+    // Reset assignment form with current academic year
+    const currentYear = academicYears.find(ay => ay.is_current);
+    setSelectedAcademicYear(currentYear?.id || null);
+    setSelectedAcademicYearInfo(currentYear || null);
     setAssignmentFormData({
       teacher_id: '',
+      classroom_id: '',
       stream_id: '',
-      academic_year_id: academicYears.find(ay => ay.is_current)?.id || '',
+      academic_year_id: currentYear?.id || '',
+      term_id: currentYear?.term_id || '',
       weekly_periods: 5,
       assignment_type: 'main_teacher',
     });
@@ -270,17 +524,31 @@ function SubjectManager() {
   // --- CRUD Operations ---
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData(prev => ({ 
-      ...prev, 
-      [name]: type === 'checkbox' ? checked : value 
-    }));
+    
+    if (name === 'name') {
+      setFormData(prev => ({ 
+        ...prev, 
+        [name]: type === 'checkbox' ? checked : value 
+      }));
+      searchSubjects(value);
+    } else {
+      setFormData(prev => ({ 
+        ...prev, 
+        [name]: type === 'checkbox' ? checked : value 
+      }));
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
     try {
-      const payload = { ...formData, school_id: schoolId };
+      // Create payload with school's predetermined values
+      const payload = { 
+        ...formData, 
+        school_id: schoolId,
+        curriculum_type: school.primary_curriculum,
+      };
       
       if (view === 'edit') {
         await apiRequest(`subjects/${selectedSubject.id}`, 'PUT', payload);
@@ -292,7 +560,23 @@ function SubjectManager() {
       
       backToList();
     } catch (error) {
-      toast.error(`Failed to ${view === 'edit' ? 'update' : 'create'} subject.`);
+      if (error.response?.status === 422) {
+        const errorData = error.response.data;
+        let errorMessage = 'Validation failed. Please check the form.';
+        
+        if (errorData.errors) {
+          const errorMessages = Object.values(errorData.errors).flat();
+          if (errorMessages.length > 0) {
+            errorMessage = errorMessages.join(', ');
+          }
+        } else if (errorData.message) {
+          errorMessage = errorData.message;
+        }
+        
+        toast.error(errorMessage);
+      } else {
+        toast.error(`Failed to ${view === 'edit' ? 'update' : 'create'} subject.`);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -334,18 +618,48 @@ function SubjectManager() {
 
   const handleCreateAssignment = async (e) => {
     e.preventDefault();
+    
+    if (!assignmentFormData.academic_year_id) {
+      toast.error('Please select an academic year first');
+      return;
+    }
+    
+    if (!assignmentFormData.teacher_id) {
+      toast.error('Please select a teacher');
+      return;
+    }
+    
+    if (hasStreams && !assignmentFormData.stream_id) {
+      toast.error('Please select a stream');
+      return;
+    }
+    
+    if (!hasStreams && !assignmentFormData.classroom_id) {
+      toast.error('Please select a classroom');
+      return;
+    }
+    
     setLoading(true);
     try {
-      await apiRequest('subject-assignments', 'POST', {
+      const payload = {
         ...assignmentFormData,
         subject_id: selectedSubject.id,
-      });
+      };
+      
+      await apiRequest('subject-assignments', 'POST', payload);
       toast.success('Assignment created successfully');
       await fetchAssignments(selectedSubject.id);
+      
+      // Reset form but keep academic year
+      setSelectedTeacher(null);
+      setTeacherClassrooms([]);
+      setTeacherStreams([]);
       setAssignmentFormData({
         teacher_id: '',
+        classroom_id: '',
         stream_id: '',
-        academic_year_id: academicYears.find(ay => ay.is_current)?.id || '',
+        academic_year_id: assignmentFormData.academic_year_id,
+        term_id: selectedAcademicYearInfo?.term_id || '',
         weekly_periods: 5,
         assignment_type: 'main_teacher',
       });
@@ -397,7 +711,9 @@ function SubjectManager() {
   const getCurriculumBadgeColor = (type) => {
     return type === 'CBC' 
       ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
-      : 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300';
+      : type === '8-4-4'
+      ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300'
+      : 'bg-gradient-to-r from-blue-100 to-purple-100 text-slate-800 dark:from-blue-900/30 dark:to-purple-900/30 dark:text-slate-300';
   };
 
   const getCategoryBadgeColor = (category) => {
@@ -411,6 +727,29 @@ function SubjectManager() {
       'Physical Ed': 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300'
     };
     return colors[category] || 'bg-gray-100 text-gray-700 dark:bg-gray-900/20 dark:text-gray-300';
+  };
+
+  const getPathwayBadgeColor = (pathway) => {
+    const colors = {
+      'STEM': 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300',
+      'Arts': 'bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300',
+      'Social Sciences': 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-300'
+    };
+    return colors[pathway] || 'bg-gray-100 text-gray-700 dark:bg-gray-900/20 dark:text-gray-300';
+  };
+
+  // Get unique classrooms from streams (for schools without streams)
+  const getClassroomsFromStreams = () => {
+    const classrooms = new Map();
+    streams.forEach(stream => {
+      if (stream.classroom && !classrooms.has(stream.classroom.id)) {
+        classrooms.set(stream.classroom.id, {
+          id: stream.classroom.id,
+          name: stream.classroom.class_name
+        });
+      }
+    });
+    return Array.from(classrooms.values());
   };
 
   // Render Delete Confirmation Modal
@@ -584,7 +923,7 @@ function SubjectManager() {
             </div>
           </div>
           <div className="overflow-y-auto px-6 py-4 space-y-4" style={{ maxHeight: 'calc(85vh - 280px)' }}>
-            <div className="bg-white dark:bg-slate-800/50 rounded-xl p-4 border border-slate-200 dark:border-slate-600">
+            <div className="bg-white dark:bg-slate-800/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
               <div className="flex items-center gap-2 mb-3">
                 <BookOpen className="w-5 h-5 text-slate-600 dark:text-slate-400" />
                 <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
@@ -604,32 +943,23 @@ function SubjectManager() {
                   Code: <span className="font-semibold text-slate-900 dark:text-white">{subject.code}</span>
                 </p>
               </div>
-            </div>
-            
-            <div className="bg-white dark:bg-slate-800/50 rounded-xl p-4 border border-slate-200 dark:border-slate-600">
-              <div className="flex items-center gap-2 mb-3">
-                <Award className="w-5 h-5 text-slate-600 dark:text-slate-400" />
-                <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
-                  Subject Details
-                </h3>
+              <div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Category</p>
+                <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getCategoryBadgeColor(subject.category)}`}>
+                  {subject.category}
+                </span>
               </div>
-              <div className="space-y-3">
+              {subject.pathway && (
                 <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Grade Level</p>
-                  <p className="text-sm font-medium text-slate-900 dark:text-white">
-                    {subject.grade_level}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Category</p>
-                  <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getCategoryBadgeColor(subject.category)}`}>
-                    {subject.category}
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Pathway</p>
+                  <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getPathwayBadgeColor(subject.pathway)}`}>
+                    {subject.pathway}
                   </span>
                 </div>
-              </div>
+              )}
             </div>
             
-            <div className="bg-white dark:bg-slate-800/50 rounded-xl p-4 border border-slate-200 dark:border-slate-600">
+            <div className="bg-white dark:bg-slate-800/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
               <div className="flex items-center gap-2 mb-3">
                 {subject.is_core ? (
                   <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
@@ -703,27 +1033,69 @@ function SubjectManager() {
             Manage subjects, create assignments, and oversee curriculum.
           </p>
           {school && (
-            <div className="flex items-center gap-2 mt-2">
-              <span className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
-                School Curriculum:
-              </span>
-              <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                school.primary_curriculum === 'Both' 
-                  ? 'bg-gradient-to-r from-blue-100 to-purple-100 text-slate-800 dark:from-blue-900/30 dark:to-purple-900/30 dark:text-slate-300'
-                  : getCurriculumBadgeColor(school.primary_curriculum)
-              }`}>
-                {school.primary_curriculum}
-              </span>
-              <span className="text-xs text-slate-500 dark:text-slate-400 ml-2">
-                Streams:
-              </span>
-              <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                hasStreams 
-                  ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
-                  : 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300'
-              }`}>
-                {hasStreams ? 'Enabled' : 'Disabled'}
-              </span>
+            <div className="flex flex-wrap items-center gap-2 mt-2">
+              <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800/50 px-3 py-1.5 rounded-lg">
+                <Building className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+                <span className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+                  School:
+                </span>
+                <span className="text-xs sm:text-sm font-medium text-slate-900 dark:text-white">
+                  {school.name}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800/50 px-3 py-1.5 rounded-lg">
+                <span className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+                  Curriculum:
+                </span>
+                <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getCurriculumBadgeColor(school.primary_curriculum)}`}>
+                  {school.primary_curriculum}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800/50 px-3 py-1.5 rounded-lg">
+                <span className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+                  Levels:
+                </span>
+                <div className="flex flex-wrap gap-1">
+                  {schoolLevels.map((level, index) => (
+                    <span key={index} className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                      {level}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              {school.senior_secondary_pathways && school.senior_secondary_pathways.length > 0 && (
+                <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800/50 px-3 py-1.5 rounded-lg">
+                  <span className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+                    Pathways:
+                  </span>
+                  <div className="flex flex-wrap gap-1">
+                    {school.senior_secondary_pathways.map((pathway, index) => (
+                      <span key={index} className={`px-2 py-1 text-xs font-semibold rounded-full ${getPathwayBadgeColor(pathway)}`}>
+                        {pathway}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {gradeLevels.length > 0 && (
+                <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800/50 px-3 py-1.5 rounded-lg">
+                  <span className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+                    Grade Levels:
+                  </span>
+                  <div className="flex flex-wrap gap-1">
+                    {gradeLevels.slice(0, 3).map((level, index) => (
+                      <span key={index} className="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
+                        {level}
+                      </span>
+                    ))}
+                    {gradeLevels.length > 3 && (
+                      <span className="px-2 py-1 text-xs font-semibold rounded-full bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                        +{gradeLevels.length - 3} more
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -792,20 +1164,6 @@ function SubjectManager() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                      Curriculum
-                    </label>
-                    <select
-                      value={filterCurriculum}
-                      onChange={(e) => setFilterCurriculum(e.target.value)}
-                      className="px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="all">All Curriculums</option>
-                      <option value="CBC">CBC</option>
-                      <option value="8-4-4">8-4-4</option>
-                    </select>
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
                       Category
                     </label>
                     <select
@@ -814,25 +1172,25 @@ function SubjectManager() {
                       className="px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     >
                       <option value="all">All Categories</option>
-                      {availableCategories.map(cat => (
+                      {constants.categories.map(cat => (
                         <option key={cat} value={cat}>{cat}</option>
                       ))}
                     </select>
                   </div>
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                    Type
-                  </label>
-                  <select
-                    value={filterCoreStatus}
-                    onChange={(e) => setFilterCoreStatus(e.target.value)}
-                    className="px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="all">Core & Elective</option>
-                    <option value="core">Core Only</option>
-                    <option value="elective">Elective Only</option>
-                  </select>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                      Type
+                    </label>
+                    <select
+                      value={filterCoreStatus}
+                      onChange={(e) => setFilterCoreStatus(e.target.value)}
+                      className="px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="all">Core & Elective</option>
+                      <option value="core">Core Only</option>
+                      <option value="elective">Elective Only</option>
+                    </select>
+                  </div>
                 </div>
               </div>
             )}
@@ -843,6 +1201,11 @@ function SubjectManager() {
             <div className="flex items-center gap-2 mb-3 sm:mb-4">
               <Filter className="w-4 sm:w-5 h-4 sm:h-5 text-slate-600 dark:text-slate-400" />
               <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white">Filters</h3>
+              {filtersInitialized && (
+                <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
+                  Auto-configured based on school settings
+                </span>
+              )}
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               {/* Search */}
@@ -862,22 +1225,6 @@ function SubjectManager() {
                 </div>
               </div>
               
-              {/* Curriculum Filter */}
-              <div className="flex flex-col gap-1 sm:gap-2">
-                <label className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300">
-                  Curriculum
-                </label>
-                <select
-                  value={filterCurriculum}
-                  onChange={(e) => setFilterCurriculum(e.target.value)}
-                  className="px-3 sm:px-4 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="all">All Curriculums</option>
-                  <option value="CBC">CBC</option>
-                  <option value="8-4-4">8-4-4</option>
-                </select>
-              </div>
-              
               {/* Category Filter */}
               <div className="flex flex-col gap-1 sm:gap-2">
                 <label className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300">
@@ -889,7 +1236,7 @@ function SubjectManager() {
                   className="px-3 sm:px-4 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="all">All Categories</option>
-                  {availableCategories.map(cat => (
+                  {constants.categories.map(cat => (
                     <option key={cat} value={cat}>{cat}</option>
                   ))}
                 </select>
@@ -947,8 +1294,6 @@ function SubjectManager() {
                     <tr>
                       <th className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 font-medium">Subject</th>
                       <th className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 font-medium">Code</th>
-                      <th className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 font-medium">Curriculum</th>
-                      <th className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 font-medium">Grade Level</th>
                       <th className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 font-medium">Category</th>
                       <th className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 font-medium">Type</th>
                       <th className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 font-medium">Assignments</th>
@@ -970,12 +1315,6 @@ function SubjectManager() {
                           </td>
                           <td className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 text-slate-500 dark:text-slate-400 font-mono text-xs">{subject.code}</td>
                           <td className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4">
-                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getCurriculumBadgeColor(subject.curriculum_type)}`}>
-                              {subject.curriculum_type}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 text-slate-600 dark:text-slate-400 text-xs">{subject.grade_level}</td>
-                          <td className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4">
                             <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getCategoryBadgeColor(subject.category)}`}>
                               {subject.category}
                             </span>
@@ -993,7 +1332,7 @@ function SubjectManager() {
                           <td className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4">
                             <button 
                               onClick={() => showManageAssignmentsView(subject)} 
-                              className="flex items-center gap-1 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+                              className="flex items-center gap-1 text-blue-600 hover:text-blue-700 dark:text-blue-400 transition-colors"
                             >
                               <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                               <span className="hidden sm:inline">Manage</span>
@@ -1021,8 +1360,8 @@ function SubjectManager() {
                       ))
                     ) : (
                       <tr>
-                        <td colSpan="8" className="px-3 sm:px-4 md:px-6 py-6 sm:py-8 text-center text-slate-500 dark:text-slate-400">
-                          {searchTerm || filterCurriculum !== 'all' || filterCategory !== 'all' || filterCoreStatus !== 'all'
+                        <td colSpan="6" className="px-3 sm:px-4 md:px-6 py-6 sm:py-8 text-center text-slate-500 dark:text-slate-400">
+                          {searchTerm || filterCategory !== 'all' || filterCoreStatus !== 'all'
                             ? 'No subjects match your filters.'
                             : 'No subjects found. Create your first subject to get started.'}
                         </td>
@@ -1056,12 +1395,6 @@ function SubjectManager() {
                   </div>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-600 dark:text-slate-400">Curriculum</span>
-                      <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${getCurriculumBadgeColor(subject.curriculum_type)}`}>
-                        {subject.curriculum_type}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
                       <span className="text-sm text-slate-600 dark:text-slate-400">Type</span>
                       {subject.is_core ? (
                         <div className="flex items-center gap-1">
@@ -1077,7 +1410,7 @@ function SubjectManager() {
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-slate-600 dark:text-slate-400">Category</span>
-                      <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${getCategoryBadgeColor(subject.category)}`}>
+                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getCategoryBadgeColor(subject.category)}`}>
                         {subject.category}
                       </span>
                     </div>
@@ -1088,10 +1421,9 @@ function SubjectManager() {
               <div className="bg-white dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700 p-6 text-center">
                 <AlertCircle className="w-10 h-10 text-slate-400 mx-auto mb-3" />
                 <p className="text-slate-500 dark:text-slate-400 text-sm">
-                  {searchTerm || filterCurriculum !== 'all' || filterCategory !== 'all' || filterCoreStatus !== 'all'
+                  {searchTerm || filterCategory !== 'all' || filterCoreStatus !== 'all'
                     ? 'No subjects match your filters.'
-                    : 'No subjects found. Create one to get started.'
-                  }
+                    : 'No subjects found. Create one to get started.'}
                 </p>
               </div>
             )}
@@ -1102,51 +1434,31 @@ function SubjectManager() {
   );
 
   const renderFormView = () => {
-    const gradeLevels = formData.curriculum_type === 'CBC' ? CBC_GRADE_LEVELS : LEGACY_GRADE_LEVELS;
-    const isCurriculumFixed = school && school.primary_curriculum !== 'Both';
-    
     return (
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[70] p-4">
-        <div className="bg-white dark:bg-slate-800/50 rounded-xl shadow-2xl w-full max-w-2xl border border-slate-200 dark:border-slate-700 transform transition-all duration-200 scale-100">
-          <div className="p-6 border-b border-slate-200 dark:border-slate-700">
-            <div className="flex items-start gap-4">
-              <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex-shrink-0">
-                <BookOpen className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="text-xl font-semibold text-slate-900 dark:text-white">
-                  {view === 'edit' ? 'Edit Subject' : 'Create New Subject'}
-                </h3>
-                {school && (
-                  <div className="mt-2 flex items-center gap-2">
-                    <span className="text-sm text-slate-600 dark:text-slate-400">
-                      School Primary Curriculum:
-                    </span>
-                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                      school.primary_curriculum === 'Both' 
-                        ? 'bg-gradient-to-r from-blue-100 to-purple-100 text-slate-800 dark:from-blue-900/30 dark:to-purple-900/30 dark:text-slate-300'
-                        : getCurriculumBadgeColor(school.primary_curriculum)
-                    }`}>
-                      {school.primary_curriculum}
-                    </span>
-                  </div>
-                )}
-              </div>
-              <button 
-                onClick={backToList} 
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
-                aria-label="Close form"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[70] p-2 sm:p-4">
+        <div className="bg-white dark:bg-slate-800/50 rounded-xl shadow-2xl w-full max-w-2xl border border-slate-200 dark:border-slate-700 max-h-[90vh] overflow-y-auto">
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 sm:p-6 border-b border-slate-200 dark:border-slate-700 sticky top-0 bg-white dark:bg-slate-800/50 z-10">
+            <h2 className="text-lg sm:text-xl font-semibold text-[#0d141b] dark:text-white">
+              {view === 'edit' ? 'Edit Subject' : 'Create New Subject'}
+            </h2>
+            <button 
+              onClick={backToList} 
+              type="button"
+              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 flex-shrink-0"
+              aria-label="Close form"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
           
-          <form onSubmit={handleSubmit} className="p-6 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div className="space-y-2">
-                <label htmlFor="name" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                  Subject Name *
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+            {/* Subject Name and Code */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-5">
+              <div className="space-y-1 relative">
+                <label htmlFor="name" className="block text-sm font-medium text-[#0d141b] dark:text-slate-300">
+                  Subject Name <span className="text-red-500">*</span>
                 </label>
                 <input 
                   type="text" 
@@ -1156,12 +1468,49 @@ function SubjectManager() {
                   onChange={handleInputChange} 
                   required
                   placeholder="e.g., Mathematics"
-                  className="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" 
+                  className="w-full px-3 py-2 text-sm sm:text-base border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-[#0d141b] dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" 
                 />
+                {/* Subject Suggestions Dropdown */}
+                {showSubjectSuggestions && subjectSearchResults.length > 0 && (
+                  <div className="absolute z-20 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    {subjectSearchResults.map((subject, index) => (
+                      <div
+                        key={index}
+                        className="px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 cursor-pointer border-b border-slate-100 dark:border-slate-700 last:border-b-0"
+                        onClick={() => selectSubject(subject)}
+                      >
+                        <div className="font-medium text-slate-900 dark:text-white">{subject.name}</div>
+                        <div className="text-xs text-slate-500 dark:text-slate-400">
+                          Code: {subject.codes[0]} | Category: {subject.categories[0]}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {/* Subject Exists Message - Only show when suggestions are not visible */}
+                {subjectExists && !showSubjectSuggestions && (
+                  <div className="mt-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg p-3">
+                    <div className="flex items-start gap-2">
+                      <div className="flex-shrink-0 mt-0.5">
+                        <svg className="w-4 h-4 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                          Subject Already Exists
+                        </p>
+                        <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+                          This subject is already in the database. No need to create it again.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-              <div className="space-y-2">
-                <label htmlFor="code" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                  Subject Code *
+              <div className="space-y-1">
+                <label htmlFor="code" className="block text-sm font-medium text-[#0d141b] dark:text-slate-300">
+                  Subject Code <span className="text-red-500">*</span>
                 </label>
                 <input 
                   type="text" 
@@ -1171,55 +1520,16 @@ function SubjectManager() {
                   onChange={handleInputChange} 
                   required
                   placeholder="e.g., G7-MAT"
-                  className="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all" 
+                  className="w-full px-3 py-2 text-sm sm:text-base border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-[#0d141b] dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all" 
                 />
               </div>
             </div>
 
-            {/* Curriculum Type Section - Mirrored from Academic Year Setup */}
-            <div className="space-y-2">
-              <label htmlFor="curriculum_type" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                Curriculum Type *
-              </label>
-              <div className="relative">
-                <select
-                  id="curriculum_type"
-                  name="curriculum_type"
-                  value={formData.curriculum_type}
-                  onChange={handleInputChange}
-                  required
-                  disabled={isCurriculumFixed}
-                  className={`w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none ${
-                    isCurriculumFixed ? 'bg-slate-100 dark:bg-slate-600 cursor-not-allowed' : ''
-                  }`}
-                >
-                  {isCurriculumFixed ? (
-                    <option value={school.primary_curriculum}>{school.primary_curriculum}</option>
-                  ) : (
-                    <>
-                      <option value="">Select curriculum</option>
-                      {CURRICULUM_TYPES.map(type => (
-                        <option key={type} value={type}>{type}</option>
-                      ))}
-                    </>
-                  )}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
-                  <ChevronDown className="w-4 h-4" />
-                </div>
-              </div>
-              {isCurriculumFixed && (
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                  <CheckCircle className="w-3 h-3" />
-                  Curriculum type is fixed based on your school's primary curriculum.
-                </p>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              <div className="space-y-2">
-                <label htmlFor="category" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                  Category *
+            {/* Category and Core Checkbox */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-5">
+              <div className="space-y-1">
+                <label htmlFor="category" className="block text-sm font-medium text-[#0d141b] dark:text-slate-300">
+                  Category <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
                   <select
@@ -1228,10 +1538,10 @@ function SubjectManager() {
                     value={formData.category}
                     onChange={handleInputChange}
                     required
-                    className="w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none"
+                    className="w-full px-3 py-2 text-sm sm:text-base border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-[#0d141b] dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none transition-all"
                   >
                     <option value="">Select category</option>
-                    {CATEGORIES.map(cat => (
+                    {constants.categories.map(cat => (
                       <option key={cat} value={cat}>{cat}</option>
                     ))}
                   </select>
@@ -1240,88 +1550,95 @@ function SubjectManager() {
                   </div>
                 </div>
               </div>
-              <div className="space-y-2">
-                <label htmlFor="grade_level" className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                  Grade Level *
-                </label>
-                <div className="relative">
-                  <select
-                    id="grade_level"
-                    name="grade_level"
-                    value={formData.grade_level}
-                    onChange={handleInputChange}
-                    required
-                    disabled={!formData.curriculum_type}
-                    className={`w-full px-3 py-2.5 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none ${
-                      !formData.curriculum_type ? 'bg-slate-100 dark:bg-slate-600 cursor-not-allowed' : ''
-                    }`}
-                  >
-                    <option value="">Select grade level</option>
-                    {gradeLevels.map(level => (
-                      <option key={level} value={level}>{level}</option>
-                    ))}
-                  </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
-                    <ChevronDown className="w-4 h-4" />
+              
+              {/* Core Subject Checkbox - Properly aligned */}
+              <div className="space-y-1 flex items-end pb-1">
+                <label className="flex items-center gap-3 cursor-pointer group">
+                  <div className="relative">
+                    <input
+                      type="checkbox"
+                      id="is_core"
+                      name="is_core"
+                      checked={formData.is_core}
+                      onChange={handleInputChange}
+                      className="sr-only peer"
+                    />
+                    <div className="w-5 h-5 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 flex items-center justify-center peer-checked:bg-blue-600 peer-checked:border-blue-600 group-hover:border-slate-400 dark:group-hover:border-slate-500 transition-all">
+                      {formData.is_core && (
+                        <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </div>
                   </div>
-                </div>
-                {!formData.curriculum_type && (
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    Select curriculum type first to see available grade levels.
-                  </p>
-                )}
+                  <span className="text-sm font-medium text-[#0d141b] dark:text-slate-300 select-none">
+                    Core/Compulsory Subject
+                  </span>
+                </label>
               </div>
             </div>
 
-            {/* Core Subject Checkbox - Mirrored from Academic Year Setup */}
-            <div className="pt-2">
-              <label className="flex items-center gap-3 cursor-pointer group">
-                <div className="relative">
-                  <input
-                    type="checkbox"
-                    id="is_core"
-                    name="is_core"
-                    checked={formData.is_core}
-                    onChange={handleInputChange}
-                    className="sr-only peer"
-                  />
-                  <div className="w-5 h-5 border border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 flex items-center justify-center peer-checked:bg-blue-600 peer-checked:border-blue-600 group-hover:border-slate-400 dark:group-hover:border-slate-500 transition-all">
-                    {formData.is_core && (
-                      <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
-                      </svg>
-                    )}
+            {/* School Configuration Info Box */}
+            {school && (
+              <div className="bg-slate-100 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <div className="p-1.5 bg-slate-200 dark:bg-slate-600/50 rounded-md flex-shrink-0">
+                    <BookOpen className="w-4 h-4 text-slate-700 dark:text-slate-300" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-semibold text-[#0d141b] dark:text-white mb-2">
+                      Subject will be configured based on your school settings:
+                    </h4>
+                    <ul className="text-xs text-slate-600 dark:text-slate-300 space-y-1.5">
+                      <li className="flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-slate-500 dark:bg-slate-400"></div>
+                        <span><strong className="font-semibold">Curriculum Type:</strong> {school.primary_curriculum}</span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-slate-500 dark:bg-slate-400"></div>
+                        <span><strong className="font-semibold">Educational Levels:</strong> {schoolLevels.join(', ')}</span>
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-slate-500 dark:bg-slate-400"></div>
+                        <span><strong className="font-semibold">Grade Levels:</strong> {gradeLevels.join(', ')}</span>
+                      </li>
+                      {school.senior_secondary_pathways && school.senior_secondary_pathways.length > 0 && (
+                        <li className="flex items-center gap-2">
+                          <div className="w-1.5 h-1.5 rounded-full bg-slate-500 dark:bg-slate-400"></div>
+                          <span><strong className="font-semibold">Pathways:</strong> {school.senior_secondary_pathways.join(', ')}</span>
+                        </li>
+                      )}
+                    </ul>
                   </div>
                 </div>
-                <span className="text-sm font-medium text-slate-700 dark:text-slate-300 select-none">
-                  Core/Compulsory Subject
-                </span>
-              </label>
-            </div>
+              </div>
+            )}
 
-            <div className="pt-4 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-3">
+            {/* Form Actions */}
+            <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 pt-4 border-t border-slate-200 dark:border-slate-700 mt-4 sm:mt-6">
               <button 
                 type="button" 
                 onClick={backToList} 
-                className="px-4 py-2.5 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 font-medium transition-all focus:outline-none focus:ring-2 focus:ring-slate-500"
+                className="px-4 py-2 text-sm sm:text-base border border-slate-300 dark:border-slate-600 rounded-lg text-[#0d141b] dark:text-slate-300 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all mt-2 sm:mt-0"
+                disabled={submitting}
               >
                 Cancel
               </button>
               <button 
                 type="submit" 
                 disabled={submitting} 
-                className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed min-w-[100px] flex items-center justify-center"
+                className="px-4 py-2 text-sm sm:text-base bg-black dark:bg-white text-white dark:text-black rounded-lg hover:bg-gray-800 dark:hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 dark:focus:ring-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all min-w-[80px] flex items-center justify-center"
               >
                 {submitting ? (
-                  <span className="flex items-center">
-                    <svg className="animate-spin h-4 w-4 mr-2 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <span className="flex items-center justify-center">
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
                     Saving...
                   </span>
                 ) : (
-                  view === 'edit' ? 'Update Subject' : 'Create Subject'
+                  view === 'edit' ? 'Update' : 'Create'
                 )}
               </button>
             </div>
@@ -1330,250 +1647,6 @@ function SubjectManager() {
       </div>
     );
   };
-
-  const renderManageAssignmentsView = () => (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-slate-800/50 rounded-xl shadow-2xl w-full max-w-4xl border border-slate-200 dark:border-slate-700 max-h-[90vh] overflow-y-auto">
-        <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
-          <div>
-            <h3 className="text-xl font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-              <GraduationCap className="w-5 h-5" />
-              Manage Assignments
-            </h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-              Subject: <span className="font-medium">{selectedSubject?.name}</span> ({selectedSubject?.code})
-            </p>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-              School: <span className="font-medium">{hasStreams ? 'Streams Enabled' : 'Direct Teacher Assignment'}</span>
-            </p>
-          </div>
-          <button 
-            onClick={backToList} 
-            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
-            aria-label="Close form"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-
-        {/* Create New Assignment Form */}
-        <form onSubmit={handleCreateAssignment} className="p-6 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800/50">
-          <h4 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Create New Assignment</h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div>
-              <label htmlFor="teacher_id" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Teacher *</label>
-              <select
-                id="teacher_id"
-                name="teacher_id"
-                value={assignmentFormData.teacher_id}
-                onChange={handleAssignmentInputChange}
-                required
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
-              >
-                <option value="">Select teacher</option>
-                {teachers.map(teacher => (
-                  <option key={teacher.id} value={teacher.id}>
-                    {teacher.user?.name} - {teacher.curriculum_specialization}
-                  </option>
-                ))}
-              </select>
-            </div>
-            
-            {/* Conditional rendering based on whether school has streams */}
-            {hasStreams ? (
-              <div>
-                <label htmlFor="stream_id" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Stream/Class *</label>
-                <select
-                  id="stream_id"
-                  name="stream_id"
-                  value={assignmentFormData.stream_id}
-                  onChange={handleAssignmentInputChange}
-                  required
-                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
-                >
-                  <option value="">Select stream</option>
-                  {streams.map(stream => (
-                    <option key={stream.id} value={stream.id}>
-                      {stream.classroom?.name} - {stream.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : (
-              <div>
-                <label htmlFor="classroom_id" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Classroom *</label>
-                <select
-                  id="classroom_id"
-                  name="classroom_id"
-                  value={assignmentFormData.classroom_id || ''}
-                  onChange={handleAssignmentInputChange}
-                  required
-                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
-                >
-                  <option value="">Select classroom</option>
-                  {streams.length > 0 && streams[0].classroom ? (
-                    [...new Set(streams.map(s => s.classroom))].map(classroom => (
-                      <option key={classroom.id} value={classroom.id}>
-                        {classroom.name}
-                      </option>
-                    ))
-                  ) : (
-                    <option disabled>No classrooms available</option>
-                  )}
-                </select>
-              </div>
-            )}
-            
-            <div>
-              <label htmlFor="academic_year_id" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Academic Year *</label>
-              <select
-                id="academic_year_id"
-                name="academic_year_id"
-                value={assignmentFormData.academic_year_id}
-                onChange={handleAssignmentInputChange}
-                required
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
-              >
-                <option value="">Select year</option>
-                {academicYears.map(year => (
-                  <option key={year.id} value={year.id}>
-                    {year.name} {year.is_current && '(Current)'}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="weekly_periods" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Weekly Periods *</label>
-              <input
-                id="weekly_periods"
-                type="number"
-                name="weekly_periods"
-                value={assignmentFormData.weekly_periods}
-                onChange={handleAssignmentInputChange}
-                min="1"
-                max="40"
-                required
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
-              />
-            </div>
-            <div>
-              <label htmlFor="assignment_type" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Assignment Type *</label>
-              <select
-                id="assignment_type"
-                name="assignment_type"
-                value={assignmentFormData.assignment_type}
-                onChange={handleAssignmentInputChange}
-                required
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
-              >
-                {ASSIGNMENT_TYPES.map(type => (
-                  <option key={type.value} value={type.value}>{type.label}</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex items-end">
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-              >
-                {loading ? (
-                  <>
-                    <Loader className="w-4 h-4 animate-spin" />
-                    Creating...
-                  </>
-                ) : (
-                  <>
-                    <Plus className="w-4 h-4" />
-                    Create Assignment
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </form>
-
-        {/* Existing Assignments List */}
-        <div className="p-6 bg-white dark:bg-slate-800/50">
-          <h4 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">
-            Existing Assignments ({assignments.length})
-          </h4>
-          {loading && assignments.length === 0 ? (
-            <div className="flex justify-center py-8">
-              <Loader className="w-8 h-8 animate-spin text-slate-400" />
-            </div>
-          ) : assignments.length > 0 ? (
-            <div className="space-y-3">
-              {assignments.map(assignment => (
-                <div
-                  key={assignment.id}
-                  className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-600 hover:border-blue-300 dark:hover:border-blue-600 transition-colors"
-                >
-                  <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Teacher</p>
-                      <p className="font-medium text-slate-900 dark:text-white flex items-center gap-2">
-                        <Users className="w-4 h-4 text-blue-500" />
-                        {assignment.teacher?.user?.name || 'Unknown'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
-                        {hasStreams ? 'Stream' : 'Classroom'}
-                      </p>
-                      <p className="font-medium text-slate-900 dark:text-white">
-                        {hasStreams 
-                          ? `${assignment.stream?.classroom?.name} - ${assignment.stream?.name}`
-                          : assignment.classroom?.name || 'Unknown'
-                        }
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Academic Year</p>
-                      <p className="font-medium text-slate-900 dark:text-white flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-green-500" />
-                        {assignment.academic_year?.name}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Details</p>
-                      <div className="flex items-center gap-3">
-                        <span className="flex items-center gap-1 text-sm font-medium text-slate-700 dark:text-slate-300">
-                          <Clock className="w-4 h-4" />
-                          {assignment.weekly_periods}h/week
-                        </span>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          assignment.assignment_type === 'main_teacher'
-                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
-                            : assignment.assignment_type === 'assistant_teacher'
-                            ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                            : 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300'
-                        }`}>
-                          {ASSIGNMENT_TYPES.find(t => t.value === assignment.assignment_type)?.label}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => handleDeleteAssignment(assignment.id)}
-                    className="ml-4 p-2 text-slate-500 hover:text-red-600 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                    title="Delete assignment"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8 text-slate-500 dark:text-slate-400">
-              <Users className="w-12 h-12 mx-auto mb-3 opacity-30" />
-              <p>No assignments yet. Create one above to get started.</p>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
 
   // --- Main Render ---
   if (authLoading) {
@@ -1597,7 +1670,30 @@ function SubjectManager() {
       )}
       {!loading && view === 'list' && renderListView()}
       {(view === 'create' || view === 'edit') && renderFormView()}
-      {view === 'manage-assignments' && renderManageAssignmentsView()}
+      
+      {/* Use the new ManageAssignments component */}
+      <ManageAssignments
+        isOpen={view === 'manage-assignments'}
+        onClose={backToList}
+        selectedSubject={selectedSubject}
+        hasStreams={hasStreams}
+        academicYears={academicYears}
+        teachers={teachers}
+        assignments={assignments}
+        loading={loading}
+        assignmentFormData={assignmentFormData}
+        selectedTeacher={selectedTeacher}
+        teacherClassrooms={teacherClassrooms}
+        teacherStreams={teacherStreams}
+        selectedAcademicYearInfo={selectedAcademicYearInfo}
+        
+        // Event handlers
+        onAcademicYearChange={(e) => handleAcademicYearChange(e.target.value)}
+        onTeacherSelection={(e) => handleTeacherSelection(e.target.value)}
+        onAssignmentInputChange={handleAssignmentInputChange}
+        onCreateAssignment={handleCreateAssignment}
+        onDeleteAssignment={handleDeleteAssignment}
+      />
       
       {/* Modals */}
       {renderDeleteConfirmationModal()}

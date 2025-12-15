@@ -63,6 +63,80 @@ function SchoolProfile() {
     }
   };
 
+  const getGradeLevelsByCurriculum = () => {
+    if (!schoolData.grade_levels || schoolData.grade_levels.length === 0) return null;
+    
+    // Define grade levels for CBC
+    const cbcGradeLevels = [
+      { id: 'PP1', name: 'PP1', curriculum: 'CBC', level: 'Pre-Primary' },
+      { id: 'PP2', name: 'PP2', curriculum: 'CBC', level: 'Pre-Primary' },
+      { id: 'Grade 1', name: 'Grade 1', curriculum: 'CBC', level: 'Primary' },
+      { id: 'Grade 2', name: 'Grade 2', curriculum: 'CBC', level: 'Primary' },
+      { id: 'Grade 3', name: 'Grade 3', curriculum: 'CBC', level: 'Primary' },
+      { id: 'Grade 4', name: 'Grade 4', curriculum: 'CBC', level: 'Primary' },
+      { id: 'Grade 5', name: 'Grade 5', curriculum: 'CBC', level: 'Primary' },
+      { id: 'Grade 6', name: 'Grade 6', curriculum: 'CBC', level: 'Primary' },
+      { id: 'Grade 7', name: 'Grade 7', curriculum: 'CBC', level: 'Junior Secondary' },
+      { id: 'Grade 8', name: 'Grade 8', curriculum: 'CBC', level: 'Junior Secondary' },
+      { id: 'Grade 9', name: 'Grade 9', curriculum: 'CBC', level: 'Junior Secondary' },
+      { id: 'Grade 10', name: 'Grade 10', curriculum: 'CBC', level: 'Senior Secondary' },
+      { id: 'Grade 11', name: 'Grade 11', curriculum: 'CBC', level: 'Senior Secondary' },
+      { id: 'Grade 12', name: 'Grade 12', curriculum: 'CBC', level: 'Senior Secondary' },
+    ];
+    
+    // Define class levels for 8-4-4
+    const classLevels = [
+      { id: 'Standard 1', name: 'Standard 1', curriculum: '8-4-4', level: 'Primary' },
+      { id: 'Standard 2', name: 'Standard 2', curriculum: '8-4-4', level: 'Primary' },
+      { id: 'Standard 3', name: 'Standard 3', curriculum: '8-4-4', level: 'Primary' },
+      { id: 'Standard 4', name: 'Standard 4', curriculum: '8-4-4', level: 'Primary' },
+      { id: 'Standard 5', name: 'Standard 5', curriculum: '8-4-4', level: 'Primary' },
+      { id: 'Standard 6', name: 'Standard 6', curriculum: '8-4-4', level: 'Primary' },
+      { id: 'Standard 7', name: 'Standard 7', curriculum: '8-4-4', level: 'Primary' },
+      { id: 'Standard 8', name: 'Standard 8', curriculum: '8-4-4', level: 'Primary' },
+      { id: 'Form 1', name: 'Form 1', curriculum: '8-4-4', level: 'Secondary' },
+      { id: 'Form 2', name: 'Form 2', curriculum: '8-4-4', level: 'Secondary' },
+      { id: 'Form 3', name: 'Form 3', curriculum: '8-4-4', level: 'Secondary' },
+      { id: 'Form 4', name: 'Form 4', curriculum: '8-4-4', level: 'Secondary' },
+    ];
+    
+    const allLevels = [...cbcGradeLevels, ...classLevels];
+    const selectedLevels = allLevels.filter(level => schoolData.grade_levels.includes(level.id));
+    
+    // Determine which curriculum to show based on school's primary curriculum
+    let curriculaToShow = [];
+    if (schoolData.primary_curriculum === 'CBC') {
+      curriculaToShow = ['CBC'];
+    } else if (schoolData.primary_curriculum === '8-4-4') {
+      curriculaToShow = ['8-4-4'];
+    } else if (schoolData.primary_curriculum === 'Both') {
+      curriculaToShow = ['CBC', '8-4-4'];
+    }
+    
+    // Group by curriculum
+    const groupedLevels = {};
+    curriculaToShow.forEach(curriculum => {
+      groupedLevels[curriculum] = selectedLevels.filter(level => level.curriculum === curriculum);
+    });
+    
+    // Group by level within each curriculum
+    const result = {};
+    
+    Object.keys(groupedLevels).forEach(curriculum => {
+      result[curriculum] = {};
+      groupedLevels[curriculum].forEach(level => {
+        if (!result[curriculum][level.level]) {
+          result[curriculum][level.level] = [];
+        }
+        result[curriculum][level.level].push(level);
+      });
+    });
+    
+    return result;
+  };
+
+  const gradeLevelsByCurriculum = getGradeLevelsByCurriculum();
+
   return (
     <div className="w-full space-y-4 sm:space-y-6 p-3 sm:p-4 md:p-6 lg:p-8">
       {/* Header */}
@@ -299,6 +373,56 @@ function SchoolProfile() {
           )}
         </div>
       </div>
+
+      {/* Grade/Class Levels Section - UPDATED */}
+      {gradeLevelsByCurriculum && Object.keys(gradeLevelsByCurriculum).length > 0 && (
+        <div className="bg-white dark:bg-slate-800/50 rounded-lg sm:rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
+          <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-700">
+            <h2 className="text-base sm:text-lg md:text-xl font-bold text-[#0d141b] dark:text-white mb-1 flex items-center gap-2">
+              <Award className="w-5 h-5" />
+              {schoolData.primary_curriculum === 'Both' ? 'Grade/Class Levels' : 
+               schoolData.primary_curriculum === 'CBC' ? 'Grade Levels' : 'Class Levels'}
+            </h2>
+            <p className="text-xs sm:text-sm text-[#4c739a] dark:text-slate-400">
+              {schoolData.primary_curriculum === 'Both' ? 'Specific grades and classes offered by this school' :
+               schoolData.primary_curriculum === 'CBC' ? 'Specific grades offered by this school' : 
+               'Specific classes offered by this school'}
+            </p>
+          </div>
+
+          <div className="p-4 sm:p-6">
+            <div className="space-y-6">
+              {Object.keys(gradeLevelsByCurriculum).map(curriculum => (
+                <div key={curriculum} className="space-y-4">
+                  <h3 className="text-lg font-semibold text-[#0d141b] dark:text-white">
+                    {curriculum === 'CBC' ? 'CBC Grade Levels' : '8-4-4 Class Levels'}
+                  </h3>
+                  {Object.keys(gradeLevelsByCurriculum[curriculum]).length > 0 ? (
+                    <div className="space-y-4">
+                      {Object.keys(gradeLevelsByCurriculum[curriculum]).map(level => (
+                        <div key={level} className={`p-4 ${curriculum === 'CBC' ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' : 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'} border rounded-lg`}>
+                          <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">{level}</h4>
+                          <div className="flex flex-wrap gap-2">
+                            {gradeLevelsByCurriculum[curriculum][level].map(item => (
+                              <span key={item.id} className="px-2 py-1 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs rounded-full border border-slate-300 dark:border-slate-600">
+                                {item.name}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                      No {curriculum === 'CBC' ? 'grade' : 'class'} levels have been set up for this curriculum.
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
