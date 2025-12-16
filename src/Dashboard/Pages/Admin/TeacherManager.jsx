@@ -1,4 +1,3 @@
-                            // src/Dashboard/Pages/Admin/TeacherManager.jsx
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { apiRequest } from '../../../utils/api';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -14,82 +13,15 @@ import {
   Search,
   AlertCircle,
   Filter,
+  BarChart3,
+  RefreshCw,
+  Building,
   ChevronDown,
-  CheckCircle,
-  BarChart3
+  ChevronUp,
+  ChevronRight
 } from 'lucide-react';
 import { toast } from "react-toastify";
-
-// Custom Searchable Dropdown Component
-const SearchableDropdown = ({ options, value, onChange, placeholder, disabled }) => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isOpen, setIsOpen] = useState(false);
-  
-  const selectedOption = useMemo(() => 
-    options.find(option => option.id === value), 
-    [options, value]
-  );
-  
-  const filteredOptions = useMemo(() => 
-    options.filter(option => 
-      option.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      option.email?.toLowerCase().includes(searchTerm.toLowerCase())
-    ), 
-    [options, searchTerm]
-  );
-  
-  return (
-    <div className="relative">
-      <div 
-        className={`w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white flex items-center justify-between cursor-text ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-        onClick={() => !disabled && setIsOpen(!isOpen)}
-      >
-        <span className={selectedOption ? 'text-slate-900 dark:text-white' : 'text-slate-400'}>
-          {selectedOption ? `${selectedOption.full_name} (${selectedOption.email})` : placeholder}
-        </span>
-        <ChevronDown className="w-5 h-5 text-slate-400" />
-      </div>
-      
-      {isOpen && !disabled && (
-        <div className="absolute z-10 w-full mt-1 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-lg shadow-lg max-h-60 overflow-auto">
-          <div className="p-2 border-b border-slate-200 dark:border-slate-600">
-            <div className="relative">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-slate-400" />
-              <input
-                type="text"
-                className="w-full pl-8 pr-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 dark:bg-slate-600 dark:text-white"
-                placeholder="Search..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                onClick={(e) => e.stopPropagation()}
-              />
-            </div>
-          </div>
-          <ul className="py-1">
-            {filteredOptions.length > 0 ? (
-              filteredOptions.map(option => (
-                <li
-                  key={option.id}
-                  className={`px-3 py-2 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-600 ${option.id === value ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : 'text-slate-700 dark:text-slate-300'}`}
-                  onClick={() => {
-                    onChange(option.id);
-                    setIsOpen(false);
-                    setSearchTerm('');
-                  }}
-                >
-                  <div className="font-medium">{option.full_name}</div>
-                  <div className="text-sm text-slate-500 dark:text-slate-400">{option.email}</div>
-                </li>
-              ))
-            ) : (
-              <li className="px-3 py-2 text-slate-500 dark:text-slate-400">No matching users found</li>
-            )}
-          </ul>
-        </div>
-      )}
-    </div>
-  );
-};
+import TeacherForm from '../../../components/TeacherForm';
 
 // Filter Panel Component
 const FilterPanel = ({ filters, setFilters, curriculumOptions, specializationOptions, onClearFilters }) => {
@@ -276,6 +208,7 @@ function TeacherManager() {
   });
   
   const [selectedTeacher, setSelectedTeacher] = useState(null);
+  const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
     user_id: '',
     qualification: '',
@@ -286,17 +219,25 @@ function TeacherManager() {
     max_subjects: '',
     max_classes: ''
   });
-  const [assignmentData, setAssignmentData] = useState({ 
-    subject_ids: [], 
-    stream_id: '',
-    academic_year_id: '',
-    weekly_periods: 5,
-    assignment_type: 'main_teacher'
-  });
-  
+
   // Add school state
   const [school, setSchool] = useState(null);
   const [hasStreams, setHasStreams] = useState(false);
+  const [gradeLevels, setGradeLevels] = useState([]);
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Delete modal state
+  const [deleteModal, setDeleteModal] = useState({
+    isOpen: false,
+    teacherId: null,
+    teacherName: ''
+  });
+
+  // Mobile bottom sheet state
+  const [mobileSheet, setMobileSheet] = useState({
+    isOpen: false,
+    teacher: null
+  });
 
   const curriculumOptions = ['CBC', '8-4-4', 'Both'];
   const specializationOptions = ['Sciences', 'Languages', 'Mathematics', 'Social Studies', 'Technical', 'Arts'];
@@ -307,7 +248,7 @@ function TeacherManager() {
       const response = await apiRequest('schools', 'GET');
       const schoolData = response?.data || response;
       setSchool(schoolData);
-      // Don't set hasStreams here - it comes from teachers endpoint
+      setGradeLevels(schoolData?.grade_levels || []);
     } catch (error) {
       console.error('Failed to fetch school information:', error);
       toast.error('Failed to fetch school information');
@@ -395,48 +336,6 @@ function TeacherManager() {
     }
   };
 
-  // New function to fetch academic years by curriculum
-  const fetchAcademicYearsByCurriculum = useCallback(async (curriculum) => {
-    if (!curriculum || curriculum === 'Both') {
-      // If curriculum is 'Both' or not specified, use all academic years
-      setFilteredAcademicYears(academicYears);
-      return;
-    }
-
-    // Normalize curriculum value to ensure it matches expected values
-    const normalizedCurriculum = curriculum.trim().toUpperCase();
-    
-    // Validate curriculum value before making API call
-    if (!['CBC', '8-4-4'].includes(normalizedCurriculum)) {
-      console.error('Invalid curriculum value:', curriculum);
-      toast.error(`Invalid curriculum type: ${curriculum}. Expected 'CBC' or '8-4-4'.`);
-      setFilteredAcademicYears(academicYears);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const response = await apiRequest(`academic-years/by-curriculum/${normalizedCurriculum}`, 'GET');
-      const curriculumAcademicYears = Array.isArray(response) ? response : (response?.data || []);
-      setFilteredAcademicYears(curriculumAcademicYears);
-      
-      // Reset academic year selection if current selection is not in the filtered list
-      if (assignmentData.academic_year_id && !curriculumAcademicYears.find(ay => ay.id === assignmentData.academic_year_id)) {
-        setAssignmentData(prev => ({
-          ...prev,
-          academic_year_id: ''
-        }));
-      }
-    } catch (error) {
-      console.error('Failed to fetch academic years by curriculum:', error);
-      toast.error('Failed to load academic years for curriculum');
-      // Fallback to all academic years
-      setFilteredAcademicYears(academicYears);
-    } finally {
-      setLoading(false);
-    }
-  }, [academicYears, assignmentData.academic_year_id]);
-
   // --- Filtered Teachers ---
   const filteredTeachers = useMemo(() => {
     return teachers.filter(teacher => {
@@ -460,7 +359,7 @@ function TeacherManager() {
 
   // --- View Handlers ---
   const showCreateForm = () => {
-    setView('create');
+    setShowForm(true);
     setSelectedTeacher(null);
     
     let defaultCurriculum = '';
@@ -481,7 +380,10 @@ function TeacherManager() {
   };
 
   const showEditForm = (teacher) => {
-    setView('edit');
+    if (mobileSheet.isOpen) {
+      closeMobileSheet();
+    }
+    setShowForm(true);
     setSelectedTeacher(teacher);
     setFormData({
       user_id: teacher.user_id,
@@ -493,28 +395,6 @@ function TeacherManager() {
       max_subjects: teacher.max_subjects || '',
       max_classes: teacher.max_classes || ''
     });
-  };
-
-  const showManageSubjectsView = async (teacher) => {
-    setView('manage-subjects');
-    setSelectedTeacher(teacher);
-    const subjectIds = teacher.subjects?.map(s => s.id) || [];
-    
-    // Set default academic year to current academic year
-    const currentAcademicYear = academicYears.find(ay => ay.is_active);
-    
-    setAssignmentData({ 
-      subject_ids: subjectIds, 
-      stream_id: '',
-      academic_year_id: currentAcademicYear?.id || '',
-      weekly_periods: 5,
-      assignment_type: 'main_teacher'
-    });
-    
-    // Fetch academic years based on teacher's curriculum specialization
-    // Normalize the curriculum value before passing it
-    const curriculum = teacher.curriculum_specialization?.trim().toUpperCase();
-    await fetchAcademicYearsByCurriculum(curriculum);
   };
 
   const showClassroomsView = async (teacher) => {
@@ -563,26 +443,20 @@ function TeacherManager() {
 
   const backToList = () => {
     setView('list');
+    setShowForm(false);
     setSelectedTeacher(null);
     fetchInitialData();
+  };
+
+  const closeForm = () => {
+    setShowForm(false);
+    setSelectedTeacher(null);
   };
 
   // --- CRUD Operations ---
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleAssignmentChange = (e) => {
-    const { name, value, options } = e.target;
-    if (name === 'subject_ids') {
-      const selectedIds = Array.from(options)
-        .filter(option => option.selected)
-        .map(option => Number(option.value));
-      setAssignmentData(prev => ({ ...prev, subject_ids: selectedIds }));
-    } else {
-      setAssignmentData(prev => ({ ...prev, [name]: value }));
-    }
   };
 
   const handleSubmit = async (e) => {
@@ -602,7 +476,7 @@ function TeacherManager() {
       }
       
       let response;
-      if (view === 'edit') {
+      if (selectedTeacher) {
         response = await apiRequest(`teachers/${selectedTeacher.id}`, 'PUT', payload);
         toast.success('Teacher updated successfully');
       } else {
@@ -623,121 +497,34 @@ function TeacherManager() {
           toast.error(`${key}: ${messages}`);
         });
       } else {
-        toast.error(`Failed to ${view === 'edit' ? 'update' : 'create'} teacher: ${errorMessage}`);
+        toast.error(`Failed to ${selectedTeacher ? 'update' : 'create'} teacher: ${errorMessage}`);
       }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this teacher? This action cannot be undone.')) {
-      setLoading(true);
-      try {
-        await apiRequest(`teachers/${id}`, 'DELETE');
-        toast.success('Teacher deleted successfully');
-        fetchInitialData();
-      } catch (error) {
-        const errorMessage = error?.response?.data?.message || 'Failed to delete teacher.';
-        toast.error(errorMessage);
-      } finally {
-        setLoading(false);
-      }
+  const handleDeleteClick = (teacher) => {
+    if (mobileSheet.isOpen) {
+      closeMobileSheet();
     }
+    setDeleteModal({
+      isOpen: true,
+      teacherId: teacher.id,
+      teacherName: teacher.user?.full_name || teacher.user?.name || 'Unknown'
+    });
   };
 
-  // Updated handleSaveSubjectAssignments function with proper academic year validation
-  const handleSaveSubjectAssignments = async () => {
+  const handleDelete = async () => {
     setLoading(true);
     try {
-      // Get current academic year if not selected
-      const currentAcademicYear = filteredAcademicYears.find(ay => ay.is_active);
-      const academicYearId = assignmentData.academic_year_id || currentAcademicYear?.id;
-      
-      // Validate academic year is selected
-      if (!academicYearId) {
-        toast.error('Please select an academic year');
-        setLoading(false);
-        return;
-      }
-      
-      if (hasStreams) {
-        // For schools with streams, create assignments for each subject-stream combination
-        const assignments = [];
-        
-        for (const subjectId of assignmentData.subject_ids) {
-          // If stream_id is selected, create assignment for that specific stream
-          if (assignmentData.stream_id) {
-            assignments.push({
-              teacher_id: selectedTeacher.id,
-              subject_id: subjectId,
-              academic_year_id: academicYearId,
-              stream_id: assignmentData.stream_id,
-              weekly_periods: assignmentData.weekly_periods,
-              assignment_type: assignmentData.assignment_type
-            });
-          } else {
-            // If no stream selected, we need to get all streams for this teacher's school
-            // and create assignments for each stream
-            const streamAssignments = streams.map(stream => ({
-              teacher_id: selectedTeacher.id,
-              subject_id: subjectId,
-              academic_year_id: academicYearId,
-              stream_id: stream.id,
-              weekly_periods: assignmentData.weekly_periods,
-              assignment_type: assignmentData.assignment_type
-            }));
-            
-            assignments.push(...streamAssignments);
-          }
-        }
-        
-        // Send all assignments in a batch
-        await apiRequest(`subject-assignments/batch`, 'POST', {
-          assignments: assignments
-        });
-      } else {
-        // For schools without streams, create assignments without stream_id
-        const assignments = assignmentData.subject_ids.map(subjectId => ({
-          teacher_id: selectedTeacher.id,
-          subject_id: subjectId,
-          academic_year_id: academicYearId,
-          weekly_periods: assignmentData.weekly_periods,
-          assignment_type: assignmentData.assignment_type
-          // Note: stream_id is not included for schools without streams
-        }));
-        
-        // Send all assignments in a batch
-        await apiRequest(`subject-assignments/batch`, 'POST', {
-          assignments: assignments
-        });
-      }
-      
-      toast.success('Subject assignments updated successfully');
-      backToList();
+      await apiRequest(`teachers/${deleteModal.teacherId}`, 'DELETE');
+      toast.success('Teacher deleted successfully');
+      setDeleteModal({ isOpen: false, teacherId: null, teacherName: '' });
+      fetchInitialData();
     } catch (error) {
-      console.error('Error:', error);
-      const errorMessage = error?.response?.data?.message || error?.message || 'Failed to update subject assignments.';
-      const validationErrors = error?.response?.data?.errors;
-      
-      if (validationErrors) {
-        // Handle array of errors
-        if (Array.isArray(validationErrors)) {
-          validationErrors.forEach(err => {
-            toast.error(err);
-          });
-        } else {
-          // Handle object of errors
-          Object.keys(validationErrors).forEach(key => {
-            const messages = Array.isArray(validationErrors[key]) 
-              ? validationErrors[key].join(', ') 
-              : validationErrors[key];
-            toast.error(`${key}: ${messages}`);
-          });
-        }
-      } else {
-        toast.error(errorMessage);
-      }
+      const errorMessage = error?.response?.data?.message || 'Failed to delete teacher.';
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -759,36 +546,292 @@ function TeacherManager() {
       : 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300';
   };
 
+  // Mobile bottom sheet handlers
+  const openMobileSheet = (teacher) => {
+    setMobileSheet({ isOpen: true, teacher });
+    document.body.style.overflow = 'hidden';
+  };
+
+  const closeMobileSheet = () => {
+    setMobileSheet({ isOpen: false, teacher: null });
+    document.body.style.overflow = '';
+  };
+
+  // Render Delete Confirmation Modal
+  const renderDeleteConfirmationModal = () => {
+    if (!deleteModal.isOpen) return null;
+    
+    return (
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[70] p-4">
+        <div className="bg-white dark:bg-slate-800/50 rounded-xl shadow-2xl w-full max-w-md border border-slate-200 dark:border-slate-700 transform transition-all duration-200 scale-100">
+          <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-700">
+            <div className="flex items-start gap-3 sm:gap-4">
+              <div className="p-2 sm:p-3 rounded-full bg-red-50 dark:bg-red-900/20 flex-shrink-0">
+                <AlertCircle className="w-5 h-5 sm:w-6 sm:h-6 text-red-500" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white">
+                  Delete Teacher
+                </h3>
+                <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                  Are you sure you want to delete <span className="font-semibold text-slate-900 dark:text-white">"{deleteModal.teacherName}"</span>?
+                  This action cannot be undone and will remove all associated data.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="px-4 sm:px-6 pt-4">
+            <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/30 rounded-lg p-3">
+              <div className="flex gap-2">
+                <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-red-800 dark:text-red-300">
+                  <strong>Warning:</strong> This will permanently delete all data associated with this teacher including assignments, grading information, and scheduling.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="p-4 sm:p-6 flex flex-col-reverse sm:flex-row gap-2 justify-end">
+            <button
+              onClick={() => setDeleteModal({ isOpen: false, teacherId: null, teacherName: '' })}
+              disabled={loading}
+              className="w-full sm:w-auto px-3 sm:px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 font-medium transition-all disabled:opacity-50"
+            >
+              Keep Teacher
+            </button>
+            <button
+              onClick={handleDelete}
+              disabled={loading}
+              className="w-full sm:w-auto px-3 sm:px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+            >
+              {loading ? (
+                <>
+                  <svg className="animate-spin h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-3.5 h-3.5" />
+                  Delete Teacher
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Render Mobile Bottom Sheet
+  const renderMobileBottomSheet = () => {
+    if (!mobileSheet.isOpen || !mobileSheet.teacher) return null;
+    const teacher = mobileSheet.teacher;
+    
+    return (
+      <>
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] md:hidden transition-opacity duration-300"
+          onClick={closeMobileSheet}
+        />
+        <div
+          className="fixed inset-x-0 bottom-0 z-[60] bg-white dark:bg-slate-800/50 rounded-t-3xl shadow-2xl md:hidden transition-transform duration-300 ease-out"
+          style={{ maxHeight: '85vh' }}
+        >
+          <div className="flex justify-center pt-3 pb-2">
+            <div className="w-12 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full" />
+          </div>
+          <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+            <div className="flex items-center justify-between">
+              <div className="flex-1 min-w-0">
+                <h2 className="text-xl font-bold text-slate-900 dark:text-white truncate">
+                  {teacher.user?.full_name || teacher.user?.name}
+                </h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                  {teacher.user?.email || 'No email'}
+                </p>
+              </div>
+              <button
+                onClick={closeMobileSheet}
+                className="p-2 -mr-2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 active:scale-95 transition-all"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+          <div className="overflow-y-auto px-6 py-4 space-y-4" style={{ maxHeight: 'calc(85vh - 280px)' }}>
+            <div className="bg-white dark:bg-slate-800/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
+              <div className="flex items-center gap-2 mb-3">
+                <Users className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
+                  Teacher Information
+                </h3>
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-lg font-bold text-slate-900 dark:text-white">
+                    {teacher.user?.full_name || teacher.user?.name}
+                  </span>
+                  <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getCurriculumBadgeColor(teacher.curriculum_specialization)}`}>
+                    {teacher.curriculum_specialization}
+                  </span>
+                </div>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  Qualification: <span className="font-semibold text-slate-900 dark:text-white">{teacher.qualification || 'Not specified'}</span>
+                </p>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  TSC: <span className="font-semibold text-slate-900 dark:text-white">{teacher.tsc_number || 'Not specified'}</span>
+                </p>
+              </div>
+              <div className="mt-3">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Specialization</p>
+                <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
+                  {teacher.specialization || 'General'}
+                </span>
+              </div>
+            </div>
+            
+            <div className="bg-white dark:bg-slate-800/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
+              <div className="flex items-center gap-2 mb-3">
+                <BookOpen className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
+                  Assignments
+                </h3>
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-600 dark:text-slate-400">{hasStreams ? 'Streams' : 'Classrooms'}</span>
+                  <span className="text-sm font-medium text-slate-900 dark:text-white">
+                    {hasStreams ? (teacher.streamCount || 0) : (teacher.classroomCount || 0)}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-600 dark:text-slate-400">Class Teacher</span>
+                  <span className="text-sm font-medium text-slate-900 dark:text-white">
+                    {hasStreams 
+                      ? (teacher.classTeacherStreamCount > 0 ? 'Yes' : 'No')
+                      : (teacher.classTeacherClassroom ? 'Yes' : 'No')
+                    }
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="border-t border-slate-200 dark:border-slate-700 p-4 space-y-2 bg-white dark:bg-slate-800/50">
+            <button
+              onClick={() => {
+                closeMobileSheet();
+                showEditForm(teacher);
+              }}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-600 active:scale-[0.98] transition-all"
+            >
+              <Edit className="w-4 h-4" />
+              Edit Teacher
+            </button>
+            <button
+              onClick={() => {
+                closeMobileSheet();
+                hasStreams ? showStreamsView(teacher) : showClassroomsView(teacher);
+              }}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded-xl hover:bg-blue-100 dark:hover:bg-blue-900/30 active:scale-[0.98] transition-all"
+            >
+              <Users className="w-4 h-4" />
+              View {hasStreams ? 'Streams' : 'Classrooms'}
+            </button>
+            <button
+              onClick={() => handleDeleteClick(teacher)}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-xl hover:bg-red-100 dark:hover:bg-red-900/30 active:scale-[0.98] transition-all"
+            >
+              <Trash2 className="w-4 h-4" />
+              Delete Teacher
+            </button>
+          </div>
+        </div>
+      </>
+    );
+  };
+
   // --- Render Functions ---
   const renderListView = () => (
     <>
-      <div className="flex flex-wrap justify-between items-start gap-4 mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-6 md:mb-8">
         <div className="flex flex-col gap-2">
-          <h1 className="text-[#0d141b] dark:text-white text-4xl font-black leading-tight tracking-[-0.033em]">Teacher Management</h1>
-          <p className="text-[#4c739a] dark:text-slate-400 text-base font-normal leading-normal">Manage teaching staff, their assignments, and qualifications.</p>
+          <h1 className="text-[#0d141b] dark:text-white text-xl sm:text-2xl md:text-3xl lg:text-4xl font-black leading-tight tracking-[-0.033em]">
+            Teacher Management
+          </h1>
+          <p className="text-[#4c739a] dark:text-slate-400 text-xs sm:text-sm md:text-base font-normal leading-normal">
+            Manage teaching staff, their assignments, and qualifications.
+          </p>
           {school && (
-            <div className="flex items-center gap-2 mt-2">
-              <span className="text-sm text-slate-600 dark:text-slate-400">
-                School Type:
-              </span>
-              <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                hasStreams 
-                  ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' 
-                  : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
-              }`}>
-                {hasStreams ? 'Streams Enabled' : 'Direct Classroom Assignment'}
-              </span>
+            <div className="flex flex-wrap items-center gap-2 mt-2">
+              <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800/50 px-3 py-1.5 rounded-lg">
+                <Building className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+                <span className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+                  School:
+                </span>
+                <span className="text-xs sm:text-sm font-medium text-slate-900 dark:text-white">
+                  {school.name}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800/50 px-3 py-1.5 rounded-lg">
+                <span className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+                  Curriculum:
+                </span>
+                <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getCurriculumBadgeColor(school.primary_curriculum)}`}>
+                  {school.primary_curriculum}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800/50 px-3 py-1.5 rounded-lg">
+                <span className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+                  Type:
+                </span>
+                <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                  hasStreams 
+                    ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' 
+                    : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                }`}>
+                  {hasStreams ? 'Streams Enabled' : 'Direct Classroom Assignment'}
+                </span>
+              </div>
+              {gradeLevels.length > 0 && (
+                <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800/50 px-3 py-1.5 rounded-lg">
+                  <span className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+                    Grade Levels:
+                  </span>
+                  <div className="flex flex-wrap gap-1">
+                    {gradeLevels.slice(0, 3).map((level, index) => (
+                      <span key={index} className="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
+                        {level}
+                      </span>
+                    ))}
+                    {gradeLevels.length > 3 && (
+                      <span className="px-2 py-1 text-xs font-semibold rounded-full bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                        +{gradeLevels.length - 3} more
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
-        <div className="flex flex-wrap gap-3">
+        <div className="flex gap-2 sm:gap-3 flex-shrink-0">
+          <button 
+            onClick={fetchInitialData}
+            disabled={loading}
+            className="bg-black text-white px-3 sm:px-4 py-2 sm:py-3 rounded-lg font-medium transition-colors duration-200 hover:bg-gray-800 disabled:opacity-50 text-sm dark:bg-white dark:text-black dark:hover:bg-gray-200"
+            title="Refresh data"
+          >
+            <RefreshCw className={`w-4 h-4 inline-block ${loading ? 'animate-spin' : ''}`} />
+          </button>
           <button 
             onClick={showCreateForm} 
             disabled={!school}
-            className="bg-black text-white px-6 py-3 rounded-lg font-medium hover:bg-gray-800 transition-colors flex items-center gap-2 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed dark:bg-white dark:text-black dark:hover:bg-gray-200"
+            className="bg-black text-white px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-medium hover:bg-gray-800 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed dark:bg-white dark:text-black dark:hover:bg-gray-200 text-sm sm:text-base whitespace-nowrap"
             title={!school ? "Loading school information..." : "Create new teacher"}
           >
-            <Plus className="w-5 h-5" />
+            <Plus className="inline-block w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" />
             New Teacher
           </button>
         </div>
@@ -796,534 +839,331 @@ function TeacherManager() {
 
       <TeacherStatistics teachers={teachers} subjects={subjects} streams={streams} />
 
-      <FilterPanel 
-        filters={filters} 
-        setFilters={setFilters} 
-        curriculumOptions={curriculumOptions}
-        specializationOptions={specializationOptions}
-        onClearFilters={clearAllFilters}
-      />
-
-      <div className="mb-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search by name, email, or TSC number..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
-      </div>
-
-      <div className="bg-white dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-[#0d141b] dark:text-white text-2xl font-bold leading-tight tracking-[-0.015em]">
-            Existing Teachers ({filteredTeachers.length})
-          </h2>
-        </div>
-        
-        <div className="overflow-x-auto">
-          <div className="border rounded-lg border-slate-200 dark:border-slate-700">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300">
-                <tr>
-                  <th className="px-6 py-4 font-medium">Name</th>
-                  <th className="px-6 py-4 font-medium">Email</th>
-                  <th className="px-6 py-4 font-medium">Qualification</th>
-                  <th className="px-6 py-4 font-medium">Specialization</th>
-                  <th className="px-6 py-4 font-medium">Curriculum</th>
-                  <th className="px-6 py-4 font-medium">Employment</th>
-                  <th className="px-6 py-4 font-medium">{hasStreams ? 'Streams' : 'Classrooms'}</th>
-                  <th className="px-6 py-4 font-medium">Class Teacher</th>
-                  <th className="px-6 py-4 font-medium text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                {filteredTeachers.length > 0 ? (
-                  filteredTeachers.map((teacher) => (
-                    <tr key={teacher.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/20 transition-colors">
-                      <td className="px-6 py-4 font-medium text-slate-900 dark:text-slate-100">
-                        {teacher.user?.full_name || teacher.user?.name || 'Unknown'}
-                      </td>
-                      <td className="px-6 py-4 text-slate-500 dark:text-slate-400 text-xs">
-                        {teacher.user?.email || '-'}
-                      </td>
-                      <td className="px-6 py-4 text-slate-500 dark:text-slate-400">
-                        {teacher.qualification || '-'}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 rounded-full text-xs font-medium">
-                          {teacher.specialization || 'General'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                          teacher.curriculum_specialization === 'CBC' 
-                            ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-                            : teacher.curriculum_specialization === '8-4-4'
-                            ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
-                            : 'bg-purple-100 dark:bg-purple-900/30 dark:text-purple-300'
-                        }`}>
-                          {teacher.curriculum_specialization}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-slate-500 dark:text-slate-400 text-xs">
-                        {teacher.employment_type || '-'}
-                      </td>
-                      <td className="px-6 py-4 text-slate-500 dark:text-slate-400">
-                        {hasStreams ? (
-                          <span>{teacher.streamCount || 0} Stream(s)</span>
-                        ) : (
-                          <span>{teacher.classroomCount || 0} Classroom(s)</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-slate-500 dark:text-slate-400">
-                        {hasStreams ? (
-                          <span>{teacher.classTeacherStreamCount > 0 ? 'Yes' : 'No'}</span>
-                        ) : (
-                          <span>{teacher.classTeacherClassroom ? 'Yes' : 'No'}</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end gap-2">
-                          <button 
-                            onClick={() => showManageSubjectsView(teacher)} 
-                            className="p-2 text-slate-500 hover:text-green-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                            title="Manage Subjects"
-                          >
-                            <BookOpen className="w-4 h-4" />
-                          </button>
-                          <button 
-                            onClick={() => hasStreams ? showStreamsView(teacher) : showClassroomsView(teacher)} 
-                            className="p-2 text-slate-500 hover:text-purple-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                            title={hasStreams ? "View Streams" : "View Classrooms"}
-                          >
-                            <Users className="w-4 h-4" />
-                          </button>
-                          <button 
-                            onClick={() => showEditForm(teacher)} 
-                            className="p-2 text-slate-500 hover:text-blue-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                            title="Edit Teacher"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button 
-                            onClick={() => handleDelete(teacher.id)} 
-                            className="p-2 text-slate-500 hover:text-red-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                            title="Delete Teacher"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="9" className="px-6 py-8 text-center text-slate-500 dark:text-slate-400">
-                      {searchTerm || Object.values(filters).some(v => v) 
-                        ? 'No teachers match your filters.' 
-                        : 'No teachers found.'}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+      {/* Filters Section */}
+      {!loading && (
+        <div className="bg-white dark:bg-slate-800/50 rounded-lg sm:rounded-xl border border-slate-200 dark:border-slate-700 p-3 sm:p-4 mb-4 md:mb-6">
+          {/* Mobile: Collapsible Filters */}
+          <div className="block md:hidden">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className="w-full flex items-center justify-between mb-3"
+            >
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
+                  Filters
+                </h3>
+                <span className="text-xs text-slate-500 dark:text-slate-400">
+                  ({filteredTeachers.length}/{teachers.length})
+                </span>
+              </div>
+              {showFilters ? (
+                <ChevronUp className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+              ) : (
+                <ChevronDown className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+              )}
+            </button>
+            {showFilters && (
+              <div className="space-y-3">
+                {/* Search */}
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                    Search
+                  </label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search by name, email, or TSC number..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="w-full pl-10 pr-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                      Curriculum
+                    </label>
+                    <select
+                      value={filters.curriculum_specialization}
+                      onChange={(e) => setFilters({ ...filters, curriculum_specialization: e.target.value })}
+                      className="px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">All Curricula</option>
+                      {curriculumOptions.map(opt => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                      Employment
+                    </label>
+                    <select
+                      value={filters.employment_type}
+                      onChange={(e) => setFilters({ ...filters, employment_type: e.target.value })}
+                      className="px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">All Types</option>
+                      <option value="Full-time">Full-time</option>
+                      <option value="Part-time">Part-time</option>
+                      <option value="Contract">Contract</option>
+                      <option value="Temporary">Temporary</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          {/* Desktop: Always Visible Filters */}
+          <div className="hidden md:block">
+            <div className="flex items-center gap-2 mb-3 sm:mb-4">
+              <Filter className="w-4 sm:w-5 h-4 sm:h-5 text-slate-600 dark:text-slate-400" />
+              <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white">Filters</h3>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+              {/* Search */}
+              <div className="flex flex-col gap-1 sm:gap-2 sm:col-span-2 lg:col-span-1"> 
+                <label className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Search
+                </label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Search by name, email, or TSC number..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-10 sm:pl-12 pr-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+              
+              {/* Curriculum Filter */}
+              <div className="flex flex-col gap-1 sm:gap-2">
+                <label className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Curriculum
+                </label>
+                <select
+                  value={filters.curriculum_specialization}
+                  onChange={(e) => setFilters({ ...filters, curriculum_specialization: e.target.value })}
+                  className="px-3 sm:px-4 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All Curricula</option>
+                  {curriculumOptions.map(opt => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+              </div>
+              
+              {/* Specialization Filter */}
+              <div className="flex flex-col gap-1 sm:gap-2">
+                <label className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Specialization
+                </label>
+                <select
+                  value={filters.specialization}
+                  onChange={(e) => setFilters({ ...filters, specialization: e.target.value })}
+                  className="px-3 sm:px-4 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">All Specializations</option>
+                  {specializationOptions.map(opt => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+              </div>
+              
+              {/* Results Count */}
+              <div className="flex items-end lg:col-span-1">
+                <div className="px-3 sm:px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded-lg w-full">
+                  <span className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
+                    Showing <span className="font-semibold">{filteredTeachers.length}</span> of <span className="font-semibold">{teachers.length}</span> teachers
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* Loading State */}
+      {loading && (
+        <div className="flex flex-col items-center justify-center py-12 md:py-16">
+          <Loader className="w-10 sm:w-12 h-10 sm:h-12 text-gray-600 dark:text-gray-400 animate-spin" />
+          <p className="mt-4 text-sm sm:text-base text-slate-600 dark:text-slate-400">Loading teachers...</p>
+        </div>
+      )}
+
+      {/* Table Section - Desktop and Tablet */}
+      {!loading && (
+        <>
+          {/* Desktop/Tablet Table View */}
+          <div className="hidden md:block bg-white dark:bg-slate-800/50 rounded-lg sm:rounded-xl border border-slate-200 dark:border-slate-700 p-3 sm:p-4 md:p-6 mb-4 md:mb-6">
+            <h2 className="text-[#0d141b] dark:text-white text-xl sm:text-2xl font-bold leading-tight tracking-[-0.015em] mb-4 sm:mb-6">
+              Existing Teachers ({filteredTeachers.length})
+            </h2>
+            <div className="overflow-x-auto">
+              <div className="border rounded-lg border-slate-200 dark:border-slate-700 min-w-[700px] sm:min-w-full">
+                <table className="w-full text-xs sm:text-sm text-left">
+                  <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300">
+                    <tr>
+                      <th className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 font-medium">Name</th>
+                      <th className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 font-medium">Email</th>
+                      <th className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 font-medium">Qualification</th>
+                      <th className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 font-medium">Specialization</th>
+                      <th className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 font-medium">Curriculum</th>
+                      <th className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 font-medium">Employment</th>
+                      <th className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 font-medium">{hasStreams ? 'Streams' : 'Classrooms'}</th>
+                      <th className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 font-medium">Class Teacher</th>
+                      <th className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 font-medium text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+                    {filteredTeachers.length > 0 ? (
+                      filteredTeachers.map((teacher) => (
+                        <tr 
+                          key={teacher.id} 
+                          className="hover:bg-slate-50 dark:hover:bg-slate-700/20 transition-colors duration-150"
+                        >
+                          <td className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 font-medium text-slate-900 dark:text-slate-100">
+                            {teacher.user?.full_name || teacher.user?.name || 'Unknown'}
+                          </td>
+                          <td className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 text-slate-500 dark:text-slate-400 text-xs">
+                            {teacher.user?.email || '-'}
+                          </td>
+                          <td className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 text-slate-500 dark:text-slate-400">
+                            {teacher.qualification || '-'}
+                          </td>
+                          <td className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4">
+                            <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
+                              {teacher.specialization || 'General'}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4">
+                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                              teacher.curriculum_specialization === 'CBC' 
+                                ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                                : teacher.curriculum_specialization === '8-4-4'
+                                ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
+                                : 'bg-purple-100 dark:bg-purple-900/30 dark:text-purple-300'
+                            }`}>
+                              {teacher.curriculum_specialization}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 text-slate-500 dark:text-slate-400 text-xs">
+                            {teacher.employment_type || '-'}
+                          </td>
+                          <td className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 text-slate-500 dark:text-slate-400">
+                            {hasStreams ? (
+                              <span>{teacher.streamCount || 0} Stream(s)</span>
+                            ) : (
+                              <span>{teacher.classroomCount || 0} Classroom(s)</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 text-slate-500 dark:text-slate-400">
+                            {hasStreams ? (
+                              <span>{teacher.classTeacherStreamCount > 0 ? 'Yes' : 'No'}</span>
+                            ) : (
+                              <span>{teacher.classTeacherClassroom ? 'Yes' : 'No'}</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 text-right">
+                            <div className="flex justify-end gap-1">
+                              <button 
+                                onClick={() => hasStreams ? showStreamsView(teacher) : showClassroomsView(teacher)} 
+                                className="p-1.5 text-slate-500 hover:text-purple-600 dark:hover:text-purple-400 transition-colors duration-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
+                                title={hasStreams ? "View Streams" : "View Classrooms"}
+                              >
+                                <Users className="w-3.5 h-3.5" />
+                              </button>
+                              <button 
+                                onClick={() => showEditForm(teacher)} 
+                                className="p-1.5 text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
+                                title="Edit Teacher"
+                              >
+                                <Edit className="w-3.5 h-3.5" />
+                              </button>
+                              <button 
+                                onClick={() => handleDeleteClick(teacher)} 
+                                className="p-1.5 text-slate-500 hover:text-red-600 dark:hover:text-red-400 transition-colors duration-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
+                                title="Delete Teacher"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="9" className="px-3 sm:px-4 md:px-6 py-6 sm:py-8 text-center text-slate-500 dark:text-slate-400">
+                          {searchTerm || Object.values(filters).some(v => v) 
+                            ? 'No teachers match your filters.' 
+                            : 'No teachers found.'}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          {/* Mobile Card View with Bottom Sheet */}
+          <div className="md:hidden space-y-3">
+            {filteredTeachers.length > 0 ? (
+              filteredTeachers.map((teacher) => (
+                <button
+                  key={teacher.id}
+                  onClick={() => openMobileSheet(teacher)}
+                  className="w-full bg-white dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700 p-4 shadow-sm hover:shadow-md active:scale-[0.98] transition-all text-left min-h-[120px] flex flex-col justify-between"
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-base font-bold text-slate-900 dark:text-white truncate">
+                        {teacher.user?.full_name || teacher.user?.name}
+                      </h3>
+                      <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                        {teacher.user?.email || 'No email'}
+                      </p>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-slate-400 flex-shrink-0 ml-2" />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-slate-600 dark:text-slate-400">Specialization</span>
+                      <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
+                        {teacher.specialization || 'General'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-slate-600 dark:text-slate-400">{hasStreams ? 'Streams' : 'Classrooms'}</span>
+                      <span className="text-sm font-medium text-slate-900 dark:text-white">
+                        {hasStreams ? (teacher.streamCount || 0) : (teacher.classroomCount || 0)}
+                      </span>
+                    </div>
+                  </div>
+                </button>
+              ))
+            ) : (
+              <div className="bg-white dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700 p-6 text-center">
+                <AlertCircle className="w-10 h-10 text-slate-400 mx-auto mb-3" />
+                <p className="text-slate-500 dark:text-slate-400 text-sm">
+                  {searchTerm || Object.values(filters).some(v => v)
+                    ? 'No teachers match your filters.'
+                    : 'No teachers found. Create one to get started.'}
+                </p>
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </>
   );
 
-  const renderFormView = () => (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-2xl border border-slate-200 dark:border-slate-700 max-h-[90vh] overflow-y-auto">
-        <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
-          <h3 className="text-xl font-semibold text-slate-900 dark:text-white">
-            {view === 'edit' ? 'Edit Teacher' : 'Create New Teacher'}
-          </h3>
-          <button 
-            onClick={backToList} 
-            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
-            aria-label="Close form"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="md:col-span-2">
-              <label htmlFor="user_id" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                User <span className="text-red-500">*</span>
-              </label>
-              <SearchableDropdown
-                options={users}
-                value={formData.user_id}
-                onChange={(value) => setFormData(prev => ({ ...prev, user_id: value }))}
-                placeholder="Select a user"
-                disabled={view === 'edit'}
-              />
-              {view === 'edit' && (
-                <p className="text-xs text-slate-500 mt-1">User cannot be changed after creation</p>
-              )}
-            </div>
-
-            {school && school.primary_curriculum === 'Both' && (
-              <div>
-                <label htmlFor="curriculum_specialization" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                  Curriculum Specialization <span className="text-red-500">*</span>
-                </label>
-                <select 
-                  id="curriculum_specialization"
-                  name="curriculum_specialization" 
-                  value={formData.curriculum_specialization} 
-                  onChange={handleInputChange}
-                  required
-                  className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
-                >
-                  <option value="">Select curriculum</option>
-                  <option value="CBC">CBC</option>
-                  <option value="8-4-4">8-4-4</option>
-                  <option value="Both">Both</option>
-                </select>
-              </div>
-            )}
-
-            <div>
-              <label htmlFor="specialization" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                Specialization
-              </label>
-              <select 
-                id="specialization"
-                name="specialization" 
-                value={formData.specialization} 
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
-              >
-                <option value="">Select specialization</option>
-                {specializationOptions.map(opt => (
-                  <option key={opt} value={opt}>{opt}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label htmlFor="qualification" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                Qualification
-              </label>
-              <input 
-                type="text" 
-                id="qualification"
-                name="qualification" 
-                value={formData.qualification} 
-                onChange={handleInputChange}
-                placeholder="e.g., B.Sc Education"
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white" 
-              />
-            </div>
-
-            <div>
-              <label htmlFor="employment_type" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                Employment Type
-              </label>
-              <select 
-                id="employment_type"
-                name="employment_type" 
-                value={formData.employment_type} 
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
-              >
-                <option value="">Select employment type</option>
-                <option value="Full-time">Full-time</option>
-                <option value="Part-time">Part-time</option>
-                <option value="Contract">Contract</option>
-                <option value="Temporary">Temporary</option>
-              </select>
-            </div>
-
-            <div>
-              <label htmlFor="tsc_number" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                TSC Number
-              </label>
-              <input 
-                type="text" 
-                id="tsc_number"
-                name="tsc_number" 
-                value={formData.tsc_number} 
-                onChange={handleInputChange}
-                placeholder="e.g., TSC123456"
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white" 
-              />
-            </div>
-
-            <div>
-              <label htmlFor="max_subjects" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                Max Subjects to Teach
-              </label>
-              <input 
-                type="number"
-                id="max_subjects"
-                name="max_subjects" 
-                value={formData.max_subjects} 
-                onChange={handleInputChange}
-                min="1"
-                placeholder="e.g., 4"
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white" 
-              />
-            </div>
-
-            <div>
-              <label htmlFor="max_classes" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                Max Classes to Teach
-              </label>
-              <input 
-                type="number"
-                id="max_classes"
-                name="max_classes" 
-                value={formData.max_classes} 
-                onChange={handleInputChange}
-                min="1"
-                placeholder="e.g., 6"
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white" 
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700 mt-6">
-            <button 
-              type="button" 
-              onClick={backToList} 
-              className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-500 transition-all"
-            >
-              Cancel
-            </button>
-            <button 
-              type="submit" 
-              disabled={loading || (view === 'create' && !formData.user_id)} 
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all min-w-[80px]"
-            >
-              {loading ? (
-                <span className="flex items-center justify-center">
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Saving...
-                </span>
-              ) : (
-                view === 'edit' ? 'Update Teacher' : 'Create Teacher'
-              )}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-
-  const renderManageSubjectsView = () => (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-2xl border border-slate-200 dark:border-slate-700 max-h-[90vh] overflow-y-auto">
-        <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
-          <div>
-            <h3 className="text-xl font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-              <BookOpen className="w-5 h-5" />Manage Subject Assignments
-            </h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              {selectedTeacher?.user?.full_name || selectedTeacher?.user?.name}
-            </p>
-            {selectedTeacher?.curriculum_specialization && (
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-xs text-slate-500 dark:text-slate-400">Curriculum:</span>
-                <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                  selectedTeacher.curriculum_specialization === 'CBC' 
-                    ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' 
-                    : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
-                }`}>
-                  {selectedTeacher.curriculum_specialization}
-                </span>
-              </div>
-            )}
-          </div>
-          <button 
-            onClick={backToList} 
-            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
-            aria-label="Close form"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-        <div className="p-6">
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
-              Select Subjects ({assignmentData.subject_ids.length} selected)
-            </label>
-            <div className="space-y-2 max-h-96 overflow-y-auto border rounded-lg border-slate-300 dark:border-slate-600 p-4 bg-slate-50 dark:bg-slate-700/50">
-              {subjects.length > 0 ? (
-                subjects.map(subject => (
-                  <label key={subject.id} className="flex items-center space-x-3 p-3 hover:bg-white dark:hover:bg-slate-700 rounded cursor-pointer transition-colors">
-                    <input
-                      type="checkbox"
-                      value={subject.id}
-                      checked={assignmentData.subject_ids.includes(subject.id)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setAssignmentData(prev => ({ 
-                            ...prev, 
-                            subject_ids: [...prev.subject_ids, subject.id] 
-                          }));
-                        } else {
-                          setAssignmentData(prev => ({ 
-                            ...prev, 
-                            subject_ids: prev.subject_ids.filter(id => id !== subject.id) 
-                          }));
-                        }
-                      }}
-                      className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 cursor-pointer"
-                    />
-                    <div className="flex-1">
-                      <span className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                        {subject.name}
-                      </span>
-                      {subject.code && (
-                        <span className="text-xs text-slate-500 dark:text-slate-400 ml-2">
-                          ({subject.code})
-                        </span>
-                      )}
-                      {subject.curriculum_type && (
-                        <span className={`ml-2 px-2 py-0.5 text-xs rounded-full ${
-                          subject.curriculum_type === 'CBC' 
-                            ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
-                            : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
-                        }`}>
-                          {subject.curriculum_type}
-                        </span>
-                      )}
-                    </div>
-                  </label>
-                ))
-              ) : (
-                <p className="text-slate-500 dark:text-slate-400 text-center py-4">No subjects available</p>
-              )}
-            </div>
-          </div>
-          
-          {/* Additional assignment fields */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <div>
-              <label htmlFor="academic_year_id" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                Academic Year <span className="text-red-500">*</span>
-              </label>
-              <select
-                id="academic_year_id"
-                name="academic_year_id"
-                value={assignmentData.academic_year_id}
-                onChange={handleAssignmentChange}
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
-              >
-                <option value="">Select academic year</option>
-                {filteredAcademicYears.map(year => (
-                  <option key={year.id} value={year.id}>
-                    {year.year} - {year.term} {year.is_active ? '(Active)' : ''}
-                  </option>
-                ))}
-              </select>
-              {selectedTeacher?.curriculum_specialization && selectedTeacher?.curriculum_specialization !== 'Both' && (
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                  Showing academic years for {selectedTeacher.curriculum_specialization} curriculum
-                </p>
-              )}
-            </div>
-            
-            <div>
-              <label htmlFor="weekly_periods" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                Weekly Periods
-              </label>
-              <input
-                id="weekly_periods"
-                type="number"
-                name="weekly_periods"
-                value={assignmentData.weekly_periods}
-                onChange={handleAssignmentChange}
-                min="1"
-                max="40"
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
-              />
-            </div>
-            
-            <div>
-              <label htmlFor="assignment_type" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                Assignment Type
-              </label>
-              <select
-                id="assignment_type"
-                name="assignment_type"
-                value={assignmentData.assignment_type}
-                onChange={handleAssignmentChange}
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
-              >
-                <option value="main_teacher">Main Teacher</option>
-                <option value="assistant_teacher">Assistant Teacher</option>
-                <option value="substitute">Substitute</option>
-              </select>
-            </div>
-          </div>
-          
-          {/* Stream selection for schools with streams */}
-          {hasStreams && (
-            <div className="mb-6">
-              <label htmlFor="stream_id" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                Stream (Optional)
-              </label>
-              <select
-                id="stream_id"
-                name="stream_id"
-                value={assignmentData.stream_id}
-                onChange={handleAssignmentChange}
-                className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
-              >
-                <option value="">Select stream (optional)</option>
-                {streams.map(stream => (
-                  <option key={stream.id} value={stream.id}>
-                    {stream.classroom?.name} - {stream.name}
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Leave empty to assign to all streams or select a specific stream
-              </p>
-            </div>
-          )}
-          
-          <div className="flex justify-end gap-3 pt-4">
-            <button 
-              type="button" 
-              onClick={backToList} 
-              className="px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
-            >
-              Cancel
-            </button>
-            <button 
-              onClick={handleSaveSubjectAssignments} 
-              disabled={loading || assignmentData.subject_ids.length === 0} 
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center gap-2"
-            >
-              {loading ? (
-                <>
-                  <Loader className="w-4 h-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                'Save Assignments'
-              )}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-  
   // New view for showing classrooms assigned to a teacher (for non-stream schools)
   const renderClassroomsView = () => (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -1513,7 +1353,7 @@ function TeacherManager() {
   // Show loading while auth is initializing
   if (authLoading) {
     return (
-      <div className="w-full py-8">
+      <div className="w-full p-3 sm:p-4 md:p-6 lg:p-8">
         <div className="flex flex-col items-center justify-center py-16">
           <Loader className="w-12 h-12 text-gray-600 dark:text-gray-400 animate-spin" />
           <p className="mt-4 text-slate-500 dark:text-slate-400">Loading...</p>
@@ -1525,7 +1365,7 @@ function TeacherManager() {
   // Check if user is authenticated and has schoolId
   if (!user || !schoolId) {
     return (
-      <div className="w-full py-8">
+      <div className="w-full p-3 sm:p-4 md:p-6 lg:p-8">
         <div className="flex flex-col items-center justify-center py-16">
           <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
           <p className="text-slate-900 dark:text-slate-100 text-lg font-semibold mb-2">
@@ -1540,19 +1380,36 @@ function TeacherManager() {
   }
 
   return (
-    <div className="w-full py-8">
+    <div className="w-full p-3 sm:p-4 md:p-6 lg:p-8">
       {loading && view === 'list' && (
-        <div className="flex flex-col items-center justify-center py-16">
-          <Loader className="w-12 h-12 text-gray-600 dark:text-gray-400 animate-spin" />
-          <p className="mt-4 text-slate-500 dark:text-slate-400">Loading Teachers...</p>
+        <div className="flex flex-col items-center justify-center py-12 md:py-16">
+          <Loader className="w-10 sm:w-12 h-10 sm:h-12 text-gray-600 dark:text-gray-400 animate-spin" />
+          <p className="mt-4 text-sm sm:text-base text-slate-600 dark:text-slate-400">Loading Teachers...</p>
         </div>
       )}
       
       {!loading && view === 'list' && renderListView()}
-      {(view === 'create' || view === 'edit') && renderFormView()}
-      {view === 'manage-subjects' && renderManageSubjectsView()}
       {view === 'classrooms' && renderClassroomsView()}
       {view === 'streams' && renderStreamsView()}
+      
+      {/* Teacher Form Component */}
+      {showForm && (
+        <TeacherForm
+          formData={formData}
+          editingTeacher={selectedTeacher}
+          onInputChange={handleInputChange}
+          onSubmit={handleSubmit}
+          onClose={closeForm}
+          isSubmitting={loading}
+          users={users}
+          school={school}
+          specializationOptions={specializationOptions}
+        />
+      )}
+      
+      {/* Modals */}
+      {renderDeleteConfirmationModal()}
+      {renderMobileBottomSheet()}
     </div>
   );
 }
