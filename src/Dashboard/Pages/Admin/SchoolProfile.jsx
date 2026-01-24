@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Edit, MapPin, Phone, Mail, School, BookOpen, CheckSquare, Square, GraduationCap, Award } from 'lucide-react';
+import { Edit, MapPin, Phone, Mail, School, BookOpen, CheckSquare, Square, GraduationCap, Award, Lock, AlertCircle } from 'lucide-react';
 import { apiRequest } from '../../../utils/api';
 import { Link } from 'react-router-dom';
 
@@ -7,6 +7,7 @@ function SchoolProfile() {
   const [schoolData, setSchoolData] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [logoError, setLogoError] = useState(false);
+  const [isLocked, setIsLocked] = useState(true); // Always true for viewing existing school
 
   useEffect(() => {
     const fetchSchools = async () => {
@@ -15,6 +16,7 @@ function SchoolProfile() {
         const response = await apiRequest('schools', 'GET');
         setSchoolData(response.data);
         setLogoError(false);
+        setIsLocked(!!response.data.id); // School is locked if it exists
       } catch (error) {
         console.error('Failed to fetch schools:', error);
       } finally {
@@ -37,21 +39,31 @@ function SchoolProfile() {
     );
   }
 
+  // Helper function to get curriculum levels with lock status
   const getCurriculumLevels = () => {
     const levels = [];
     
-    if (schoolData.has_pre_primary) levels.push('Pre-Primary');
-    if (schoolData.has_primary) levels.push('Primary');
-    if (schoolData.has_junior_secondary) levels.push('Junior Secondary');
-    if (schoolData.has_senior_secondary) levels.push('Senior Secondary');
-    if (schoolData.has_secondary) levels.push('Secondary');
+    if (schoolData.has_pre_primary) levels.push({name: 'Pre-Primary', locked: true});
+    if (schoolData.has_primary) levels.push({name: 'Primary', locked: true});
+    if (schoolData.has_junior_secondary) levels.push({name: 'Junior Secondary', locked: true});
+    if (schoolData.has_senior_secondary) levels.push({name: 'Senior Secondary', locked: true});
+    if (schoolData.has_secondary) levels.push({name: 'Secondary', locked: true});
     
     return levels;
   };
 
+  // Get curriculum type with lock indicator
   const getCurriculumType = () => {
-    if (schoolData.primary_curriculum === 'Both') return 'Both CBC & 8-4-4';
-    return schoolData.primary_curriculum || 'Not Set';
+    if (schoolData.primary_curriculum === 'Both') return {text: 'Both CBC & 8-4-4', locked: true};
+    if (schoolData.primary_curriculum) return {text: schoolData.primary_curriculum, locked: true};
+    return {text: 'Not Set', locked: false};
+  };
+
+  // Get secondary curriculum type
+  const getSecondaryCurriculumType = () => {
+    if (schoolData.secondary_curriculum === 'Both') return {text: 'Both CBC & 8-4-4', locked: true};
+    if (schoolData.secondary_curriculum) return {text: schoolData.secondary_curriculum, locked: true};
+    return {text: 'N/A', locked: false};
   };
 
   const getPathwayLabel = (pathway) => {
@@ -136,6 +148,9 @@ function SchoolProfile() {
   };
 
   const gradeLevelsByCurriculum = getGradeLevelsByCurriculum();
+  const curriculumType = getCurriculumType();
+  const secondaryCurriculumType = getSecondaryCurriculumType();
+  const curriculumLevels = getCurriculumLevels();
 
   return (
     <div className="w-full space-y-4 sm:space-y-6 p-3 sm:p-4 md:p-6 lg:p-8">
@@ -153,6 +168,27 @@ function SchoolProfile() {
           </p>
         </div>
       </div>
+
+      {/* Locked Fields Warning */}
+      {isLocked && (
+        <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl">
+          <div className="flex items-center gap-2 mb-2">
+            <Lock className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+            <h3 className="text-sm font-medium text-amber-800 dark:text-amber-300">
+              Important: School Structure is Locked
+            </h3>
+          </div>
+          <p className="text-sm text-amber-700 dark:text-amber-400">
+            School type, curriculum, and level selections cannot be changed after initial setup. 
+            This ensures consistency in school structure and prevents data conflicts.
+          </p>
+          <div className="mt-3 p-2 bg-white/50 dark:bg-slate-800/50 rounded">
+            <p className="text-xs text-amber-700 dark:text-amber-400">
+              <strong>Locked Fields:</strong> School Type, Primary/Secondary Curriculum, Curriculum Levels, Streams, Grade/Class Levels
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Header Card */}
       <div className="bg-white dark:bg-slate-800/50 rounded-lg sm:rounded-xl border border-slate-200 dark:border-slate-700 p-4 sm:p-6 shadow-sm">
@@ -183,6 +219,9 @@ function SchoolProfile() {
                 <div className="flex items-center gap-2 justify-center sm:justify-start">
                   <BookOpen className="w-3 sm:w-4 h-3 sm:h-4 flex-shrink-0" />
                   <span className="font-medium">{schoolData.school_type || 'School Type'}</span>
+                  {isLocked && schoolData.school_type && (
+                    <Lock className="w-3 sm:w-4 h-3 sm:h-4 text-amber-500 dark:text-amber-400 flex-shrink-0" title="Cannot be changed" />
+                  )}
                 </div>
                 <div className="flex items-center gap-2 justify-center sm:justify-start">
                   <MapPin className="w-3 sm:w-4 h-3 sm:h-4 flex-shrink-0" />
@@ -220,36 +259,75 @@ function SchoolProfile() {
           {/* Column 1 */}
           <div className="space-y-4 sm:space-y-6">
             <div className="border-b border-slate-200 dark:border-slate-700 pb-3 sm:pb-4">
-              <label className="block text-xs font-semibold text-[#4c739a] dark:text-slate-400 mb-1 sm:mb-2 uppercase tracking-wide">
-                School Code
-              </label>
+              <div className="flex items-center justify-between mb-1 sm:mb-2">
+                <label className="block text-xs font-semibold text-[#4c739a] dark:text-slate-400 uppercase tracking-wide">
+                  School Code
+                </label>
+                {isLocked && schoolData.code && (
+                  <Lock className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" title="Cannot be changed" />
+                )}
+              </div>
               <p className="text-base sm:text-lg text-[#0d141b] dark:text-white font-semibold">
                 {schoolData.code || 'N/A'}
               </p>
+              {isLocked && schoolData.code && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                  Permanent school identifier
+                </p>
+              )}
             </div>
 
             <div className="border-b border-slate-200 dark:border-slate-700 pb-3 sm:pb-4">
-              <label className="block text-xs font-semibold text-[#4c739a] dark:text-slate-400 mb-1 sm:mb-2 uppercase tracking-wide">
-                School Type
-              </label>
-              <p className="text-base sm:text-lg text-[#0d141b] dark:text-white font-semibold">
-                {schoolData.school_type || 'N/A'}
-              </p>
+              <div className="flex items-center justify-between mb-1 sm:mb-2">
+                <label className="block text-xs font-semibold text-[#4c739a] dark:text-slate-400 uppercase tracking-wide">
+                  School Type
+                </label>
+                {isLocked && schoolData.school_type && (
+                  <Lock className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" title="Cannot be changed" />
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <p className="text-base sm:text-lg text-[#0d141b] dark:text-white font-semibold">
+                  {schoolData.school_type || 'N/A'}
+                </p>
+              </div>
+              {isLocked && schoolData.school_type && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                  School type is permanent after setup
+                </p>
+              )}
             </div>
 
             <div className="border-b border-slate-200 dark:border-slate-700 pb-3 sm:pb-4">
-              <label className="block text-xs font-semibold text-[#4c739a] dark:text-slate-400 mb-1 sm:mb-2 uppercase tracking-wide">
-                Curriculum Type
-              </label>
-              <p className="text-base sm:text-lg text-[#0d141b] dark:text-white font-semibold">
-                {getCurriculumType()}
-              </p>
+              <div className="flex items-center justify-between mb-1 sm:mb-2">
+                <label className="block text-xs font-semibold text-[#4c739a] dark:text-slate-400 uppercase tracking-wide">
+                  Primary Curriculum
+                </label>
+                {isLocked && curriculumType.locked && (
+                  <Lock className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" title="Cannot be changed" />
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <p className="text-base sm:text-lg text-[#0d141b] dark:text-white font-semibold">
+                  {curriculumType.text}
+                </p>
+              </div>
+              {isLocked && curriculumType.locked && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                  Primary curriculum is permanent
+                </p>
+              )}
             </div>
 
             <div className="border-b border-slate-200 dark:border-slate-700 pb-3 sm:pb-4">
-              <label className="block text-xs font-semibold text-[#4c739a] dark:text-slate-400 mb-1 sm:mb-2 uppercase tracking-wide">
-                Stream Configuration
-              </label>
+              <div className="flex items-center justify-between mb-1 sm:mb-2">
+                <label className="block text-xs font-semibold text-[#4c739a] dark:text-slate-400 uppercase tracking-wide">
+                  Stream Configuration
+                </label>
+                {isLocked && schoolData.has_streams !== undefined && (
+                  <Lock className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" title="Cannot be changed" />
+                )}
+              </div>
               <div className="flex items-center gap-2">
                 {schoolData.has_streams ? (
                   <>
@@ -272,6 +350,13 @@ function SchoolProfile() {
                   ? "This school can create and manage streams for classrooms." 
                   : "This school does not use stream-based organization."}
               </p>
+              {isLocked && schoolData.has_streams !== undefined && (
+                <div className="mt-2 p-2 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded">
+                  <p className="text-xs text-amber-700 dark:text-amber-400">
+                    <strong>Note:</strong> Stream setting cannot be changed after curriculum levels are selected
+                  </p>
+                </div>
+              )}
             </div>
 
             <div>
@@ -296,6 +381,32 @@ function SchoolProfile() {
               <p className="text-base sm:text-lg text-[#0d141b] dark:text-white font-semibold">
                 {schoolData.city || 'N/A'}
               </p>
+            </div>
+
+            <div className="border-b border-slate-200 dark:border-slate-700 pb-3 sm:pb-4">
+              <div className="flex items-center justify-between mb-1 sm:mb-2">
+                <label className="block text-xs font-semibold text-[#4c739a] dark:text-slate-400 uppercase tracking-wide">
+                  Secondary Curriculum
+                </label>
+                {isLocked && secondaryCurriculumType.locked && secondaryCurriculumType.text !== 'N/A' && (
+                  <Lock className="w-3.5 h-3.5 text-amber-500 dark:text-amber-400" title="Cannot be changed" />
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <p className="text-base sm:text-lg text-[#0d141b] dark:text-white font-semibold">
+                  {secondaryCurriculumType.text}
+                </p>
+              </div>
+              {isLocked && secondaryCurriculumType.locked && secondaryCurriculumType.text !== 'N/A' && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                  Secondary curriculum is permanent
+                </p>
+              )}
+              {schoolData.school_type === 'Primary' && (
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Secondary curriculum is not applicable for primary schools
+                </p>
+              )}
             </div>
 
             <div className="border-b border-slate-200 dark:border-slate-700 pb-3 sm:pb-4">
@@ -328,27 +439,43 @@ function SchoolProfile() {
       {/* Curriculum Levels Section */}
       <div className="bg-white dark:bg-slate-800/50 rounded-lg sm:rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
         <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-700">
-          <h2 className="text-base sm:text-lg md:text-xl font-bold text-[#0d141b] dark:text-white mb-1 flex items-center gap-2">
-            <GraduationCap className="w-5 h-5" />
-            Curriculum Levels
-          </h2>
-          <p className="text-xs sm:text-sm text-[#4c739a] dark:text-slate-400">
-            Educational levels offered by this school
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-base sm:text-lg md:text-xl font-bold text-[#0d141b] dark:text-white mb-1 flex items-center gap-2">
+                <GraduationCap className="w-5 h-5" />
+                Curriculum Levels
+              </h2>
+              <p className="text-xs sm:text-sm text-[#4c739a] dark:text-slate-400">
+                Educational levels offered by this school
+              </p>
+            </div>
+            {isLocked && curriculumLevels.length > 0 && (
+              <div className="flex items-center gap-2 px-3 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs font-medium rounded-full">
+                <Lock className="w-3 h-3" />
+                <span>Locked</span>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="p-4 sm:p-6">
-          {getCurriculumLevels().length > 0 ? (
+          {curriculumLevels.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {getCurriculumLevels().map((level, index) => (
-                <div key={index} className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              {curriculumLevels.map((level, index) => (
+                <div key={index} className={`p-4 ${level.name === 'Secondary' ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'} border rounded-lg relative`}>
+                  {isLocked && level.locked && (
+                    <div className="absolute top-2 right-2">
+                      <Lock className="w-4 h-4 text-amber-500 dark:text-amber-400" title="Cannot be changed" />
+                    </div>
+                  )}
                   <div className="flex items-center gap-2 mb-2">
                     <CheckSquare className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                     <h3 className="text-base sm:text-lg font-semibold text-[#0d141b] dark:text-white">
-                      {level}
+                      {level.name}
+                      {isLocked && level.locked && " (Locked)"}
                     </h3>
                   </div>
-                  {level === 'Senior Secondary' && schoolData.senior_secondary_pathways && (
+                  {level.name === 'Senior Secondary' && schoolData.senior_secondary_pathways && schoolData.senior_secondary_pathways.length > 0 && (
                     <div className="mt-3 space-y-2">
                       <p className="text-xs font-medium text-slate-600 dark:text-slate-400">Pathways:</p>
                       <div className="flex flex-wrap gap-2">
@@ -359,7 +486,17 @@ function SchoolProfile() {
                           </span>
                         ))}
                       </div>
+                      {isLocked && (
+                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
+                          Pathways are permanent after setup
+                        </p>
+                      )}
                     </div>
+                  )}
+                  {isLocked && level.locked && level.name !== 'Senior Secondary' && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
+                      This level cannot be changed
+                    </p>
                   )}
                 </div>
               ))}
@@ -378,30 +515,54 @@ function SchoolProfile() {
       {gradeLevelsByCurriculum && Object.keys(gradeLevelsByCurriculum).length > 0 && (
         <div className="bg-white dark:bg-slate-800/50 rounded-lg sm:rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
           <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-700">
-            <h2 className="text-base sm:text-lg md:text-xl font-bold text-[#0d141b] dark:text-white mb-1 flex items-center gap-2">
-              <Award className="w-5 h-5" />
-              {schoolData.primary_curriculum === 'Both' ? 'Grade/Class Levels' : 
-               schoolData.primary_curriculum === 'CBC' ? 'Grade Levels' : 'Class Levels'}
-            </h2>
-            <p className="text-xs sm:text-sm text-[#4c739a] dark:text-slate-400">
-              {schoolData.primary_curriculum === 'Both' ? 'Specific grades and classes offered by this school' :
-               schoolData.primary_curriculum === 'CBC' ? 'Specific grades offered by this school' : 
-               'Specific classes offered by this school'}
-            </p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-base sm:text-lg md:text-xl font-bold text-[#0d141b] dark:text-white mb-1 flex items-center gap-2">
+                  <Award className="w-5 h-5" />
+                  {schoolData.primary_curriculum === 'Both' ? 'Grade/Class Levels' : 
+                   schoolData.primary_curriculum === 'CBC' ? 'Grade Levels' : 'Class Levels'}
+                </h2>
+                <p className="text-xs sm:text-sm text-[#4c739a] dark:text-slate-400">
+                  {schoolData.primary_curriculum === 'Both' ? 'Specific grades and classes offered by this school' :
+                   schoolData.primary_curriculum === 'CBC' ? 'Specific grades offered by this school' : 
+                   'Specific classes offered by this school'}
+                </p>
+              </div>
+              {isLocked && (
+                <div className="flex items-center gap-2 px-3 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-xs font-medium rounded-full">
+                  <Lock className="w-3 h-3" />
+                  <span>Locked</span>
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="p-4 sm:p-6">
             <div className="space-y-6">
               {Object.keys(gradeLevelsByCurriculum).map(curriculum => (
                 <div key={curriculum} className="space-y-4">
-                  <h3 className="text-lg font-semibold text-[#0d141b] dark:text-white">
-                    {curriculum === 'CBC' ? 'CBC Grade Levels' : '8-4-4 Class Levels'}
-                  </h3>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-[#0d141b] dark:text-white">
+                      {curriculum === 'CBC' ? 'CBC Grade Levels' : '8-4-4 Class Levels'}
+                    </h3>
+                    {isLocked && (
+                      <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                        Permanent
+                      </span>
+                    )}
+                  </div>
                   {Object.keys(gradeLevelsByCurriculum[curriculum]).length > 0 ? (
                     <div className="space-y-4">
                       {Object.keys(gradeLevelsByCurriculum[curriculum]).map(level => (
-                        <div key={level} className={`p-4 ${curriculum === 'CBC' ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' : 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'} border rounded-lg`}>
-                          <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">{level}</h4>
+                        <div key={level} className={`p-4 ${curriculum === 'CBC' ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' : 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'} border rounded-lg relative`}>
+                          {isLocked && (
+                            <div className="absolute top-2 right-2">
+                              <Lock className="w-4 h-4 text-amber-500 dark:text-amber-400" title="Cannot be changed" />
+                            </div>
+                          )}
+                          <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
+                            {level} {isLocked && "(Locked)"}
+                          </h4>
                           <div className="flex flex-wrap gap-2">
                             {gradeLevelsByCurriculum[curriculum][level].map(item => (
                               <span key={item.id} className="px-2 py-1 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-xs rounded-full border border-slate-300 dark:border-slate-600">
@@ -409,6 +570,11 @@ function SchoolProfile() {
                               </span>
                             ))}
                           </div>
+                          {isLocked && (
+                            <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
+                              Grade/Class levels cannot be changed after setup
+                            </p>
+                          )}
                         </div>
                       ))}
                     </div>

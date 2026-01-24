@@ -30,21 +30,30 @@ const ProtectedRoute = ({ children, requiredRole }) => {
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-white dark:bg-black">
-        {/* You can add a spinner here */}
+        <div className="w-12 h-12 border-4 border-slate-200 dark:border-slate-700 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
 
   if (!user) return <Navigate to="/login" replace />;
 
-  // Redirect to dashboard if password change is required
-  if (mustChangePassword && !window.location.pathname.includes(`/${user.role}/dashboard`)) {
-    return <Navigate to={`/${user.role}/dashboard`} replace />;
+  // ✅ FIX: Add condition to prevent infinite redirect loop
+  const currentPath = window.location.pathname;
+  const expectedDashboard = `/${user.role}/dashboard`;
+  
+  // Redirect to dashboard if password change is required AND user is not already on their dashboard
+  if (mustChangePassword && !currentPath.includes(expectedDashboard)) {
+    return <Navigate to={expectedDashboard} replace />;
   }
 
+  // ✅ FIX: Only redirect if user is on wrong role path
   if (requiredRole && user.role !== requiredRole) {
-    return <Navigate to={`/${user.role}/dashboard`} replace />;
+    // Prevent redirect loop by checking if already redirecting to correct dashboard
+    if (!currentPath.includes(`/${user.role}/dashboard`)) {
+      return <Navigate to={`/${user.role}/dashboard`} replace />;
+    }
   }
+  
   return children;
 };
 

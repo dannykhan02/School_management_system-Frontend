@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Lock, Mail, User, AlertCircle, Loader } from 'lucide-react';
+import { Eye, EyeOff, Lock, Mail, User, AlertCircle } from 'lucide-react';
 import { API_BASE_URL } from '../utils/api';
 
 const Login = () => {
@@ -12,14 +12,43 @@ const Login = () => {
   const [error, setError] = useState('');
   const { user, login, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const hasRedirectedRef = useRef(false);
 
-  // Redirect if user is already authenticated
+  // ✅ CRITICAL FIX: Separate useEffect that only runs once when user is authenticated
   useEffect(() => {
-    if (user && !authLoading) {
-      const role = user.role || user.role_name?.toLowerCase().replace('-', '_') || 'admin';
-      navigate(`/${role}/dashboard`, { replace: true });
+    // Only run if user exists, auth is not loading, and we haven't redirected yet
+    if (!user || authLoading || hasRedirectedRef.current) {
+      return;
     }
+
+    // Mark that we're redirecting
+    hasRedirectedRef.current = true;
+    
+    // Normalize role by replacing hyphens with underscores
+    const rawRole = user.role || user.role_name || 'admin';
+    const role = rawRole.toLowerCase().replace(/[-\s]/g, '_');
+    
+    console.log('Login: Redirecting user', { 
+      userId: user.id, 
+      rawRole, 
+      normalizedRole: role 
+    });
+    
+    const targetPath = `/${role}/dashboard`;
+    console.log('Login: Navigating to:', targetPath);
+    
+    // Use replace to prevent back button issues
+    navigate(targetPath, { replace: true });
   }, [user, authLoading, navigate]);
+
+  // ✅ Reset redirect flag when component unmounts or user logs out
+  useEffect(() => {
+    return () => {
+      if (!user) {
+        hasRedirectedRef.current = false;
+      }
+    };
+  }, [user]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -27,14 +56,26 @@ const Login = () => {
     setIsLoading(true);
 
     try {
+      // Backend expects 'login' field (not 'email')
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Accept: "application/json",
+          "Accept": "application/json",
         },
-        body: JSON.stringify({ login: email, password }),
+        body: JSON.stringify({ 
+          login: email,
+          password: password 
+        }),
       });
+
+      // Check if response is JSON
+      const contentType = response.headers.get("content-type");
+      if (!contentType || !contentType.includes("application/json")) {
+        const textResponse = await response.text();
+        console.error('Non-JSON response:', textResponse.substring(0, 500));
+        throw new Error('Server error. Please check if Laravel is running correctly.');
+      }
 
       const data = await response.json();
 
@@ -42,18 +83,17 @@ const Login = () => {
         throw new Error(data.message || 'Login failed. Please check your credentials.');
       }
 
-      // ✅ FIXED: Backend now returns flat object with token at root level
       const token = data.token;
       
       if (!token) {
-        throw new Error('No authentication token received');
+        throw new Error('No authentication token received from server.');
       }
       
-      // Extract role name and normalize it
+      // Extract role information
       const roleName = data.role_name || data.role || 'admin';
       const role = roleName.toLowerCase().replace(/[-\s]/g, '_');
       
-      // ✅ Construct complete user info object
+      // Construct user info object from flat backend response
       const userInfo = {
         id: data.id,
         school_id: data.school_id,
@@ -68,17 +108,20 @@ const Login = () => {
         role_name: roleName,
         token: token,
         must_change_password: data.must_change_password || false,
-        email_verified_at: data.email_verified_at
+        email_verified_at: data.email_verified_at,
       };
+
+      // Reset redirect flag before login
+      hasRedirectedRef.current = false;
 
       // Save to context and localStorage
       login(userInfo);
       
-      // Navigate to appropriate dashboard
-      navigate(`/${role}/dashboard`, { replace: true });
+      // Navigation will happen in useEffect
       
     } catch (error) {
-      setError(error.message);
+      console.error('Login error:', error);
+      setError(error.message || 'An unexpected error occurred. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -96,10 +139,10 @@ const Login = () => {
     );
   }
 
-  // Don't render login form if user is authenticated (will redirect via useEffect)
+  // Show redirecting screen if user is authenticated
   if (user) {
     return (
-      <div className="min-h-screen bg-white dark:bg-slate-800/50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-white dark:bg-black flex items-center justify-center p-4">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-slate-200 dark:border-slate-700 border-t-transparent rounded-full animate-spin"></div>
           <p className="mt-4 text-slate-500 dark:text-slate-400">Redirecting...</p>
@@ -152,7 +195,7 @@ const Login = () => {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email or full name"
+                  placeholder="Enter your email"
                   className="w-full pl-9 sm:pl-10 pr-4 py-2 sm:py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-900 text-[#0d141b] dark:text-white placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-colors text-sm sm:text-base"
                   required
                   disabled={isLoading}

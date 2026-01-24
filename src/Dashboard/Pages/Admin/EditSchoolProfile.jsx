@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Save, School, Upload, AlertCircle, X, Eye, EyeOff, History, CheckSquare, Square, ChevronDown, ChevronUp, GraduationCap, Award } from "lucide-react";
+import { Save, School, Upload, AlertCircle, X, Eye, EyeOff, History, CheckSquare, Square, ChevronDown, ChevronUp, GraduationCap, Award, Lock } from "lucide-react"; // Removed EditOff
 import { useParams, useNavigate } from "react-router-dom";
 import { apiRequest } from "../../../utils/api";
 import { toast } from "react-toastify";
@@ -71,7 +71,50 @@ function EditSchoolProfile() {
   const [originalData, setOriginalData] = useState(null);
   const [logoError, setLogoError] = useState(false);
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
-  const [isLocked, setIsLocked] = useState(false);   // ← NEW
+  const [isLocked, setIsLocked] = useState(true); // Always true for edit mode
+
+  // NEW FEATURE 1: Check if streams should be disabled based on curriculum levels
+  const shouldDisableStreams = () => {
+    // In edit mode, streams should always be locked if the school structure is already defined
+    if (isLocked) {
+      return true;
+    }
+    
+    // Check if any curriculum level is selected
+    const hasAnyLevelSelected = 
+      formData.has_pre_primary || 
+      formData.has_primary || 
+      formData.has_junior_secondary || 
+      formData.has_senior_secondary || 
+      formData.has_secondary;
+    
+    return hasAnyLevelSelected;
+  };
+
+  // NEW FEATURE 2: Check if field should be locked in edit mode
+  const isFieldLocked = (fieldName) => {
+    if (!isLocked) return false;
+    
+    // Fields that cannot be edited in edit mode
+    const lockedFields = [
+      'schoolType',
+      'primary_curriculum',
+      'secondary_curriculum',
+      'has_streams',
+      'has_pre_primary',
+      'has_primary',
+      'has_junior_secondary',
+      'has_senior_secondary',
+      'has_secondary',
+      'senior_secondary_pathways',
+      'grade_levels'
+    ];
+    
+    return lockedFields.includes(fieldName);
+  };
+
+  // Combined function for backward compatibility
+  const lock = (field) => isLocked && originalData?.[field] && isFieldLocked(field);
 
   useEffect(() => {
     const fetchSchool = async () => {
@@ -101,7 +144,6 @@ function EditSchoolProfile() {
 
         setFormData(schoolData);
         setOriginalData(schoolData);
-        setIsLocked(!!data.id);   // ← NEW
 
         if (data.logo) {
           setLogoPreview(data.logo);
@@ -115,9 +157,6 @@ function EditSchoolProfile() {
 
     fetchSchool();
   }, [id]);
-
-  // returns true when the control must be disabled
-  const lock = (field) => isLocked && originalData?.[field];   // ← NEW
 
   // Update secondary curriculum when primary curriculum changes
   useEffect(() => {
@@ -228,8 +267,8 @@ function EditSchoolProfile() {
     } else if (formData.schoolType === 'Mixed') {
       setFormData(prev => ({
         ...prev,
-        primary_curriculum: prev.primary_curriculum || 'Both',
-        secondary_curriculum: prev.secondary_curriculum || 'Both'
+        primary_curriculum: 'CBC', // Mixed schools primary curriculum should only be CBC
+        secondary_curriculum: prev.secondary_curriculum || ''
       }));
     }
   }, [formData.schoolType]);
@@ -257,6 +296,12 @@ function EditSchoolProfile() {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
+    
+    // NEW FEATURE: Check if field is locked before allowing changes
+    if (isFieldLocked(name)) {
+      return;
+    }
+    
     setFormData((prev) => ({ 
       ...prev, 
       [name]: type === 'checkbox' ? checked : value 
@@ -272,6 +317,11 @@ function EditSchoolProfile() {
   };
 
   const handleGradeLevelChange = (levelId) => {
+    // NEW FEATURE: Check if grade levels are locked
+    if (isFieldLocked('grade_levels')) {
+      return;
+    }
+    
     setFormData(prev => {
       const gradeLevels = [...prev.grade_levels];
       if (gradeLevels.includes(levelId)) {
@@ -283,6 +333,11 @@ function EditSchoolProfile() {
   };
 
   const handlePathwayChange = (pathway) => {
+    // NEW FEATURE: Check if pathways are locked
+    if (isFieldLocked('senior_secondary_pathways')) {
+      return;
+    }
+    
     setFormData(prev => {
       const pathways = [...prev.senior_secondary_pathways];
       if (pathways.includes(pathway)) {
@@ -409,6 +464,7 @@ function EditSchoolProfile() {
     { value: 'Social Sciences', label: 'Social Sciences' }
   ];
 
+  // Get appropriate grade levels based on curriculum
   const getGradeLevels = () => {
     if (formData.primary_curriculum === 'CBC') return cbcGradeLevels;
     if (formData.primary_curriculum === '8-4-4') return classLevels;
@@ -416,6 +472,7 @@ function EditSchoolProfile() {
     return [];
   };
 
+  // Get filtered curriculum options based on school type
   const getFilteredCurriculumOptions = (isPrimary) => {
     if (formData.schoolType === 'Primary') {
       return isPrimary 
@@ -426,10 +483,38 @@ function EditSchoolProfile() {
         ? [{ value: '', label: 'Not applicable for secondary schools' }]
         : curriculumOptions;
     } else if (formData.schoolType === 'Mixed') {
-      return curriculumOptions;
+      if (isPrimary) {
+        return curriculumOptions.filter(option => option.value === 'CBC');
+      } else {
+        return curriculumOptions;
+      }
     } else {
       return curriculumOptions;
     }
+  };
+
+  // Fix: Show 8-4-4 levels when secondary curriculum is Both
+  const shouldShow844Secondary = () => {
+    if (formData.schoolType === 'Primary') return false;
+    
+    return (
+      formData.primary_curriculum === '8-4-4' ||
+      formData.primary_curriculum === 'Both' ||
+      formData.secondary_curriculum === '8-4-4' ||
+      formData.secondary_curriculum === 'Both'
+    );
+  };
+
+  // Fix: Show CBC levels when secondary curriculum is Both
+  const shouldShowCBCLevels = () => {
+    if (formData.schoolType === 'Primary') return true;
+    
+    return (
+      formData.primary_curriculum === 'CBC' ||
+      formData.primary_curriculum === 'Both' ||
+      formData.secondary_curriculum === 'CBC' ||
+      formData.secondary_curriculum === 'Both'
+    );
   };
 
   return (
@@ -449,6 +534,16 @@ function EditSchoolProfile() {
           </div>
         </div>
         
+        {/* Lock Indicator - Changed from EditOff to Lock */}
+        {isLocked && (
+          <div className="flex items-center gap-2 px-4 py-2 bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 rounded-lg">
+            <Lock className="w-4 h-4" />
+            <span className="text-sm font-medium">
+              Edit Mode: School structure cannot be changed
+            </span>
+          </div>
+        )}
+        
         <div className="flex items-center gap-2">
           {hasUnsavedChanges && (
             <span className="px-3 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 text-sm font-medium rounded-full flex items-center gap-1">
@@ -466,6 +561,23 @@ function EditSchoolProfile() {
           </button>
         </div>
       </div>
+
+      {/* Warning Alert for Locked Fields */}
+      {isLocked && (
+        <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl">
+          <div className="flex items-center gap-2 mb-2">
+            <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+            <h3 className="text-sm font-medium text-amber-800 dark:text-amber-300">
+              Important: Restricted Fields in Edit Mode
+            </h3>
+          </div>
+          <p className="text-sm text-amber-700 dark:text-amber-400">
+            School type, curriculum, and level selections cannot be changed once saved. 
+            This ensures consistency in school structure and prevents data conflicts.
+            You can only modify basic information, contact details, and upload a new logo.
+          </p>
+        </div>
+      )}
 
       {Object.keys(errors).length > 0 && (
         <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl">
@@ -566,14 +678,20 @@ function EditSchoolProfile() {
                 name="schoolType"
                 value={formData.schoolType}
                 onChange={handleChange}
-                className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-[#0d141b] dark:text-white focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-colors"
+                className={`w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-[#0d141b] dark:text-white focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-colors ${isFieldLocked('schoolType') ? 'opacity-70 cursor-not-allowed' : ''}`}
                 required
+                disabled={isFieldLocked('schoolType')}
               >
                 <option value="">Select type</option>
                 <option value="Primary">Primary School</option>
                 <option value="Secondary">Secondary School</option>
                 <option value="Mixed">Mixed (Primary & Secondary)</option>
               </select>
+              {isFieldLocked('schoolType') && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                  School type cannot be changed after initial setup
+                </p>
+              )}
             </div>
 
             <div>
@@ -585,10 +703,16 @@ function EditSchoolProfile() {
                 name="code"
                 value={formData.code}
                 onChange={handleChange}
-                className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-[#0d141b] dark:text-white focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-colors"
+                className={`w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-[#0d141b] dark:text-white focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-colors ${isLocked ? 'opacity-70 cursor-not-allowed' : ''}`}
                 placeholder="Enter school code"
                 required
+                disabled={isLocked}
               />
+              {isLocked && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                  School code is permanent and cannot be changed
+                </p>
+              )}
             </div>
 
             <div>
@@ -599,9 +723,9 @@ function EditSchoolProfile() {
                 name="primary_curriculum"
                 value={formData.primary_curriculum}
                 onChange={handleChange}
-                className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-[#0d141b] dark:text-white focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-colors"
+                className={`w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-[#0d141b] dark:text-white focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-colors ${isFieldLocked('primary_curriculum') ? 'opacity-70 cursor-not-allowed' : ''}`}
                 required
-                disabled={formData.schoolType === 'Secondary' || lock('primary_curriculum')}
+                disabled={isFieldLocked('primary_curriculum') || formData.schoolType === 'Secondary' || formData.schoolType === 'Mixed'}
               >
                 <option value="">Select curriculum</option>
                 {getFilteredCurriculumOptions(true).map(option => (
@@ -618,9 +742,14 @@ function EditSchoolProfile() {
                   Primary curriculum is not applicable for secondary schools
                 </p>
               )}
-              {lock('primary_curriculum') && (
+              {formData.schoolType === 'Mixed' && (
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Mixed schools primary curriculum is automatically set to CBC
+                </p>
+              )}
+              {isFieldLocked('primary_curriculum') && (
                 <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                  Curriculum cannot be changed once saved.
+                  Primary curriculum cannot be changed after initial setup
                 </p>
               )}
             </div>
@@ -633,9 +762,9 @@ function EditSchoolProfile() {
                 name="secondary_curriculum"
                 value={formData.secondary_curriculum}
                 onChange={handleChange}
-                className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-[#0d141b] dark:text-white focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-colors"
+                className={`w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-[#0d141b] dark:text-white focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-colors ${isFieldLocked('secondary_curriculum') ? 'opacity-70 cursor-not-allowed' : ''}`}
                 required
-                disabled={formData.schoolType === 'Primary' || lock('secondary_curriculum')}
+                disabled={isFieldLocked('secondary_curriculum') || formData.schoolType === 'Primary'}
               >
                 <option value="">Select curriculum</option>
                 {getFilteredCurriculumOptions(false).map(option => (
@@ -652,9 +781,9 @@ function EditSchoolProfile() {
                   Secondary curriculum is not applicable for primary schools
                 </p>
               )}
-              {lock('secondary_curriculum') && (
+              {isFieldLocked('secondary_curriculum') && (
                 <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                  Curriculum cannot be changed once saved.
+                  Secondary curriculum cannot be changed after initial setup
                 </p>
               )}
             </div>
@@ -725,9 +854,10 @@ function EditSchoolProfile() {
             </div>
           </div>
 
+          {/* Stream Configuration - Updated with both features */}
           <div className="pt-6 border-t border-slate-200 dark:border-slate-700">
             <h3 className="text-lg font-semibold text-[#0d141b] dark:text-white mb-4">Stream Configuration</h3>
-            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <div className={`p-4 border rounded-lg ${shouldDisableStreams() ? 'bg-gray-100 dark:bg-gray-800/50 border-gray-300 dark:border-gray-700' : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'}`}>
               <div className="flex items-start gap-3">
                 <div className="pt-1">
                   <input
@@ -736,17 +866,19 @@ function EditSchoolProfile() {
                     name="has_streams"
                     checked={formData.has_streams}
                     onChange={handleChange}
-                    disabled={lock('has_streams')}
-                    className="w-5 h-5 text-blue-600 bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 focus:ring-2"
+                    disabled={shouldDisableStreams()}
+                    className={`w-5 h-5 ${shouldDisableStreams() ? 'text-gray-400 cursor-not-allowed' : 'text-blue-600'} bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 focus:ring-2`}
                   />
                 </div>
                 <div className="flex-1">
-                  <label htmlFor="has_streams" className="block text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                  <label htmlFor="has_streams" className={`block text-sm font-medium ${shouldDisableStreams() ? 'text-gray-500 dark:text-gray-400' : 'text-slate-700 dark:text-slate-300'} cursor-pointer`}>
                     Enable Streams for this School
+                    {shouldDisableStreams() && " (Cannot be changed)"}
                   </label>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                    Check this box if your school uses stream-based organization (e.g., Class A, Class B, etc.). 
-                    This will allow you to create streams and assign teachers and students to them.
+                  <p className={`text-xs ${shouldDisableStreams() ? 'text-gray-500 dark:text-gray-500' : 'text-slate-500 dark:text-slate-400'} mt-1`}>
+                    {shouldDisableStreams() 
+                      ? 'Streams setting cannot be changed once curriculum levels are selected or after school is saved.'
+                      : 'Check this box if your school uses stream-based organization (e.g., Class A, Class B, etc.). This will allow you to create streams and assign teachers and students to them.'}
                   </p>
                   {formData.has_streams && (
                     <div className="mt-2 p-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded">
@@ -755,10 +887,12 @@ function EditSchoolProfile() {
                       </p>
                     </div>
                   )}
-                  {lock('has_streams') && (
-                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                      Stream setting cannot be changed once saved.
-                    </p>
+                  {shouldDisableStreams() && (
+                    <div className="mt-2 p-2 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded">
+                      <p className="text-xs text-amber-700 dark:text-amber-400">
+                        <strong>Note:</strong> Streams cannot be enabled or disabled after curriculum levels are selected or once the school is saved.
+                      </p>
+                    </div>
                   )}
                 </div>
               </div>
@@ -773,31 +907,41 @@ function EditSchoolProfile() {
                 </div>
                 <h3 className="text-lg font-semibold text-[#0d141b] dark:text-white">Curriculum Levels</h3>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
-                className="flex items-center gap-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
-              >
-                {showAdvancedOptions ? (
-                  <>
-                    Hide Advanced Options
-                    <ChevronUp className="w-4 h-4" />
-                  </>
-                ) : (
-                  <>
-                    Show Advanced Options
-                    <ChevronDown className="w-4 h-4" />
-                  </>
-                )}
-              </button>
+              {!isFieldLocked('has_pre_primary') && (
+                <button
+                  type="button"
+                  onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+                  className="flex items-center gap-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+                >
+                  {showAdvancedOptions ? (
+                    <>
+                      Hide Advanced Options
+                      <ChevronUp className="w-4 h-4" />
+                    </>
+                  ) : (
+                    <>
+                      Show Advanced Options
+                      <ChevronDown className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {(formData.primary_curriculum === 'CBC' || formData.primary_curriculum === 'Both' || formData.secondary_curriculum === 'CBC') && (
+              {/* CBC Levels */}
+              {shouldShowCBCLevels() && (
                 <div className="space-y-4">
-                  <h3 className="text-lg font-medium text-[#0d141b] dark:text-white mb-4">CBC Levels</h3>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-medium text-[#0d141b] dark:text-white mb-4">CBC Levels</h3>
+                    {isFieldLocked('has_pre_primary') && (
+                      <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                        Locked
+                      </span>
+                    )}
+                  </div>
                   
-                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <div className={`p-4 border rounded-lg ${isFieldLocked('has_pre_primary') ? 'bg-gray-100 dark:bg-gray-800/50 border-gray-300 dark:border-gray-700' : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'}`}>
                     <div className="flex items-start gap-3">
                       <div className="pt-1">
                         <input
@@ -806,22 +950,23 @@ function EditSchoolProfile() {
                           name="has_pre_primary"
                           checked={formData.has_pre_primary}
                           onChange={handleChange}
-                          disabled={formData.primary_curriculum === '8-4-4' || formData.schoolType === 'Secondary' || lock('has_pre_primary')}
-                          className="w-5 h-5 text-blue-600 bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 focus:ring-2"
+                          disabled={isFieldLocked('has_pre_primary') || formData.primary_curriculum === '8-4-4' || formData.schoolType === 'Secondary'}
+                          className={`w-5 h-5 ${isFieldLocked('has_pre_primary') ? 'text-gray-400 cursor-not-allowed' : 'text-blue-600'} bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 focus:ring-2`}
                         />
                       </div>
                       <div className="flex-1">
-                        <label htmlFor="has_pre_primary" className="block text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                        <label htmlFor="has_pre_primary" className={`block text-sm font-medium ${isFieldLocked('has_pre_primary') ? 'text-gray-500 dark:text-gray-400' : 'text-slate-700 dark:text-slate-300'} cursor-pointer`}>
                           Pre-Primary (PP1-PP2)
+                          {isFieldLocked('has_pre_primary') && " (Cannot be changed)"}
                         </label>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                        <p className={`text-xs ${isFieldLocked('has_pre_primary') ? 'text-gray-500 dark:text-gray-500' : 'text-slate-500 dark:text-slate-400'} mt-1`}>
                           Early childhood education for ages 4-6
                         </p>
                       </div>
                     </div>
                   </div>
 
-                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <div className={`p-4 border rounded-lg ${isFieldLocked('has_primary') ? 'bg-gray-100 dark:bg-gray-800/50 border-gray-300 dark:border-gray-700' : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'}`}>
                     <div className="flex items-start gap-3">
                       <div className="pt-1">
                         <input
@@ -830,22 +975,23 @@ function EditSchoolProfile() {
                           name="has_primary"
                           checked={formData.has_primary}
                           onChange={handleChange}
-                          disabled={formData.schoolType === 'Secondary' || lock('has_primary')}
-                          className="w-5 h-5 text-blue-600 bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 focus:ring-2"
+                          disabled={isFieldLocked('has_primary') || formData.schoolType === 'Secondary'}
+                          className={`w-5 h-5 ${isFieldLocked('has_primary') ? 'text-gray-400 cursor-not-allowed' : 'text-blue-600'} bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 focus:ring-2`}
                         />
                       </div>
                       <div className="flex-1">
-                        <label htmlFor="has_primary" className="block text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                        <label htmlFor="has_primary" className={`block text-sm font-medium ${isFieldLocked('has_primary') ? 'text-gray-500 dark:text-gray-400' : 'text-slate-700 dark:text-slate-300'} cursor-pointer`}>
                           Primary (Grade 1-6)
+                          {isFieldLocked('has_primary') && " (Cannot be changed)"}
                         </label>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                        <p className={`text-xs ${isFieldLocked('has_primary') ? 'text-gray-500 dark:text-gray-500' : 'text-slate-500 dark:text-slate-400'} mt-1`}>
                           Primary education for ages 6-12
                         </p>
                       </div>
                     </div>
                   </div>
 
-                  <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                  <div className={`p-4 border rounded-lg ${isFieldLocked('has_junior_secondary') ? 'bg-gray-100 dark:bg-gray-800/50 border-gray-300 dark:border-gray-700' : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'}`}>
                     <div className="flex items-start gap-3">
                       <div className="pt-1">
                         <input
@@ -854,15 +1000,16 @@ function EditSchoolProfile() {
                           name="has_junior_secondary"
                           checked={formData.has_junior_secondary}
                           onChange={handleChange}
-                          disabled={formData.primary_curriculum === '8-4-4' || formData.schoolType === 'Secondary' || lock('has_junior_secondary')}
-                          className="w-5 h-5 text-blue-600 bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 focus:ring-2"
+                          disabled={isFieldLocked('has_junior_secondary') || formData.primary_curriculum === '8-4-4' || formData.schoolType === 'Secondary'}
+                          className={`w-5 h-5 ${isFieldLocked('has_junior_secondary') ? 'text-gray-400 cursor-not-allowed' : 'text-blue-600'} bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 focus:ring-2`}
                         />
                       </div>
                       <div className="flex-1">
-                        <label htmlFor="has_junior_secondary" className="block text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                        <label htmlFor="has_junior_secondary" className={`block text-sm font-medium ${isFieldLocked('has_junior_secondary') ? 'text-gray-500 dark:text-gray-400' : 'text-slate-700 dark:text-slate-300'} cursor-pointer`}>
                           Junior Secondary (Grade 7-9)
+                          {isFieldLocked('has_junior_secondary') && " (Cannot be changed)"}
                         </label>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                        <p className={`text-xs ${isFieldLocked('has_junior_secondary') ? 'text-gray-500 dark:text-gray-500' : 'text-slate-500 dark:text-slate-400'} mt-1`}>
                           Lower secondary education for ages 12-15
                         </p>
                       </div>
@@ -870,7 +1017,7 @@ function EditSchoolProfile() {
                   </div>
 
                   {(formData.schoolType === 'Secondary' || formData.schoolType === 'Mixed') && (
-                    <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                    <div className={`p-4 border rounded-lg ${isFieldLocked('has_senior_secondary') ? 'bg-gray-100 dark:bg-gray-800/50 border-gray-300 dark:border-gray-700' : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'}`}>
                       <div className="flex items-start gap-3">
                         <div className="pt-1">
                           <input
@@ -879,15 +1026,17 @@ function EditSchoolProfile() {
                             name="has_senior_secondary"
                             checked={formData.has_senior_secondary}
                             onChange={handleChange}
-                            disabled={formData.primary_curriculum === '8-4-4' || lock('has_senior_secondary')}
-                            className="w-5 h-5 text-blue-600 bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 focus:ring-2"
+                            disabled={isFieldLocked('has_senior_secondary') || formData.primary_curriculum === '8-4-4' || 
+                              (formData.secondary_curriculum === '8-4-4' && formData.primary_curriculum !== 'Both')}
+                            className={`w-5 h-5 ${isFieldLocked('has_senior_secondary') ? 'text-gray-400 cursor-not-allowed' : 'text-blue-600'} bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 focus:ring-2`}
                           />
                         </div>
                         <div className="flex-1">
-                          <label htmlFor="has_senior_secondary" className="block text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                          <label htmlFor="has_senior_secondary" className={`block text-sm font-medium ${isFieldLocked('has_senior_secondary') ? 'text-gray-500 dark:text-gray-400' : 'text-slate-700 dark:text-slate-300'} cursor-pointer`}>
                             Senior Secondary (Grade 10-12)
+                            {isFieldLocked('has_senior_secondary') && " (Cannot be changed)"}
                           </label>
-                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                          <p className={`text-xs ${isFieldLocked('has_senior_secondary') ? 'text-gray-500 dark:text-gray-500' : 'text-slate-500 dark:text-slate-400'} mt-1`}>
                             Upper secondary education for ages 15-18 with STEM pathways
                           </p>
                         </div>
@@ -896,12 +1045,21 @@ function EditSchoolProfile() {
                   )}
 
                   {formData.has_senior_secondary && (
-                    <div className="p-4 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
-                      <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
-                        Senior Secondary Pathways
-                      </h4>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
-                        Select the pathways your school offers for Senior Secondary students
+                    <div className={`p-4 border rounded-lg ${isFieldLocked('senior_secondary_pathways') ? 'bg-gray-100 dark:bg-gray-800/50 border-gray-300 dark:border-gray-700' : 'bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800'}`}>
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                          Senior Secondary Pathways
+                        </h4>
+                        {isFieldLocked('senior_secondary_pathways') && (
+                          <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                            Locked
+                          </span>
+                        )}
+                      </div>
+                      <p className={`text-xs ${isFieldLocked('senior_secondary_pathways') ? 'text-gray-500 dark:text-gray-500' : 'text-slate-500 dark:text-slate-400'} mb-3`}>
+                        {isFieldLocked('senior_secondary_pathways') 
+                          ? 'Pathways cannot be changed after initial setup'
+                          : 'Select the pathways your school offers for Senior Secondary students'}
                       </p>
                       <div className="space-y-2">
                         {pathwayOptions.map(option => (
@@ -912,57 +1070,94 @@ function EditSchoolProfile() {
                                 id={`pathway_${option.value}`}
                                 checked={formData.senior_secondary_pathways.includes(option.value)}
                                 onChange={() => handlePathwayChange(option.value)}
-                                disabled={lock('senior_secondary_pathways')}
-                                className="w-5 h-5 text-purple-600 bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-purple-500 dark:focus:ring-purple-600 focus:ring-2"
+                                disabled={isFieldLocked('senior_secondary_pathways')}
+                                className={`w-5 h-5 ${isFieldLocked('senior_secondary_pathways') ? 'text-gray-400 cursor-not-allowed' : 'text-purple-600'} bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-purple-500 dark:focus:ring-purple-600 focus:ring-2`}
                               />
                             </div>
                             <div className="flex-1">
-                              <label htmlFor={`pathway_${option.value}`} className="block text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
+                              <label htmlFor={`pathway_${option.value}`} className={`block text-sm font-medium ${isFieldLocked('senior_secondary_pathways') ? 'text-gray-500 dark:text-gray-400' : 'text-slate-700 dark:text-slate-300'} cursor-pointer`}>
                                 {option.label}
+                                {isFieldLocked('senior_secondary_pathways') && " (Locked)"}
                               </label>
                             </div>
                           </div>
                         ))}
                       </div>
-                      {lock('senior_secondary_pathways') && (
-                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
-                          Pathways cannot be changed once saved.
-                        </p>
-                      )}
                     </div>
                   )}
                 </div>
               )}
 
-              {(formData.primary_curriculum === '8-4-4' || formData.primary_curriculum === 'Both' || formData.secondary_curriculum === '8-4-4') && (
+              {/* 8-4-4 Levels */}
+              {shouldShow844Secondary() && (
                 <div className="space-y-4">
-                  <h3 className="text-lg font-medium text-[#0d141b] dark:text-white mb-4">8-4-4 Levels</h3>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-medium text-[#0d141b] dark:text-white mb-4">8-4-4 Levels</h3>
+                    {isFieldLocked('has_secondary') && (
+                      <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                        Locked
+                      </span>
+                    )}
+                  </div>
                   
-                  <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                    <div className="flex items-start gap-3">
-                      <div className="pt-1">
-                        <input
-                          type="checkbox"
-                          id="has_secondary"
-                          name="has_secondary"
-                          checked={formData.has_secondary}
-                          onChange={handleChange}
-                          disabled={formData.primary_curriculum === 'CBC' || formData.schoolType === 'Primary' || lock('has_secondary')}
-                          className="w-5 h-5 text-green-600 bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-green-500 dark:focus:ring-green-600 focus:ring-2"
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <label htmlFor="has_secondary" className="block text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
-                          Secondary (Form 1-4)
-                        </label>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                          Secondary education for ages 13-17
-                        </p>
+                  {/* Only show Primary level for Primary or Mixed schools */}
+                  {(formData.schoolType === 'Primary' || formData.schoolType === 'Mixed') && (
+                    <div className={`p-4 border rounded-lg ${isFieldLocked('has_primary') ? 'bg-gray-100 dark:bg-gray-800/50 border-gray-300 dark:border-gray-700' : 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'}`}>
+                      <div className="flex items-start gap-3">
+                        <div className="pt-1">
+                          <input
+                            type="checkbox"
+                            id="has_primary_844"
+                            name="has_primary"
+                            checked={formData.has_primary}
+                            onChange={handleChange}
+                            disabled={isFieldLocked('has_primary') || formData.primary_curriculum === 'CBC' || formData.schoolType === 'Secondary'}
+                            className={`w-5 h-5 ${isFieldLocked('has_primary') ? 'text-gray-400 cursor-not-allowed' : 'text-green-600'} bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-green-500 dark:focus:ring-green-600 focus:ring-2`}
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <label htmlFor="has_primary_844" className={`block text-sm font-medium ${isFieldLocked('has_primary') ? 'text-gray-500 dark:text-gray-400' : 'text-slate-700 dark:text-slate-300'} cursor-pointer`}>
+                            Primary (Standard 1-8)
+                            {isFieldLocked('has_primary') && " (Cannot be changed)"}
+                          </label>
+                          <p className={`text-xs ${isFieldLocked('has_primary') ? 'text-gray-500 dark:text-gray-500' : 'text-slate-500 dark:text-slate-400'} mt-1`}>
+                            Primary education for ages 6-13
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
+                  
+                  {/* Show Secondary level for Secondary or Mixed schools */}
+                  {(formData.schoolType === 'Secondary' || formData.schoolType === 'Mixed') && (
+                    <div className={`p-4 border rounded-lg ${isFieldLocked('has_secondary') ? 'bg-gray-100 dark:bg-gray-800/50 border-gray-300 dark:border-gray-700' : 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'}`}>
+                      <div className="flex items-start gap-3">
+                        <div className="pt-1">
+                          <input
+                            type="checkbox"
+                            id="has_secondary"
+                            name="has_secondary"
+                            checked={formData.has_secondary}
+                            onChange={handleChange}
+                            disabled={isFieldLocked('has_secondary') || formData.primary_curriculum === 'CBC' || 
+                              (formData.secondary_curriculum === 'CBC' && formData.primary_curriculum !== 'Both')}
+                            className={`w-5 h-5 ${isFieldLocked('has_secondary') ? 'text-gray-400 cursor-not-allowed' : 'text-green-600'} bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-green-500 dark:focus:ring-green-600 focus:ring-2`}
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <label htmlFor="has_secondary" className={`block text-sm font-medium ${isFieldLocked('has_secondary') ? 'text-gray-500 dark:text-gray-400' : 'text-slate-700 dark:text-slate-300'} cursor-pointer`}>
+                            Secondary (Form 1-4)
+                            {isFieldLocked('has_secondary') && " (Cannot be changed)"}
+                          </label>
+                          <p className={`text-xs ${isFieldLocked('has_secondary') ? 'text-gray-500 dark:text-gray-500' : 'text-slate-500 dark:text-slate-400'} mt-1`}>
+                            Secondary education for ages 13-17
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
-                  {showAdvancedOptions && (
+                  {showAdvancedOptions && !isFieldLocked('has_secondary') && (
                     <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
                       <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
                         Advanced Options
@@ -983,9 +1178,16 @@ function EditSchoolProfile() {
                 <div className="p-2 bg-black dark:bg-white rounded-lg">
                   <Award className="w-5 h-5 text-white dark:text-black" />
                 </div>
-                <h3 className="text-lg font-semibold text-[#0d141b] dark:text-white">
-                  {formData.primary_curriculum === '8-4-4' ? 'Class Levels' : 'Grade Levels'}
-                </h3>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-[#0d141b] dark:text-white">
+                    {formData.primary_curriculum === '8-4-4' ? 'Class Levels' : 'Grade Levels'}
+                  </h3>
+                  {isFieldLocked('grade_levels') && (
+                    <p className="text-sm text-amber-600 dark:text-amber-400 mt-1">
+                      Grade/Class levels cannot be changed after initial setup
+                    </p>
+                  )}
+                </div>
               </div>
 
               <div className="space-y-4">
@@ -1010,11 +1212,12 @@ function EditSchoolProfile() {
                                   id={`grade_${grade.id}`}
                                   checked={formData.grade_levels.includes(grade.id)}
                                   onChange={() => handleGradeLevelChange(grade.id)}
-                                  disabled={!isLevelSelected || lock('grade_levels')}
-                                  className="w-4 h-4 text-blue-600 bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 focus:ring-2"
+                                  disabled={!isLevelSelected || isFieldLocked('grade_levels')}
+                                  className={`w-4 h-4 ${isFieldLocked('grade_levels') ? 'text-gray-400 cursor-not-allowed' : 'text-blue-600'} bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 focus:ring-2`}
                                 />
-                                <label htmlFor={`grade_${grade.id}`} className="text-sm text-slate-700 dark:text-slate-300">
+                                <label htmlFor={`grade_${grade.id}`} className={`text-sm ${isFieldLocked('grade_levels') ? 'text-gray-500 dark:text-gray-400' : 'text-slate-700 dark:text-slate-300'}`}>
                                   {grade.name}
+                                  {isFieldLocked('grade_levels') && formData.grade_levels.includes(grade.id) && " ✓"}
                                 </label>
                               </div>
                             ))}
@@ -1037,11 +1240,12 @@ function EditSchoolProfile() {
                                 id={`grade_${grade.id}`}
                                 checked={formData.grade_levels.includes(grade.id)}
                                 onChange={() => handleGradeLevelChange(grade.id)}
-                                disabled={lock('grade_levels')}
-                                className="w-4 h-4 text-blue-600 bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 focus:ring-2"
+                                disabled={isFieldLocked('grade_levels')}
+                                className={`w-4 h-4 ${isFieldLocked('grade_levels') ? 'text-gray-400 cursor-not-allowed' : 'text-blue-600'} bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 focus:ring-2`}
                               />
-                              <label htmlFor={`grade_${grade.id}`} className="text-sm text-slate-700 dark:text-slate-300">
+                              <label htmlFor={`grade_${grade.id}`} className={`text-sm ${isFieldLocked('grade_levels') ? 'text-gray-500 dark:text-gray-400' : 'text-slate-700 dark:text-slate-300'}`}>
                                 {grade.name}
+                                {isFieldLocked('grade_levels') && formData.grade_levels.includes(grade.id) && " ✓"}
                               </label>
                             </div>
                           ))}
@@ -1073,11 +1277,12 @@ function EditSchoolProfile() {
                                   id={`class_${cls.id}`}
                                   checked={formData.grade_levels.includes(cls.id)}
                                   onChange={() => handleGradeLevelChange(cls.id)}
-                                  disabled={!isLevelSelected || lock('grade_levels')}
-                                  className="w-4 h-4 text-green-600 bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-green-500 dark:focus:ring-green-600 focus:ring-2"
+                                  disabled={!isLevelSelected || isFieldLocked('grade_levels')}
+                                  className={`w-4 h-4 ${isFieldLocked('grade_levels') ? 'text-gray-400 cursor-not-allowed' : 'text-green-600'} bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-green-500 dark:focus:ring-green-600 focus:ring-2`}
                                 />
-                                <label htmlFor={`class_${cls.id}`} className="text-sm text-slate-700 dark:text-slate-300">
+                                <label htmlFor={`class_${cls.id}`} className={`text-sm ${isFieldLocked('grade_levels') ? 'text-gray-500 dark:text-gray-400' : 'text-slate-700 dark:text-slate-300'}`}>
                                   {cls.name}
+                                  {isFieldLocked('grade_levels') && formData.grade_levels.includes(cls.id) && " ✓"}
                                 </label>
                               </div>
                             ))}
@@ -1094,6 +1299,11 @@ function EditSchoolProfile() {
                       <p className="text-sm text-slate-700 dark:text-slate-300">
                         You have selected to offer both CBC and 8-4-4 curricula. Please select grade levels for CBC and class levels for 8-4-4 that your school offers.
                       </p>
+                      {isFieldLocked('grade_levels') && (
+                        <p className="text-sm text-amber-600 dark:text-amber-400 mt-2">
+                          ⚠️ Grade/Class levels cannot be changed after initial setup
+                        </p>
+                      )}
                     </div>
                     
                     <div className="space-y-4">
@@ -1117,11 +1327,12 @@ function EditSchoolProfile() {
                                     id={`cbc_grade_${grade.id}`}
                                     checked={formData.grade_levels.includes(grade.id)}
                                     onChange={() => handleGradeLevelChange(grade.id)}
-                                    disabled={!isLevelSelected || lock('grade_levels')}
-                                    className="w-4 h-4 text-blue-600 bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 focus:ring-2"
+                                    disabled={!isLevelSelected || isFieldLocked('grade_levels')}
+                                    className={`w-4 h-4 ${isFieldLocked('grade_levels') ? 'text-gray-400 cursor-not-allowed' : 'text-blue-600'} bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 focus:ring-2`}
                                   />
-                                  <label htmlFor={`cbc_grade_${grade.id}`} className="text-sm text-slate-700 dark:text-slate-300">
+                                  <label htmlFor={`cbc_grade_${grade.id}`} className={`text-sm ${isFieldLocked('grade_levels') ? 'text-gray-500 dark:text-gray-400' : 'text-slate-700 dark:text-slate-300'}`}>
                                     {grade.name}
+                                    {isFieldLocked('grade_levels') && formData.grade_levels.includes(grade.id) && " ✓"}
                                   </label>
                                 </div>
                               ))}
@@ -1144,11 +1355,12 @@ function EditSchoolProfile() {
                                   id={`cbc_grade_${grade.id}`}
                                   checked={formData.grade_levels.includes(grade.id)}
                                   onChange={() => handleGradeLevelChange(grade.id)}
-                                  disabled={lock('grade_levels')}
-                                  className="w-4 h-4 text-blue-600 bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 focus:ring-2"
+                                  disabled={isFieldLocked('grade_levels')}
+                                  className={`w-4 h-4 ${isFieldLocked('grade_levels') ? 'text-gray-400 cursor-not-allowed' : 'text-blue-600'} bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 dark:focus:ring-blue-600 focus:ring-2`}
                                 />
-                                <label htmlFor={`cbc_grade_${grade.id}`} className="text-sm text-slate-700 dark:text-slate-300">
+                                <label htmlFor={`cbc_grade_${grade.id}`} className={`text-sm ${isFieldLocked('grade_levels') ? 'text-gray-500 dark:text-gray-400' : 'text-slate-700 dark:text-slate-300'}`}>
                                   {grade.name}
+                                  {isFieldLocked('grade_levels') && formData.grade_levels.includes(grade.id) && " ✓"}
                                 </label>
                               </div>
                             ))}
@@ -1179,11 +1391,12 @@ function EditSchoolProfile() {
                                     id={`844_class_${cls.id}`}
                                     checked={formData.grade_levels.includes(cls.id)}
                                     onChange={() => handleGradeLevelChange(cls.id)}
-                                    disabled={!isLevelSelected || lock('grade_levels')}
-                                    className="w-4 h-4 text-green-600 bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-green-500 dark:focus:ring-green-600 focus:ring-2"
+                                    disabled={!isLevelSelected || isFieldLocked('grade_levels')}
+                                    className={`w-4 h-4 ${isFieldLocked('grade_levels') ? 'text-gray-400 cursor-not-allowed' : 'text-green-600'} bg-white dark:bg-slate-700 border-gray-300 dark:border-gray-600 rounded focus:ring-green-500 dark:focus:ring-green-600 focus:ring-2`}
                                   />
-                                  <label htmlFor={`844_class_${cls.id}`} className="text-sm text-slate-700 dark:text-slate-300">
+                                  <label htmlFor={`844_class_${cls.id}`} className={`text-sm ${isFieldLocked('grade_levels') ? 'text-gray-500 dark:text-gray-400' : 'text-slate-700 dark:text-slate-300'}`}>
                                     {cls.name}
+                                    {isFieldLocked('grade_levels') && formData.grade_levels.includes(cls.id) && " ✓"}
                                   </label>
                                 </div>
                               ))}
@@ -1195,11 +1408,6 @@ function EditSchoolProfile() {
                   </div>
                 )}
               </div>
-              {lock('grade_levels') && (
-                <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
-                  Grade / Class levels cannot be changed once saved.
-                </p>
-              )}
             </div>
           )}
         </div>

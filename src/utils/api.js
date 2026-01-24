@@ -12,6 +12,7 @@ export const apiRequest = async (endpoint, method = "GET", body = null) => {
   };
 
   if (token) {
+    
     headers["Authorization"] = `Bearer ${token}`;
   }
 
