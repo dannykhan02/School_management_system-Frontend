@@ -9,7 +9,7 @@ function SchoolRegistration({ onClose, onSave, isEditMode = false, initialData =
     schoolName: '',
     schoolType: '',
     address: '',
-    city: '',
+    city: '', // This stores the county but will be displayed as "County" in UI
     phone: '',
     email: '',
     code: '',
@@ -78,6 +78,15 @@ function SchoolRegistration({ onClose, onSave, isEditMode = false, initialData =
     { id: 'Form 2', name: 'Form 2', curriculum: '8-4-4', level: 'Secondary' },
     { id: 'Form 3', name: 'Form 3', curriculum: '8-4-4', level: 'Secondary' },
     { id: 'Form 4', name: 'Form 4', curriculum: '8-4-4', level: 'Secondary' },
+  ];
+
+  // Kenyan Counties List
+  const kenyanCounties = [
+    'Baringo', 'Bomet', 'Bungoma', 'Busia', 'Elgeyo-Marakwet', 'Embu', 'Garissa', 'Homa Bay', 'Isiolo', 
+    'Kajiado', 'Kakamega', 'Kericho', 'Kiambu', 'Kilifi', 'Kirinyaga', 'Kisii', 'Kisumu', 'Kitui', 'Kwale', 
+    'Laikipia', 'Lamu', 'Machakos', 'Makueni', 'Mandera', 'Marsabit', 'Meru', 'Migori', 'Mombasa', 'Murang\'a', 
+    'Nairobi', 'Nakuru', 'Nandi', 'Narok', 'Nyamira', 'Nyandarua', 'Nyeri', 'Samburu', 'Siaya', 'Taita-Taveta', 
+    'Tana River', 'Tharaka-Nithi', 'Trans Nzoia', 'Turkana', 'Uasin Gishu', 'Vihiga', 'Wajir', 'West Pokot'
   ];
   
   // NEW FEATURE 1: Disable streams checkbox when curriculum levels are selected
@@ -337,6 +346,65 @@ function SchoolRegistration({ onClose, onSave, isEditMode = false, initialData =
     e.preventDefault();
     setErrors({});
 
+    // Enhanced client-side validation for required fields
+    const newErrors = {};
+    
+    // School Information Validation
+    if (!formData.schoolName.trim()) newErrors['school.name'] = 'School name is required';
+    if (!formData.schoolType) newErrors['school.school_type'] = 'School type is required';
+    if (!formData.address.trim()) newErrors['school.address'] = 'Address is required';
+    if (!formData.city) newErrors['school.city'] = 'County is required';
+    if (!formData.phone.trim()) newErrors['school.phone'] = 'Phone number is required';
+    if (!formData.email.trim()) newErrors['school.email'] = 'Email is required';
+    if (!formData.code.trim()) newErrors['school.code'] = 'School code is required';
+    if (!formData.primaryCurriculum) newErrors['school.primary_curriculum'] = 'Primary curriculum is required';
+    
+    // Only validate secondary curriculum for secondary and mixed schools
+    if ((formData.schoolType === 'Secondary' || formData.schoolType === 'Mixed') && !formData.secondaryCurriculum) {
+      newErrors['school.secondary_curriculum'] = 'Secondary curriculum is required';
+    }
+    
+    // Curriculum Levels Validation - at least one must be selected
+    if (formData.schoolType === 'Primary') {
+      if (!formData.has_primary) {
+        newErrors['school.has_primary'] = 'Primary schools must have at least the Primary level';
+      }
+    } else if (formData.schoolType === 'Secondary') {
+      if (!formData.has_senior_secondary && !formData.has_secondary) {
+        newErrors['school.has_senior_secondary'] = 'Secondary schools must have at least one secondary level';
+        newErrors['school.has_secondary'] = 'Secondary schools must have at least one secondary level';
+      }
+    } else if (formData.schoolType === 'Mixed') {
+      if (!formData.has_primary && !formData.has_senior_secondary && !formData.has_secondary) {
+        newErrors['school.has_primary'] = 'Mixed schools must have at least one curriculum level';
+      }
+    }
+    
+    // Admin Information Validation (only for new registrations)
+    if (!isEditMode) {
+      if (!formData.adminName.trim()) newErrors['admin.full_name'] = 'Admin full name is required';
+      if (!formData.gender) newErrors['admin.gender'] = 'Gender is required';
+      if (!formData.adminEmail.trim()) newErrors['admin.email'] = 'Admin email is required';
+      if (!formData.adminPhone.trim()) newErrors['admin.phone'] = 'Admin phone is required';
+      if (!formData.password) newErrors['admin.password'] = 'Password is required';
+      if (formData.password && formData.password.length < 8) {
+        newErrors['admin.password'] = 'Password must be at least 8 characters';
+      }
+    }
+
+    // Check if there are any validation errors
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      // Scroll to the first error
+      const firstErrorField = Object.keys(newErrors)[0];
+      const errorElement = document.querySelector(`[name="${firstErrorField.split('.')[1]}"]`);
+      if (errorElement) {
+        errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        errorElement.focus();
+      }
+      return;
+    }
+
     try {
       const formDataToSend = new FormData();
 
@@ -344,6 +412,7 @@ function SchoolRegistration({ onClose, onSave, isEditMode = false, initialData =
       formDataToSend.append("school[name]", formData.schoolName);
       formDataToSend.append("school[school_type]", formData.schoolType);
       formDataToSend.append("school[address]", formData.address);
+      // Note: Backend expects "city" but we're sending the county value
       formDataToSend.append("school[city]", formData.city);
       formDataToSend.append("school[phone]", formData.phone);
       formDataToSend.append("school[email]", formData.email);
@@ -424,7 +493,7 @@ function SchoolRegistration({ onClose, onSave, isEditMode = false, initialData =
         alert('School updated successfully!');
       }
     } catch (error) {
-      setErrors(error.message);
+      setErrors({ general: error.message });
     }
   };
 
@@ -434,7 +503,7 @@ function SchoolRegistration({ onClose, onSave, isEditMode = false, initialData =
     "school.phone": "School Phone",
     "school.address": "School Address",
     "school.code": "School Code",
-    "school.city": "City",
+    "school.city": "County", // Changed from "City" to "County" for display
     "school.primary_curriculum": "Primary Curriculum",
     "school.secondary_curriculum": "Secondary Curriculum",
     "school.has_streams": "Enable Streams",
@@ -758,7 +827,7 @@ function SchoolRegistration({ onClose, onSave, isEditMode = false, initialData =
                     value={formData.secondaryCurriculum}
                     onChange={handleChange}
                     className={`w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-[#0d141b] dark:text-white focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-colors ${isFieldLocked('secondaryCurriculum') ? 'opacity-70 cursor-not-allowed' : ''}`}
-                    required
+                    required={formData.schoolType === 'Secondary' || formData.schoolType === 'Mixed'}
                     disabled={isFieldLocked('secondaryCurriculum') || formData.schoolType === 'Primary'}
                   >
                     <option value="">Select curriculum</option>
@@ -789,7 +858,7 @@ function SchoolRegistration({ onClose, onSave, isEditMode = false, initialData =
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                     Address *
@@ -799,25 +868,34 @@ function SchoolRegistration({ onClose, onSave, isEditMode = false, initialData =
                     name="address"
                     value={formData.address}
                     onChange={handleChange}
-                    placeholder="e.g., 123 Education Lane"
+                    placeholder="e.g., 123 Education Lane, Westlands"
                     className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-[#0d141b] dark:text-white focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-colors"
                     required
                   />
                 </div>
 
+                {/* County field - displayed as "County" but stored in "city" for backend */}
                 <div>
                   <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                    City *
+                    County *
                   </label>
-                  <input
-                    type="text"
-                    name="city"
-                    value={formData.city}
+                  <select
+                    name="city" // This is the field name that backend expects
+                    value={formData.city} // Value is stored in formData.city
                     onChange={handleChange}
-                    placeholder="e.g., Northwood"
                     className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-[#0d141b] dark:text-white focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-colors"
                     required
-                  />
+                  >
+                    <option value="">Select County</option>
+                    {kenyanCounties.map((county) => (
+                      <option key={county} value={county}>
+                        {county}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    Select the county where your school is located (sent as "city" to backend)
+                  </p>
                 </div>
 
                 <div>
@@ -829,10 +907,15 @@ function SchoolRegistration({ onClose, onSave, isEditMode = false, initialData =
                     name="phone"
                     value={formData.phone}
                     onChange={handleChange}
-                    placeholder="e.g., (123) 456-7890"
+                    placeholder="e.g., 0712 345 678"
                     className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-[#0d141b] dark:text-white focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-colors"
                     required
+                    pattern="[0-9\s\-\(\)]+"
+                    minLength="10"
                   />
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    Format: 0712 345 678 or 020 123 4567
+                  </p>
                 </div>
 
                 <div className="md:col-span-2">
@@ -895,7 +978,7 @@ function SchoolRegistration({ onClose, onSave, isEditMode = false, initialData =
                   <div className="p-2 bg-black dark:bg-white rounded-lg">
                     <GraduationCap className="w-5 h-5 text-white dark:text-black" />
                   </div>
-                  <h2 className="text-xl font-semibold text-[#0d141b] dark:text-white">Curriculum Levels</h2>
+                  <h2 className="text-xl font-semibold text-[#0d141b] dark:text-white">Curriculum Levels *</h2>
                 </div>
                 {!isFieldLocked('has_pre_primary') && (
                   <button
@@ -1421,7 +1504,7 @@ function SchoolRegistration({ onClose, onSave, isEditMode = false, initialData =
                   <div className="p-2 bg-black dark:bg-white rounded-lg">
                     <User className="w-5 h-5 text-white dark:text-black" />
                   </div>
-                  <h2 className="text-xl font-semibold text-[#0d141b] dark:text-white">Administrator Details</h2>
+                  <h2 className="text-xl font-semibold text-[#0d141b] dark:text-white">Administrator Details *</h2>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1482,10 +1565,15 @@ function SchoolRegistration({ onClose, onSave, isEditMode = false, initialData =
                       name="adminPhone"
                       value={formData.adminPhone}
                       onChange={handleChange}
-                      placeholder="e.g., (123) 456-7890"
+                      placeholder="e.g., 0712 345 678"
                       className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-[#0d141b] dark:text-white focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-colors"
                       required
+                      pattern="[0-9\s\-\(\)]+"
+                      minLength="10"
                     />
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                      Format: 0712 345 678 or 020 123 4567
+                    </p>
                   </div>
 
                   <div className="md:col-span-2">
@@ -1498,9 +1586,10 @@ function SchoolRegistration({ onClose, onSave, isEditMode = false, initialData =
                         name="password"
                         value={formData.password}
                         onChange={handleChange}
-                        placeholder="Create a secure password"
+                        placeholder="Create a secure password (minimum 8 characters)"
                         className="w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-[#0d141b] dark:text-white focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent pr-10 transition-colors"
                         required
+                        minLength="8"
                       />
                       <Lock className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
                     </div>

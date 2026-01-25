@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import DashboardLayout from "./Dashboard/Layout/DashboardLayout";
 import SchoolManager from './Dashboard/Pages/SuperAdmin/SchoolManager';
 import Roles from './Dashboard/Pages/SuperAdmin/Roles';
+import UserProfile from './Dashboard/Pages/SuperAdmin/UserProfile';
 import Login from './Auth/Login';
 import SchoolProfile from './Dashboard/Pages/Admin/SchoolProfile';
 import AcademicYearSetup from './Dashboard/Pages/Admin/AcademicYearSetup';
@@ -100,6 +101,7 @@ function App() {
             <Route path="dashboard" element={<SchoolManager />} />
             <Route path="schools" element={<SchoolManager />} />
             <Route path="roles" element={<Roles />} />
+            <Route path="user-profile" element={<UserProfile />} />
           </Route>
 
           {/* Admin */}
@@ -110,10 +112,12 @@ function App() {
           }>
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<SchoolProfile />} />
-            <Route path="edit-school-info/:id" element={<EditSchoolProfile />} />
+            {/* ✅ FIXED: Removed :id parameter since component fetches based on authenticated user */}
+            <Route path="edit-school-info" element={<EditSchoolProfile />} />
             <Route path="academic-year" element={<AcademicYearSetup />} />
             <Route path="new-user" element={<CreateUser />} />
             <Route path="update-user/:id" element={<UpdateUser />} />
+            <Route path="user-profile" element={<UserProfile />} />
             
             {/* NEW Admin Routes */}
             <Route path="classrooms" element={<ClassroomManager />} />
@@ -133,6 +137,7 @@ function App() {
             <Route path="classes" element={<div>Teacher Classes Page</div>} />
             <Route path="attendance" element={<div>Teacher Attendance Page</div>} />
             <Route path="grades" element={<div>Teacher Grades Page</div>} />
+            <Route path="user-profile" element={<UserProfile />} />
           </Route>
           
           {/* Student */}
@@ -145,6 +150,7 @@ function App() {
             <Route path="dashboard" element={<StudentDashboard />} />
             <Route path="courses" element={<div>Student Courses Page</div>} />
             <Route path="grades" element={<div>Student Grades Page</div>} />
+            <Route path="user-profile" element={<UserProfile />} />
           </Route>
           
           {/* Parent */}
@@ -158,6 +164,7 @@ function App() {
             <Route path="children" element={<div>Parent Children Page</div>} />
             <Route path="events" element={<div>Parent Events Page</div>} />
             <Route path="reports" element={<div>Parent Reports Page</div>} />
+            <Route path="user-profile" element={<UserProfile />} />
           </Route>
           
           {/* Default redirects */}

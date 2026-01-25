@@ -11,7 +11,8 @@ import {
   BookOpen,
   GraduationCap,
   Building2,
-  Shield
+  Shield,
+  User // Add this import
 } from "lucide-react";
 
 export const NAVIGATION_ITEMS = {
@@ -25,6 +26,11 @@ export const NAVIGATION_ITEMS = {
       name: "Roles", 
       icon: Shield,
       href: "/super_admin/roles" 
+    },
+    { 
+      name: "User Profile", 
+      icon: User,
+      href: "/super_admin/user-profile" 
     },
   ],
   admin: [
@@ -64,6 +70,11 @@ export const NAVIGATION_ITEMS = {
       icon: Users,
       href: "/admin/new-user" 
     },
+    { 
+      name: "User Profile", 
+      icon: User,
+      href: "/admin/user-profile" 
+    },
   ],
   teacher: [
     { 
@@ -92,6 +103,11 @@ export const NAVIGATION_ITEMS = {
       icon: FileText,
       href: "/teacher/grades" 
     },
+    { 
+      name: "User Profile", 
+      icon: User,
+      href: "/teacher/user-profile" 
+    },
   ],
   student: [
     { 
@@ -108,6 +124,11 @@ export const NAVIGATION_ITEMS = {
       name: "Grades", 
       icon: FileText,
       href: "/student/grades" 
+    },
+    { 
+      name: "User Profile", 
+      icon: User,
+      href: "/student/user-profile" 
     },
   ],
   parent: [
@@ -130,6 +151,11 @@ export const NAVIGATION_ITEMS = {
       name: "Reports", 
       icon: FileText,
       href: "/parent/reports" 
+    },
+    { 
+      name: "User Profile", 
+      icon: User,
+      href: "/parent/user-profile" 
     },
   ],
 };
