@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import DashboardLayout from "./Dashboard/Layout/DashboardLayout";
 import SchoolManager from './Dashboard/Pages/SuperAdmin/SchoolManager';
+import EditSchool from './Dashboard/Pages/SuperAdmin/EditSchool';
 import Roles from './Dashboard/Pages/SuperAdmin/Roles';
 import UserProfile from './Dashboard/Pages/SuperAdmin/UserProfile';
 import Login from './Auth/Login';
@@ -38,18 +39,14 @@ const ProtectedRoute = ({ children, requiredRole }) => {
 
   if (!user) return <Navigate to="/login" replace />;
 
-  // ✅ FIX: Add condition to prevent infinite redirect loop
   const currentPath = window.location.pathname;
   const expectedDashboard = `/${user.role}/dashboard`;
   
-  // Redirect to dashboard if password change is required AND user is not already on their dashboard
   if (mustChangePassword && !currentPath.includes(expectedDashboard)) {
     return <Navigate to={expectedDashboard} replace />;
   }
 
-  // ✅ FIX: Only redirect if user is on wrong role path
   if (requiredRole && user.role !== requiredRole) {
-    // Prevent redirect loop by checking if already redirecting to correct dashboard
     if (!currentPath.includes(`/${user.role}/dashboard`)) {
       return <Navigate to={`/${user.role}/dashboard`} replace />;
     }
@@ -59,7 +56,6 @@ const ProtectedRoute = ({ children, requiredRole }) => {
 };
 
 function App() {
-  // Initialize theme on app load
   useEffect(() => {
     const initializeTheme = () => {
       const savedTheme = localStorage.getItem('theme');
@@ -70,7 +66,6 @@ function App() {
       } else if (savedTheme === 'light') {
         html.classList.remove('dark');
       } else {
-        // Use system preference if no saved theme
         if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
           html.classList.add('dark');
           localStorage.setItem('theme', 'dark');
@@ -91,7 +86,7 @@ function App() {
           <Route path="/school-registration" element={<SchoolRegistration />} />
           <Route path="/login" element={<Login />} />
           
-          {/* Super Admin */}
+          {/* Super Admin Routes - FIXED */}
           <Route path="/super_admin/*" element={
             <ProtectedRoute requiredRole="super_admin">
               <DashboardLayout />
@@ -100,11 +95,13 @@ function App() {
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<SchoolManager />} />
             <Route path="schools" element={<SchoolManager />} />
+            {/* ✅ FIXED: EditSchool route */}
+            <Route path="schools/edit/:id" element={<EditSchool />} />
             <Route path="roles" element={<Roles />} />
             <Route path="user-profile" element={<UserProfile />} />
           </Route>
 
-          {/* Admin */}
+          {/* Admin Routes */}
           <Route path="/admin/*" element={
             <ProtectedRoute requiredRole="admin">
               <DashboardLayout />
@@ -112,21 +109,18 @@ function App() {
           }>
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<SchoolProfile />} />
-            {/* ✅ FIXED: Removed :id parameter since component fetches based on authenticated user */}
             <Route path="edit-school-info" element={<EditSchoolProfile />} />
             <Route path="academic-year" element={<AcademicYearSetup />} />
             <Route path="new-user" element={<CreateUser />} />
             <Route path="update-user/:id" element={<UpdateUser />} />
             <Route path="user-profile" element={<UserProfile />} />
-            
-            {/* NEW Admin Routes */}
             <Route path="classrooms" element={<ClassroomManager />} />
             <Route path="streams" element={<StreamManager />} />
             <Route path="subjects" element={<SubjectManager />} />
             <Route path="teachers" element={<TeacherManager />} />
           </Route>
 
-          {/* Teacher */}
+          {/* Teacher Routes */}
           <Route path="/teacher/*" element={
             <ProtectedRoute requiredRole="teacher">
               <DashboardLayout />
@@ -140,7 +134,7 @@ function App() {
             <Route path="user-profile" element={<UserProfile />} />
           </Route>
           
-          {/* Student */}
+          {/* Student Routes */}
           <Route path="/student/*" element={
             <ProtectedRoute requiredRole="student">
               <DashboardLayout />
@@ -153,7 +147,7 @@ function App() {
             <Route path="user-profile" element={<UserProfile />} />
           </Route>
           
-          {/* Parent */}
+          {/* Parent Routes */}
           <Route path="/parent/*" element={
             <ProtectedRoute requiredRole="parent">
               <DashboardLayout />

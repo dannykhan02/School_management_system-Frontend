@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AlertCircle, Users, Shield, ChevronUp, ChevronDown, Loader, Mail, Phone, X } from 'lucide-react';
+import { AlertCircle, Users, Shield, Loader, Mail, Phone, X } from 'lucide-react';
 import { apiRequest } from '../utils/api';
 
 const SuperAdminContactCard = ({ show, onClose }) => {
@@ -135,7 +135,7 @@ const SuperAdminContactCard = ({ show, onClose }) => {
                 </h4>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+              <div className="grid grid-cols-1 gap-3 sm:gap-4">
                 {superAdmins.map((admin, index) => (
                   <div
                     key={admin.id || index}
@@ -146,19 +146,17 @@ const SuperAdminContactCard = ({ show, onClose }) => {
                         <Shield className="w-5 h-5 sm:w-6 sm:h-6 text-slate-600 dark:text-slate-300" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h5 className="font-medium text-slate-900 dark:text-white truncate text-sm sm:text-base">
-                            {admin.name || admin.full_name || 'Super Admin'}
-                          </h5>
-                        </div>
+                        <h5 className="font-medium text-slate-900 dark:text-white text-sm sm:text-base mb-3">
+                          {admin.name || admin.full_name || 'Super Admin'}
+                        </h5>
                         
-                        <div className="space-y-2 mt-3">
+                        <div className="space-y-2.5">
                           {(admin.email || admin.Email) && (
-                            <div className="flex items-center gap-2">
-                              <Mail className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 flex-shrink-0" />
+                            <div className="flex items-start gap-2">
+                              <Mail className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 flex-shrink-0 mt-0.5" />
                               <a 
                                 href={`mailto:${admin.email || admin.Email}`}
-                                className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:underline truncate"
+                                className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:underline break-all"
                                 title={admin.email || admin.Email}
                               >
                                 {admin.email || admin.Email}
@@ -167,11 +165,11 @@ const SuperAdminContactCard = ({ show, onClose }) => {
                           )}
                           
                           {(admin.phone || admin.Phone) && (
-                            <div className="flex items-center gap-2">
-                              <Phone className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 flex-shrink-0" />
+                            <div className="flex items-start gap-2">
+                              <Phone className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 flex-shrink-0 mt-0.5" />
                               <a 
                                 href={`tel:${admin.phone || admin.Phone}`}
-                                className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:underline truncate"
+                                className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:underline"
                                 title={admin.phone || admin.Phone}
                               >
                                 {admin.phone || admin.Phone}

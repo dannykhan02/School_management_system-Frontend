@@ -1,5 +1,5 @@
-// components/SchoolManagerComponent.jsx
 import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { apiRequest } from '../utils/api'
 import { 
   Loader, 
@@ -7,6 +7,7 @@ import {
   Building2, 
   X,
   Eye,
+  Edit,
   MapPin,
   Phone,
   Mail,
@@ -33,6 +34,8 @@ import {
 import { toast } from "react-toastify";
 
 function SchoolManagerComponent() {
+  const navigate = useNavigate();
+  
   // Kenyan Counties (47 counties)
   const KENYAN_COUNTIES = [
     "Mombasa", "Kwale", "Kilifi", "Tana River", "Lamu", "Taita Taveta", "Garissa", "Wajir", "Mandera", "Marsabit",
@@ -146,7 +149,6 @@ function SchoolManagerComponent() {
         }));
       }
     } catch (error) {
-      console.error('Failed to fetch schools:', error);
       toast.error('Failed to load schools. Please refresh page.');
     } finally {
       setLoading(false);
@@ -159,7 +161,6 @@ function SchoolManagerComponent() {
       const response = await apiRequest('schools/statistics', 'GET');
       setStatistics(response?.data || null);
     } catch (error) {
-      console.error('Failed to fetch statistics:', error);
       toast.error('Failed to load statistics');
     } finally {
       setStatsLoading(false);
@@ -239,6 +240,10 @@ function SchoolManagerComponent() {
         setLoading(false);
       }
     }
+  };
+
+  const handleEditSchool = (school) => {
+    navigate(`/super_admin/schools/edit/${school.id}`);
   };
 
   const backToList = () => {
@@ -567,21 +572,24 @@ function SchoolManagerComponent() {
     <div className="md:hidden space-y-3">
       {schools.length > 0 ? (
         schools.map((school) => (
-          <button
+          <div
             key={school.id}
-            onClick={() => showSchoolDetails(school)}
-            className="w-full bg-white dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700 p-4 shadow-sm hover:shadow-md active:scale-[0.98] transition-all text-left"
+            className="w-full bg-white dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700 p-4 shadow-sm"
           >
+            {/* Header with Edit Button */}
             <div className="flex items-start justify-between mb-3">
-              <div className="flex items-center gap-3">
+              <button
+                onClick={() => showSchoolDetails(school)}
+                className="flex items-center gap-3 flex-1 min-w-0 text-left"
+              >
                 {school.logo ? (
                   <img 
                     src={school.logo} 
                     alt={school.name}
-                    className="w-12 h-12 rounded-lg object-cover"
+                    className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
                   />
                 ) : (
-                  <div className="bg-blue-100 dark:bg-blue-900/30 p-2 rounded-lg">
+                  <div className="bg-blue-100 dark:bg-blue-900/30 p-2 rounded-lg flex-shrink-0">
                     <Building2 className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                   </div>
                 )}
@@ -594,10 +602,28 @@ function SchoolManagerComponent() {
                     {school.code}
                   </p>
                 </div>
+              </button>
+              
+              {/* Action Buttons */}
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <button
+                  onClick={() => handleEditSchool(school)}
+                  className="p-2 bg-white dark:bg-black text-black dark:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-900 active:scale-95 transition-all border border-slate-200 dark:border-slate-700"
+                  title="Edit School"
+                >
+                  <Edit className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => showSchoolDetails(school)}
+                  className="p-2 text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 active:scale-95 transition-all"
+                  title="View Details"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
               </div>
-              <ChevronRight className="w-5 h-5 text-slate-400 flex-shrink-0" />
             </div>
             
+            {/* Rest of the card content */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400">
@@ -645,7 +671,7 @@ function SchoolManagerComponent() {
                 </div>
               </div>
             </div>
-          </button>
+          </div>
         ))
       ) : (
         <div className="bg-white dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700 p-6 text-center">
@@ -763,10 +789,17 @@ function SchoolManagerComponent() {
                       <div className="flex justify-end gap-2">
                         <button 
                           onClick={() => showSchoolDetails(school)} 
-                          className="p-2 text-slate-500 hover:text-blue-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                          className="p-2 text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                           title="View Details"
                         >
                           <Eye className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => handleEditSchool(school)} 
+                          className="p-2 text-slate-500 hover:text-green-600 dark:hover:text-green-400 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                          title="Edit School"
+                        >
+                          <Edit className="w-4 h-4" />
                         </button>
                       </div>
                     </td>
@@ -818,15 +851,15 @@ function SchoolManagerComponent() {
           
           <div className="px-4 sm:px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex-shrink-0">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-1 min-w-0">
                 {schoolDetails?.logo ? (
                   <img 
                     src={schoolDetails.logo} 
                     alt={schoolDetails.name}
-                    className="w-10 h-10 rounded-lg object-cover"
+                    className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
                   />
                 ) : (
-                  <div className="bg-blue-100 dark:bg-blue-900/30 p-2 rounded-lg">
+                  <div className="bg-blue-100 dark:bg-blue-900/30 p-2 rounded-lg flex-shrink-0">
                     <Building2 className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                   </div>
                 )}
@@ -839,12 +872,27 @@ function SchoolManagerComponent() {
                   </p>
                 </div>
               </div>
-              <button
-                onClick={closeMobileSheet}
-                className="p-2 -mr-2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 active:scale-95 transition-all"
-              >
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {/* Edit Button - White in dark mode, Black in light mode */}
+                <button
+                  onClick={() => {
+                    handleEditSchool(schoolDetails);
+                    closeMobileSheet();
+                  }}
+                  disabled={!schoolDetails}
+                  className="p-2 bg-white dark:bg-black text-black dark:text-white rounded-lg hover:bg-gray-100 dark:hover:bg-gray-900 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed border border-slate-200 dark:border-slate-700"
+                  title="Edit School"
+                >
+                  <Edit className="w-5 h-5" />
+                </button>
+                {/* Close Button */}
+                <button
+                  onClick={closeMobileSheet}
+                  className="p-2 text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 active:scale-95 transition-all"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
           </div>
           
@@ -870,7 +918,7 @@ function SchoolManagerComponent() {
                     )}
                     {schoolDetails?.phone && (
                       <div className="flex items-start gap-2">
-                        <Phone className="w-4 h-4 text-slate-400 mt=0.5" />
+                        <Phone className="w-4 h-4 text-slate-400 mt-0.5" />
                         <div>
                           <p className="text-xs text-slate-500 dark:text-slate-400">Phone</p>
                           <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{schoolDetails.phone}</p>
@@ -967,13 +1015,22 @@ function SchoolManagerComponent() {
     return (
       <div className="w-full">
         <div className="mb-6">
-          <button 
-            onClick={backToList}
-            className="flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 mb-4 transition-colors"
-          >
-            <X className="w-4 h-4" />
-            Back to Schools List
-          </button>
+          <div className="flex items-center justify-between">
+            <button 
+              onClick={backToList}
+              className="flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 mb-4 transition-colors"
+            >
+              <X className="w-4 h-4" />
+              Back to Schools List
+            </button>
+            <button
+              onClick={() => handleEditSchool(schoolDetails)}
+              className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-black text-black dark:text-white border border-slate-200 dark:border-slate-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors mb-4"
+            >
+              <Edit className="w-4 h-4" />
+              Edit School
+            </button>
+          </div>
           <h1 className="text-[#0d141b] dark:text-white text-4xl font-black leading-tight tracking-[-0.033em]">
             School Details
           </h1>
@@ -1026,7 +1083,7 @@ function SchoolManagerComponent() {
                 )}
                 {schoolDetails.phone && (
                   <div className="flex items-start gap-3">
-                    <Phone className="w-5 h-5 text-slate-400 mt=0.5" />
+                    <Phone className="w-5 h-5 text-slate-400 mt-0.5" />
                     <div>
                       <p className="text-xs text-slate-500 dark:text-slate-400">Phone</p>
                       <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{schoolDetails.phone}</p>
