@@ -12,7 +12,6 @@ export const apiRequest = async (endpoint, method = "GET", body = null) => {
   };
 
   if (token) {
-    
     headers["Authorization"] = `Bearer ${token}`;
   }
 
@@ -29,11 +28,23 @@ export const apiRequest = async (endpoint, method = "GET", body = null) => {
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
+    // Handle 401 Unauthorized - token expired or invalid
+    if (response.status === 401) {
+      // Clear auth data
+      localStorage.removeItem('user');
+      localStorage.removeItem('auth_token');
+      
+      // Only redirect if not already on login page
+      if (!window.location.pathname.includes('/login')) {
+        window.location.href = '/login';
+      }
+    }
+    
     // Attach status to the error so you can catch validation errors
     const error = new Error(data.message || "API request failed");
     error.status = response.status;
     error.data = data;
-    error.response = { data }; // Add this for compatibility with your error handling
+    error.response = { data };
     throw error;
   }
 

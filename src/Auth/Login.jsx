@@ -88,6 +88,11 @@ const Login = () => {
       if (!token) {
         throw new Error('No authentication token received from server.');
       }
+
+      // ✅ Validate Redis token format (should be 64 characters)
+      if (token.length !== 64) {
+        console.warn('Warning: Token length is not 64 characters. Expected Redis token format.');
+      }
       
       // Extract role information
       const roleName = data.role_name || data.role || 'admin';
@@ -109,7 +114,17 @@ const Login = () => {
         token: token,
         must_change_password: data.must_change_password || false,
         email_verified_at: data.email_verified_at,
+        active_sessions: data.active_sessions || 1, // ✅ NEW: Track sessions
+        token_expires_in: data.token_expires_in || 3600, // ✅ NEW: Track expiry (default 1 hour)
       };
+
+      console.log('Login successful:', {
+        userId: userInfo.id,
+        role: userInfo.role,
+        activeSessions: userInfo.active_sessions,
+        tokenLength: token.length,
+        expiresIn: userInfo.token_expires_in
+      });
 
       // Reset redirect flag before login
       hasRedirectedRef.current = false;

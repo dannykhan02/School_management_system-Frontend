@@ -65,7 +65,7 @@ function AcademicYearSetup() {
   // Fetch school information to get primary curriculum
   const fetchSchoolInfo = useCallback(async () => {
     try {
-      const response = await apiRequest('schools', 'GET');
+      const response = await apiRequest('schools/my-school', 'GET'); // Changed from 'schools' to 'schools/my-school'
       const schoolData = response.data || response;
       setSchool(schoolData);
       

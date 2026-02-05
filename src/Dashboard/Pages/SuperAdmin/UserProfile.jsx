@@ -12,9 +12,14 @@ import {
   Check,
   Info,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  LogOut,
+  Smartphone,
+  AlertTriangle
 } from 'lucide-react';
 import { apiRequest } from '../../../utils/api';
+import { useAuth } from '../../../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 function UserProfile() {
   const [profile, setProfile] = useState({
@@ -45,18 +50,28 @@ function UserProfile() {
   const [message, setMessage] = useState({ text: '', type: '' });
   const [validationErrors, setValidationErrors] = useState({});
   const [showMoreInfo, setShowMoreInfo] = useState(false);
+  
+  // Session management state
+  const [activeSessions, setActiveSessions] = useState(null);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+  
+  // Auth context and navigation
+  const { logout } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchProfile();
+    fetchActiveSessions();
   }, []);
 
   const fetchProfile = async () => {
     try {
       setLoading(true);
       const response = await apiRequest('auth/user', 'GET');
-      console.log('Profile API Response:', response); // Debug log
+      console.log('Profile API Response:', response);
       
-      // Safe mapping with type checking
       const mappedProfile = {
         school_id: response.school_id || null,
         role_id: response.role_id || '',
@@ -69,7 +84,8 @@ function UserProfile() {
         email_verified_at: response.email_verified_at || null,
         must_change_password: response.must_change_password || false,
         created_at: response.created_at || '',
-        updated_at: response.updated_at || ''
+        updated_at: response.updated_at || '',
+        active_sessions: response.active_sessions || 0
       };
       
       setProfile(mappedProfile);
@@ -89,6 +105,57 @@ function UserProfile() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchActiveSessions = async () => {
+    try {
+      setSessionsLoading(true);
+      const response = await apiRequest('auth/active-sessions', 'GET');
+      console.log('Active sessions response:', response);
+      setActiveSessions(response);
+    } catch (error) {
+      console.error('Failed to fetch active sessions:', error);
+      setActiveSessions(null);
+    } finally {
+      setSessionsLoading(false);
+    }
+  };
+
+  const handleLogoutAllDevices = async () => {
+    if (!showLogoutConfirm) {
+      setShowLogoutConfirm(true);
+      return;
+    }
+
+    try {
+      setLoggingOut(true);
+      
+      await apiRequest('auth/logout-all', 'POST');
+      
+      await logout();
+      
+      setMessage({
+        text: 'Successfully logged out from all devices. Redirecting...',
+        type: 'success'
+      });
+      
+      setTimeout(() => {
+        navigate('/login');
+      }, 1000);
+      
+    } catch (error) {
+      console.error('Failed to logout from all devices:', error);
+      setMessage({
+        text: error.message || 'Failed to logout from all devices. Please try again.',
+        type: 'error'
+      });
+      setLoggingOut(false);
+      setShowLogoutConfirm(false);
+    }
+  };
+
+  const handleCancelLogout = () => {
+    setShowLogoutConfirm(false);
   };
 
   const handleInputChange = (e) => {
@@ -157,7 +224,8 @@ function UserProfile() {
           email_verified_at: response.user.email_verified_at || profile.email_verified_at,
           must_change_password: response.user.must_change_password || profile.must_change_password,
           created_at: response.user.created_at || profile.created_at,
-          updated_at: response.user.updated_at || new Date().toISOString()
+          updated_at: response.user.updated_at || new Date().toISOString(),
+          active_sessions: response.user.active_sessions || profile.active_sessions
         };
         
         setProfile(updatedProfile);
@@ -231,18 +299,14 @@ function UserProfile() {
     return diffDays === 0 ? 'Today' : `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
   };
 
-  // Safe role display function
   const getRoleDisplay = () => {
     const role = profile.role;
     
-    // If role is a string (like "super-admin")
     if (typeof role === 'string') {
       return role.replace('-', ' ').toUpperCase();
     }
     
-    // If role is a number (role ID) or other type
     if (typeof role === 'number') {
-      // Map role IDs to role names if needed
       const roleMap = {
         1: 'ADMIN',
         2: 'TEACHER',
@@ -253,7 +317,6 @@ function UserProfile() {
       return roleMap[role] || `ROLE ${role}`;
     }
     
-    // If role is null/undefined
     return 'No Role Assigned';
   };
 
@@ -360,6 +423,97 @@ function UserProfile() {
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* Session Management Card */}
+            <div className="bg-white dark:bg-slate-800/50 rounded-lg sm:rounded-xl border border-slate-200 dark:border-slate-700 p-4 sm:p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Smartphone className="w-5 h-5 text-slate-500 dark:text-slate-400" />
+                <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
+                  Active Sessions
+                </h3>
+              </div>
+
+              {sessionsLoading ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader className="w-6 h-6 text-slate-400 animate-spin" />
+                </div>
+              ) : activeSessions ? (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700/30 rounded-lg">
+                    <span className="text-sm text-slate-600 dark:text-slate-400">Total Devices</span>
+                    <span className="text-lg font-bold text-slate-900 dark:text-white">
+                      {activeSessions.total_sessions || 0}
+                    </span>
+                  </div>
+
+                  {!showLogoutConfirm ? (
+                    <button
+                      onClick={handleLogoutAllDevices}
+                      disabled={loggingOut || !activeSessions.total_sessions}
+                      className="w-full flex items-center justify-center gap-2 rounded-lg h-10 px-4 bg-red-600 text-white text-sm font-bold hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      <span>Logout All Devices</span>
+                    </button>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                        <div className="flex items-start gap-2">
+                          <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-sm font-medium text-yellow-800 dark:text-yellow-300">
+                              Are you sure?
+                            </p>
+                            <p className="text-xs text-yellow-700 dark:text-yellow-400 mt-1">
+                              This will log you out from all {activeSessions.total_sessions} device{activeSessions.total_sessions !== 1 ? 's' : ''}.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleCancelLogout}
+                          disabled={loggingOut}
+                          className="flex-1 flex items-center justify-center gap-2 rounded-lg h-10 px-4 border-2 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white text-sm font-bold hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleLogoutAllDevices}
+                          disabled={loggingOut}
+                          className="flex-1 flex items-center justify-center gap-2 rounded-lg h-10 px-4 bg-red-600 text-white text-sm font-bold hover:bg-red-700 transition-colors disabled:opacity-50"
+                        >
+                          {loggingOut ? (
+                            <>
+                              <Loader className="w-4 h-4 animate-spin" />
+                              <span>Logging out...</span>
+                            </>
+                          ) : (
+                            <>
+                              <LogOut className="w-4 h-4" />
+                              <span>Confirm</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <button
+                    onClick={fetchActiveSessions}
+                    disabled={sessionsLoading}
+                    className="w-full text-xs text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
+                  >
+                    Refresh Sessions
+                  </button>
+                </div>
+              ) : (
+                <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-4">
+                  Unable to load sessions
+                </p>
+              )}
             </div>
 
             {/* Account Information Card */}

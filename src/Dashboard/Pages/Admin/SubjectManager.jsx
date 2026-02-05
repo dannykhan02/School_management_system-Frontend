@@ -59,8 +59,7 @@ function SubjectManager() {
   const [filtersInitialized, setFiltersInitialized] = useState(false);
   const [gradeLevels, setGradeLevels] = useState([]);
   
-  // Academic setup state
-  const [academicSetup, setAcademicSetup] = useState(null);
+  // Academic year state
   const [selectedAcademicYear, setSelectedAcademicYear] = useState(null);
   const [selectedAcademicYearInfo, setSelectedAcademicYearInfo] = useState(null);
   
@@ -138,7 +137,7 @@ function SubjectManager() {
 
   const fetchSchoolInfo = useCallback(async () => {
     try {
-      const response = await apiRequest('schools', 'GET');
+      const response = await apiRequest('schools/my-school', 'GET'); // ✅ Fixed endpoint
       const schoolData = response.data || response;
       setSchool(schoolData);
       setHasStreams(schoolData?.has_streams || false);
@@ -314,16 +313,6 @@ function SubjectManager() {
     setSubjectExists(true);
   }, []);
 
-  // Fetch academic setup
-  const fetchAcademicSetup = useCallback(async () => {
-    try {
-      const response = await apiRequest('academic-setup', 'GET');
-      setAcademicSetup(response.data || null);
-    } catch (error) {
-      console.error('Failed to fetch academic setup:', error);
-    }
-  }, []);
-
   // Handle teacher selection
   const handleTeacherSelection = (teacherId) => {
     setSelectedTeacher(teacherId);
@@ -390,8 +379,7 @@ function SubjectManager() {
 
   useEffect(() => {
     fetchConstants();
-    fetchAcademicSetup();
-  }, [fetchConstants, fetchAcademicSetup]);
+  }, [fetchConstants]);
 
   useEffect(() => {
     if (schoolId) {

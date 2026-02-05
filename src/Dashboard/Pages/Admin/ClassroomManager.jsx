@@ -270,7 +270,10 @@ function ClassroomManager() {
   const showCreateForm = () => {
     setView('create');
     setSelectedClassroom(null);
-    setFormData({ class_name: '', capacity: '' });
+    setFormData({ 
+      class_name: '', 
+      capacity: hasStreams ? '' : '' // Keep empty for both, but it will be disabled for streams
+    });
   };
 
   const showEditForm = (classroom) => {
@@ -372,9 +375,14 @@ function ClassroomManager() {
     try {
       const payload = {
         class_name: formData.class_name,
-        capacity: formData.capacity,
         school_id: schoolId
       };
+      
+      // Only include capacity for non-stream schools
+      if (!hasStreams) {
+        payload.capacity = formData.capacity;
+      }
+      
       if (hasStreams && selectedClassroom && selectedClassroom.streams) {
         payload.streams = selectedClassroom.streams.map(stream => ({
           id: stream.id,
@@ -388,6 +396,7 @@ function ClassroomManager() {
           is_class_teacher: teacher.pivot ? teacher.pivot.is_class_teacher : false
         }));
       }
+      
       let response;
       if (view === 'edit') {
         response = await apiRequest(`classrooms/${selectedClassroom.id}`, 'PUT', payload);
@@ -459,9 +468,6 @@ function ClassroomManager() {
       await apiRequest(`teachers/${teacherRemovalModal.teacherId}/classrooms/${selectedClassroom.id}`, 'DELETE');
       toast.success('Teacher removed successfully');
       
-      // Fetch updated teacher data after removal
-      await fetchUpdatedTeacherData(teacherRemovalModal.teacherId);
-      
       // Close the modal
       setTeacherRemovalModal({
         isOpen: false,
@@ -470,8 +476,13 @@ function ClassroomManager() {
         classroomName: ''
       });
       
-      // Refresh the teachers view
-      await showTeachersView(selectedClassroom);
+      // Refresh all data to update counts everywhere
+      await fetchInitialData();
+      
+      // Refresh the teachers view if still on it
+      if (view === 'teachers' && selectedClassroom) {
+        await showTeachersView(selectedClassroom);
+      }
     } catch (error) {
       const errorMessage = error?.response?.data?.message || 'Failed to remove teacher';
       toast.error(errorMessage);
@@ -486,13 +497,11 @@ function ClassroomManager() {
       await apiRequest(`classrooms/${classroomId}/class-teacher`, 'POST', { teacher_id: teacherId });
       toast.success('Class teacher assigned successfully');
       
-      // Fetch updated teacher data after assignment
-      await fetchUpdatedTeacherData(teacherId);
+      // Refresh all data to update counts
+      await fetchInitialData();
       
       if (selectedClassroom && selectedClassroom.id === classroomId) {
         await showTeachersView(selectedClassroom);
-      } else {
-        fetchInitialData();
       }
     } catch (error) {
       // Enhanced error handling for class teacher assignment
@@ -526,10 +535,11 @@ function ClassroomManager() {
       await apiRequest(`classrooms/${classroomId}/class-teacher`, 'DELETE');
       toast.success('Class teacher removed successfully');
       
+      // Refresh all data to update counts
+      await fetchInitialData();
+      
       if (selectedClassroom && selectedClassroom.id === classroomId) {
         await showTeachersView(selectedClassroom);
-      } else {
-        fetchInitialData();
       }
     } catch (error) {
       const errorMessage = error?.response?.data?.message || 'Failed to remove class teacher';
@@ -544,6 +554,19 @@ function ClassroomManager() {
       toast.error('Please select at least one teacher');
       return;
     }
+    
+    // Get already assigned teachers
+    const alreadyAssignedTeachers = selectedClassroom?.teachers?.map(t => t.id) || [];
+    
+    // Filter out teachers who are already assigned
+    const newTeachers = selectedTeachers.filter(tid => !alreadyAssignedTeachers.includes(tid));
+    
+    // If trying to assign teachers who are already assigned
+    if (newTeachers.length === 0 && selectedTeachers.length > 0) {
+      toast.info('All selected teachers are already assigned to this classroom');
+      return;
+    }
+    
     setLoading(true);
     try {
       const teachersPayload = selectedTeachers.map(teacherId => ({
@@ -555,13 +578,12 @@ function ClassroomManager() {
       });
       toast.success('Teachers assigned successfully');
       
-      // Fetch updated data for all assigned teachers
-      const teacherUpdatePromises = selectedTeachers.map(teacherId => 
-        fetchUpdatedTeacherData(teacherId)
-      );
-      await Promise.all(teacherUpdatePromises);
-      
       setShowTeacherAssignmentModal(false);
+      
+      // Refresh ALL data to update counts everywhere
+      await fetchInitialData();
+      
+      // Then show the updated teachers view
       await showTeachersView(selectedClassroom);
     } catch (error) {
       // Enhanced error handling for teacher assignment
@@ -590,6 +612,14 @@ function ClassroomManager() {
   };
 
   const toggleTeacherSelection = (teacherId) => {
+    // Check if teacher is already assigned to THIS classroom
+    const isAlreadyAssigned = selectedClassroom?.teachers?.some(t => t.id === teacherId);
+    
+    if (isAlreadyAssigned) {
+      toast.info('This teacher is already assigned to this classroom');
+      return; // Exit early - don't allow selection
+    }
+    
     setSelectedTeachers(prev => {
       if (prev.includes(teacherId)) {
         if (classTeacherId === teacherId) {
@@ -660,7 +690,7 @@ function ClassroomManager() {
           <div className="flex items-center gap-2 mt-1">
             <span className={`px-2 py-1 text-xs font-medium rounded-full ${
               hasStreams
-                ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
+                ? 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300'
                 : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
             }`}>
               {hasStreams ? 'Streams Enabled' : 'Direct Teacher Assignment'}
@@ -829,7 +859,7 @@ function ClassroomManager() {
                             classroom.streamCount > 0 ? (
                               <button
                                 onClick={() => showStreamsView(classroom)}
-                                className="flex items-center gap-1 text-blue-600 hover:text-blue-700 hover:underline transition-colors"
+                                className="flex items-center gap-1 text-cyan-500 hover:text-cyan-600 hover:underline transition-colors"
                               >
                                 <MapPin className="w-4 h-4" />
                                 <span>{classroom.streamCount} Stream(s)</span>
@@ -841,7 +871,7 @@ function ClassroomManager() {
                             classroom.teacherCount > 0 ? (
                               <button
                                 onClick={() => showTeachersView(classroom)}
-                                className="flex items-center gap-1 text-blue-600 hover:text-blue-700 hover:underline transition-colors"
+                                className="flex items-center gap-1 text-cyan-500 hover:text-cyan-600 hover:underline transition-colors"
                               >
                                 <Users className="w-4 h-4" />
                                 <span>{classroom.teacherCount} Teacher(s)</span>
@@ -856,7 +886,7 @@ function ClassroomManager() {
                             classroom.streams && classroom.streams.find(s => s.class_teacher_id) ? (
                               <div className="flex items-center gap-1">
                                 <span>{classroom.streams.find(s => s.class_teacher_id)?.classTeacher?.user?.name || 'Assigned'}</span>
-                                <span className="px-2 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 rounded-full text-xs font-medium">
+                                <span className="px-2 py-1 bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300 rounded-full text-xs font-medium">
                                   Class Teacher
                                 </span>
                               </div>
@@ -867,7 +897,7 @@ function ClassroomManager() {
                             classroom.classTeacher ? (
                               <div className="flex items-center gap-1">
                                 <span>{classroom.classTeacher.user?.name || 'Assigned'}</span>
-                                <span className="px-2 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 rounded-full text-xs font-medium">
+                                <span className="px-2 py-1 bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300 rounded-full text-xs font-medium">
                                   Class Teacher
                                 </span>
                               </div>
@@ -880,7 +910,7 @@ function ClassroomManager() {
                           <div className="flex justify-end gap-1">
                             <button
                               onClick={() => showEditForm(classroom)}
-                              className="p-1.5 text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
+                              className="p-1.5 text-slate-500 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors duration-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
                               title="Edit classroom"
                             >
                               <Edit className="w-3.5 h-3.5" />
@@ -979,13 +1009,13 @@ function ClassroomManager() {
                 {!hasStreams && classroom.classTeacher && (
                   <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700">
                     <div className="flex items-center gap-2">
-                      <UserCheck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      <UserCheck className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
                       <span className="text-xs text-slate-600 dark:text-slate-400">
                         Class Teacher: <span className="font-medium text-slate-900 dark:text-white">
                           {classroom.classTeacher.user?.name || 'Assigned'}
                         </span>
                       </span>
-                      <span className="px-2 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 rounded-full text-xs font-medium">
+                      <span className="px-2 py-1 bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300 rounded-full text-xs font-medium">
                         Class Teacher
                       </span>
                     </div>
@@ -1040,9 +1070,11 @@ function ClassroomManager() {
               className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent dark:bg-slate-700 dark:text-white placeholder:text-slate-400 transition-all"
             />
           </div>
+          
+          {/* Capacity field - only editable for non-stream schools */}
           <div>
             <label htmlFor="capacity" className="block text-sm font-medium text-[#0d141b] dark:text-slate-300 mb-2">
-              Capacity
+              Capacity {!hasStreams && <span className="text-red-500">*</span>}
             </label>
             <input
               type="number"
@@ -1051,13 +1083,33 @@ function ClassroomManager() {
               value={formData.capacity}
               onChange={handleInputChange}
               min="1"
-              placeholder="Maximum number of students"
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent dark:bg-slate-700 dark:text-white placeholder:text-slate-400 transition-all"
+              placeholder={hasStreams ? "Auto-calculated from streams" : "Maximum number of students"}
+              disabled={hasStreams}
+              className={`w-full px-3 py-2 border rounded-lg shadow-sm transition-all ${
+                hasStreams 
+                  ? 'border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-500 cursor-not-allowed'
+                  : 'border-slate-300 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent dark:bg-slate-700 dark:text-white placeholder:text-slate-400'
+              }`}
             />
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              Note: {hasStreams ? 'For schools with streams, capacity will be calculated from stream capacities.' : 'For schools without streams, this is the maximum number of students.'}
-            </p>
+            
+            {/* Enhanced info message for streams-enabled schools */}
+            {hasStreams ? (
+              <div className="mt-2 p-3 bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-200 dark:border-cyan-800 rounded-lg">
+                <div className="flex gap-2">
+                  <Info className="w-4 h-4 text-cyan-600 dark:text-cyan-400 flex-shrink-0 mt-0.5" />
+                  <div className="text-xs text-cyan-800 dark:text-cyan-300">
+                    <p className="font-semibold mb-1">Capacity is auto-calculated</p>
+                    <p>For stream-enabled schools, classroom capacity is automatically calculated from the total capacity of all streams in this class. Please manage stream capacities to adjust the total classroom capacity.</p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Maximum number of students this classroom can accommodate.
+              </p>
+            )}
           </div>
+          
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700 mt-6">
             <button
               type="button"
@@ -1134,7 +1186,7 @@ function ClassroomManager() {
                         Class Teacher: {stream.classTeacher?.user?.name || stream.class_teacher?.name || 'Not Assigned'}
                       </p>
                       {stream.classTeacher && (
-                        <span className="px-2 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 rounded-full text-xs font-medium">
+                        <span className="px-2 py-1 bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300 rounded-full text-xs font-medium">
                           Class Teacher
                         </span>
                       )}
@@ -1208,7 +1260,7 @@ function ClassroomManager() {
                       <div className="flex items-center gap-2">
                         <p className="font-medium text-[#0d141b] dark:text-white truncate">{teacher.user?.full_name || teacher.user?.name}</p>
                         {teacher.pivot?.is_class_teacher && (
-                          <span className="px-2 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 rounded-full text-xs font-medium">
+                          <span className="px-2 py-1 bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300 rounded-full text-xs font-medium">
                             Class Teacher
                           </span>
                         )}
@@ -1221,8 +1273,8 @@ function ClassroomManager() {
                       </p>
                       {/* Show teacher's class count and max_classes */}
                       <div className="flex items-center gap-1 mt-1">
-                        <Info className="w-3 h-3 text-blue-500" />
-                        <span className="text-xs text-blue-600 dark:text-blue-400">
+                        <Info className="w-3 h-3 text-cyan-500" />
+                        <span className="text-xs text-cyan-600 dark:text-cyan-400">
                           Assigned to {teacherClassroomAssignments[teacher.id]?.length || 0} of {teacherMaxClasses[teacher.id] || 10} classes
                         </span>
                       </div>
@@ -1309,8 +1361,8 @@ function ClassroomManager() {
         <div className="flex-1 overflow-y-auto p-4 sm:p-6">
           {allTeachers.length > 0 ? (
             <div className="space-y-3">
-              <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                <p className="text-sm text-blue-800 dark:text-blue-300">
+              <div className="mb-4 p-3 bg-cyan-50 dark:bg-cyan-900/20 rounded-lg">
+                <p className="text-sm text-cyan-800 dark:text-cyan-300">
                   <strong>Instructions:</strong> Select teachers to assign to this classroom.
                   You can also designate one of them as the class teacher, who can also teach subjects in this class.
                   Teachers have a maximum number of classes they can be assigned to.
@@ -1331,7 +1383,7 @@ function ClassroomManager() {
                     key={teacher.id}
                     className={`flex justify-between items-center p-4 border rounded-lg transition-colors cursor-pointer ${
                       isSelected || isAlreadyAssigned
-                        ? 'border-blue-300 bg-blue-50 dark:border-blue-700 dark:bg-blue-900/20'
+                        ? 'border-cyan-300 bg-cyan-50 dark:border-cyan-700 dark:bg-cyan-900/20'
                         : 'border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700/50'
                     } ${!canAssign && !isAlreadyAssigned ? 'opacity-60' : ''}`}
                     onClick={() => {
@@ -1341,7 +1393,7 @@ function ClassroomManager() {
                     }}
                   >
                     <div className="flex items-center gap-3">
-                      <button className="text-blue-600 dark:text-blue-400">
+                      <button className="text-cyan-600 dark:text-cyan-400">
                         {isSelected || isAlreadyAssigned ?
                           <CheckSquare className="w-5 h-5" /> :
                           <Square className="w-5 h-5" />
@@ -1351,7 +1403,7 @@ function ClassroomManager() {
                         <p className="font-medium text-[#0d141b] dark:text-white">
                           {teacher.user?.full_name || teacher.user?.name}
                           {isAlreadyAssigned && (
-                            <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">
+                            <span className="ml-2 text-xs text-cyan-600 dark:text-cyan-400">
                               (Already assigned)
                             </span>
                           )}
@@ -1361,8 +1413,8 @@ function ClassroomManager() {
                         </p>
                         {/* Show teacher's class count and max_classes */}
                         <div className="flex items-center gap-1 mt-1">
-                          <Info className="w-3 h-3 text-blue-500" />
-                          <span className="text-xs text-blue-600 dark:text-blue-400">
+                          <Info className="w-3 h-3 text-cyan-500" />
+                          <span className="text-xs text-cyan-600 dark:text-cyan-400">
                             Assigned to {teacherClassroomAssignments[teacher.id]?.length || 0} of {teacherMaxClasses[teacher.id] || 10} classes
                             {remainingSlots > 0 ? ` (${remainingSlots} slots remaining)` : ' (No slots remaining)'}
                           </span>
@@ -1399,7 +1451,7 @@ function ClassroomManager() {
                           }}
                           className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
                             isClassTeacher || isCurrentClassTeacher
-                              ? 'bg-blue-600 text-white'
+                              ? 'bg-cyan-600 text-white'
                               : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600'
                           }`}
                           disabled={isClassTeacherElsewhere && !isClassTeacher}
@@ -1689,7 +1741,7 @@ function ClassroomManager() {
                     className="w-full flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-600 rounded-lg border border-slate-200 dark:border-slate-500 hover:bg-slate-100 dark:hover:bg-slate-500 transition-colors"
                   >
                     <div className="flex items-center gap-2">
-                      <MapPin className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      <MapPin className="w-4 h-4 text-cyan-500 dark:text-cyan-400" />
                       <span className="text-sm font-medium text-slate-900 dark:text-white">
                         View {classroom.streamCount} Stream(s)
                       </span>
@@ -1709,7 +1761,7 @@ function ClassroomManager() {
                     className="w-full flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-600 rounded-lg border border-slate-200 dark:border-slate-500 hover:bg-slate-100 dark:hover:bg-slate-500 transition-colors"
                   >
                     <div className="flex items-center gap-2">
-                      <Users className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      <Users className="w-4 h-4 text-cyan-500 dark:text-cyan-400" />
                       <span className="text-sm font-medium text-slate-900 dark:text-white">
                         View {classroom.teacherCount} Teacher(s)
                       </span>
@@ -1731,8 +1783,8 @@ function ClassroomManager() {
                 </div>
                 {classroom.classTeacher ? (
                   <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-600 rounded-lg border border-slate-200 dark:border-slate-500">
-                    <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                      <UserCheck className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                    <div className="w-10 h-10 rounded-full bg-cyan-100 dark:bg-cyan-900/30 flex items-center justify-center">
+                      <UserCheck className="w-5 h-5 text-cyan-600 dark:text-cyan-400" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-slate-900 dark:text-white truncate">
@@ -1741,7 +1793,7 @@ function ClassroomManager() {
                       <p className="text-xs text-slate-500 dark:text-slate-400">
                         Primary contact for this class
                       </p>
-                      <span className="px-2 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 rounded-full text-xs font-medium">
+                      <span className="px-2 py-1 bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300 rounded-full text-xs font-medium">
                         Class Teacher
                       </span>
                     </div>
