@@ -1,3 +1,4 @@
+// src/Dashboard/Pages/Admin/TeacherManager.jsx
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { apiRequest } from '../../../utils/api';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -22,6 +23,7 @@ import {
 } from 'lucide-react';
 import { toast } from "react-toastify";
 import TeacherForm from '../../../components/TeacherForm';
+import WorkloadMeter from '../../../components/WorkloadMeter';
 
 // Filter Panel Component
 const FilterPanel = ({ filters, setFilters, curriculumOptions, specializationOptions, onClearFilters }) => {
@@ -34,7 +36,7 @@ const FilterPanel = ({ filters, setFilters, curriculumOptions, specializationOpt
         className="flex items-center gap-2 px-4 py-2 text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
       >
         <Filter className="w-4 h-4" />
-        Filters {Object.values(filters).some(v => v) && <span className="ml-2 px-2 py-1 bg-blue-500 text-white rounded text-xs">Active</span>}
+        Filters {Object.values(filters).some(v => v) && <span className="ml-2 px-2 py-1 bg-cyan-500 text-white rounded text-xs">Active</span>}
       </button>
 
       {showFilters && (
@@ -46,7 +48,7 @@ const FilterPanel = ({ filters, setFilters, curriculumOptions, specializationOpt
             <select
               value={filters.curriculum_specialization}
               onChange={(e) => setFilters({ ...filters, curriculum_specialization: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white"
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
             >
               <option value="">All Curricula</option>
               {curriculumOptions.map(opt => (
@@ -62,7 +64,7 @@ const FilterPanel = ({ filters, setFilters, curriculumOptions, specializationOpt
             <select
               value={filters.specialization}
               onChange={(e) => setFilters({ ...filters, specialization: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white"
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
             >
               <option value="">All Specializations</option>
               {specializationOptions.map(opt => (
@@ -78,7 +80,7 @@ const FilterPanel = ({ filters, setFilters, curriculumOptions, specializationOpt
             <select
               value={filters.employment_type}
               onChange={(e) => setFilters({ ...filters, employment_type: e.target.value })}
-              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white"
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg dark:bg-slate-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
             >
               <option value="">All Types</option>
               <option value="Full-time">Full-time</option>
@@ -138,7 +140,7 @@ const TeacherStatistics = ({ teachers, subjects, streams }) => {
             <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Total Teachers</p>
             <p className="text-3xl font-bold text-slate-900 dark:text-white mt-2">{stats.totalTeachers}</p>
           </div>
-          <Users className="w-8 h-8 text-blue-500" />
+          <Users className="w-8 h-8 text-cyan-500" />
         </div>
       </div>
 
@@ -213,39 +215,49 @@ function TeacherManager() {
     user_id: '',
     qualification: '',
     employment_type: '',
+    employment_status: 'active',
     tsc_number: '',
+    tsc_status: '',
     specialization: '',
     curriculum_specialization: '',
+    teaching_levels: [],
+    teaching_pathways: [],
+    subject_ids: [],
+    subject_pivot_meta: {},
     max_subjects: '',
-    max_classes: ''
+    max_classes: '',
+    max_weekly_lessons: '',
+    min_weekly_lessons: ''
   });
 
-  // Add school state
   const [school, setSchool] = useState(null);
   const [hasStreams, setHasStreams] = useState(false);
   const [gradeLevels, setGradeLevels] = useState([]);
   const [showFilters, setShowFilters] = useState(false);
 
-  // Delete modal state
+  const [selectedAcademicYear, setSelectedAcademicYear] = useState(null);
+
   const [deleteModal, setDeleteModal] = useState({
     isOpen: false,
     teacherId: null,
     teacherName: ''
   });
 
-  // Mobile bottom sheet state
   const [mobileSheet, setMobileSheet] = useState({
     isOpen: false,
     teacher: null
   });
 
   const curriculumOptions = ['CBC', '8-4-4', 'Both'];
-  const specializationOptions = ['Sciences', 'Languages', 'Mathematics', 'Social Studies', 'Technical', 'Arts'];
+  
+  const specializationOptions = useMemo(() => {
+    const specs = teachers.map(t => t.specialization).filter(Boolean);
+    return [...new Set(specs)].sort();
+  }, [teachers]);
 
-  // Fetch school information to get primary curriculum and stream setting
   const fetchSchoolInfo = useCallback(async () => {
     try {
-      const response = await apiRequest('schools', 'GET');
+      const response = await apiRequest('schools/my-school', 'GET');
       const schoolData = response?.data || response;
       setSchool(schoolData);
       setGradeLevels(schoolData?.grade_levels || []);
@@ -255,7 +267,6 @@ function TeacherManager() {
     }
   }, []);
 
-  // --- Data Fetching ---
   useEffect(() => {
     if (schoolId) {
       fetchInitialData();
@@ -263,7 +274,25 @@ function TeacherManager() {
     }
   }, [schoolId]);
 
-  // Fetch initial data including school information
+  useEffect(() => {
+    const fetchCurrentAcademicYear = async () => {
+      try {
+        const response = await apiRequest('academic-years', 'GET');
+        const years = Array.isArray(response) ? response : (response?.data || []);
+        const currentYear = years.find(year => year.is_active === 1 || year.is_active === true || year.is_current);
+        if (currentYear) {
+          setSelectedAcademicYear(currentYear.id);
+        }
+      } catch (error) {
+        console.error('Failed to fetch academic years:', error);
+      }
+    };
+
+    if (schoolId) {
+      fetchCurrentAcademicYear();
+    }
+  }, [schoolId]);
+
   const fetchInitialData = async () => {
     setLoading(true);
     try {
@@ -274,7 +303,6 @@ function TeacherManager() {
         apiRequest(`academic-years`, 'GET')
       ]);
 
-      // Handle new response structure from backend
       const teachersData = teachersResponse?.data || [];
       const hasStreamsFromAPI = teachersResponse?.has_streams || false;
       
@@ -292,18 +320,15 @@ function TeacherManager() {
         setUsers(Array.isArray(usersResponse) ? usersResponse : []);
       }
       
-      // Enrich teachers with appropriate relationships based on school type
       let enrichedTeachers = Array.isArray(teachersData) ? teachersData : [];
 
       if (hasStreamsFromAPI) {
-        // For stream schools, teachers already have streams loaded
         enrichedTeachers = enrichedTeachers.map(teacher => ({
           ...teacher,
-          streamCount: teacher.teachingStreams?.length || 0,
-          classTeacherStreamCount: teacher.classTeacherStreams?.length || 0
+          streamCount: teacher.teaching_streams?.length || 0,
+          classTeacherStreamCount: teacher.class_teacher_streams?.length || 0
         }));
       } else {
-        // For non-stream schools, teachers already have classrooms loaded
         enrichedTeachers = enrichedTeachers.map(teacher => {
           const teacherClassrooms = teacher.classrooms || [];
           const classTeacherClassroom = teacherClassrooms.find(c => 
@@ -319,7 +344,6 @@ function TeacherManager() {
       
       setTeachers(enrichedTeachers);
       
-      // Fetch streams if school has streams
       if (hasStreamsFromAPI) {
         try {
           const streamsResponse = await apiRequest('streams', 'GET');
@@ -336,7 +360,6 @@ function TeacherManager() {
     }
   };
 
-  // --- Filtered Teachers ---
   const filteredTeachers = useMemo(() => {
     return teachers.filter(teacher => {
       const matchesSearch = searchTerm === '' || 
@@ -357,7 +380,6 @@ function TeacherManager() {
     });
   }, [teachers, searchTerm, filters]);
 
-  // --- View Handlers ---
   const showCreateForm = () => {
     setShowForm(true);
     setSelectedTeacher(null);
@@ -371,11 +393,19 @@ function TeacherManager() {
       user_id: '',
       qualification: '',
       employment_type: '',
+      employment_status: 'active',
       tsc_number: '',
+      tsc_status: '',
       specialization: '',
       curriculum_specialization: defaultCurriculum,
+      teaching_levels: [],
+      teaching_pathways: [],
+      subject_ids: [],
+      subject_pivot_meta: {},
       max_subjects: '',
-      max_classes: ''
+      max_classes: '',
+      max_weekly_lessons: '',
+      min_weekly_lessons: ''
     });
   };
 
@@ -385,15 +415,34 @@ function TeacherManager() {
     }
     setShowForm(true);
     setSelectedTeacher(teacher);
+    const pivotMeta = (teacher.qualified_subjects || []).reduce((acc, s) => {
+      if (s.pivot?.combination_label || s.pivot?.years_experience) {
+        acc[s.id] = {
+          combination_label: s.pivot.combination_label || '',
+          years_experience: s.pivot.years_experience || null,
+          is_primary_subject: s.pivot.is_primary_subject || false,
+        };
+      }
+      return acc;
+    }, {});
+
     setFormData({
       user_id: teacher.user_id,
       qualification: teacher.qualification || '',
       employment_type: teacher.employment_type || '',
+      employment_status: teacher.employment_status || 'active',
       tsc_number: teacher.tsc_number || '',
+      tsc_status: teacher.tsc_status || '',
       specialization: teacher.specialization || '',
       curriculum_specialization: teacher.curriculum_specialization || '',
+      teaching_levels: teacher.teaching_levels || [],
+      teaching_pathways: teacher.teaching_pathways || [],
+      subject_ids: teacher.qualified_subjects?.map(s => s.id) || [],
+      subject_pivot_meta: pivotMeta,
       max_subjects: teacher.max_subjects || '',
-      max_classes: teacher.max_classes || ''
+      max_classes: teacher.max_classes || '',
+      max_weekly_lessons: teacher.max_weekly_lessons || '',
+      min_weekly_lessons: teacher.min_weekly_lessons || ''
     });
   };
 
@@ -425,13 +474,13 @@ function TeacherManager() {
     try {
       const response = await apiRequest(`teachers/${teacher.id}`, 'GET');
       const teacherData = response?.data || response;
-      
+
       setSelectedTeacher(prev => ({
         ...prev,
-        classTeacherStreams: teacherData.classTeacherStreams || [],
-        teachingStreams: teacherData.teachingStreams || [],
-        streamCount: teacherData.teachingStreams?.length || 0,
-        classTeacherStreamCount: teacherData.classTeacherStreams?.length || 0
+        classTeacherStreams: teacherData.class_teacher_streams || [],
+        teachingStreams: teacherData.teaching_streams || [],
+        streamCount: teacherData.teaching_streams?.length || 0,
+        classTeacherStreamCount: teacherData.class_teacher_streams?.length || 0
       }));
     } catch (error) {
       const errorMessage = error?.response?.data?.message || 'Could not load streams';
@@ -453,27 +502,53 @@ function TeacherManager() {
     setSelectedTeacher(null);
   };
 
-  // --- CRUD Operations ---
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleArrayChange = (name, value) => {
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (
+      formData.teaching_levels?.length > 0 &&
+      (!formData.subject_ids || formData.subject_ids.length === 0)
+    ) {
+      toast.error('Please select at least one qualified subject for the selected teaching levels.');
+      return;
+    }
+
     setLoading(true);
     
     try {
       const payload = {
-        ...formData,
+        user_id: formData.user_id,
+        qualification: formData.qualification || null,
+        employment_type: formData.employment_type || null,
+        employment_status: formData.employment_status || 'active',
+        tsc_number: formData.tsc_number || null,
+        tsc_status: formData.tsc_status || null,
+        curriculum_specialization: formData.curriculum_specialization || null,
+        teaching_levels: formData.teaching_levels?.length > 0 ? formData.teaching_levels : null,
+        teaching_pathways: formData.teaching_pathways?.length > 0 ? formData.teaching_pathways : null,
+        subject_ids: formData.subject_ids?.length > 0 ? formData.subject_ids : undefined,
+        subject_pivot_meta: formData.subject_pivot_meta || undefined,
         max_subjects: formData.max_subjects ? parseInt(formData.max_subjects) : null,
-        max_classes: formData.max_classes ? parseInt(formData.max_classes) : null
+        max_classes: formData.max_classes ? parseInt(formData.max_classes) : null,
+        max_weekly_lessons: formData.max_weekly_lessons ? parseInt(formData.max_weekly_lessons) : null,
+        min_weekly_lessons: formData.min_weekly_lessons ? parseInt(formData.min_weekly_lessons) : null,
       };
-      
-      // Only send curriculum_specialization if school requires it
+      delete payload.specialization;
+
       if (school && school.primary_curriculum !== 'Both') {
         delete payload.curriculum_specialization;
       }
+
+      console.log('Submitting payload:', payload);
       
       let response;
       if (selectedTeacher) {
@@ -539,14 +614,12 @@ function TeacherManager() {
     setSearchTerm('');
   };
 
-  // Helper function to get curriculum badge color
   const getCurriculumBadgeColor = (type) => {
     return type === 'CBC' 
       ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
       : 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300';
   };
 
-  // Mobile bottom sheet handlers
   const openMobileSheet = (teacher) => {
     setMobileSheet({ isOpen: true, teacher });
     document.body.style.overflow = 'hidden';
@@ -557,7 +630,6 @@ function TeacherManager() {
     document.body.style.overflow = '';
   };
 
-  // Render Delete Confirmation Modal
   const renderDeleteConfirmationModal = () => {
     if (!deleteModal.isOpen) return null;
     
@@ -624,7 +696,6 @@ function TeacherManager() {
     );
   };
 
-  // Render Mobile Bottom Sheet
   const renderMobileBottomSheet = () => {
     if (!mobileSheet.isOpen || !mobileSheet.teacher) return null;
     const teacher = mobileSheet.teacher;
@@ -686,7 +757,7 @@ function TeacherManager() {
               </div>
               <div className="mt-3">
                 <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Specialization</p>
-                <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
+                <span className="px-2 py-1 text-xs font-semibold rounded-full bg-cyan-100 dark:bg-cyan-900/30 text-cyan-800 dark:text-cyan-300">
                   {teacher.specialization || 'General'}
                 </span>
               </div>
@@ -717,6 +788,22 @@ function TeacherManager() {
                 </div>
               </div>
             </div>
+
+            {selectedAcademicYear && (
+              <div className="bg-white dark:bg-slate-800/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
+                <div className="flex items-center gap-2 mb-3">
+                  <BarChart3 className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+                  <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
+                    Workload
+                  </h3>
+                </div>
+                <WorkloadMeter 
+                  teacherId={teacher.id} 
+                  academicYearId={selectedAcademicYear}
+                  compact={false}
+                />
+              </div>
+            )}
           </div>
           <div className="border-t border-slate-200 dark:border-slate-700 p-4 space-y-2 bg-white dark:bg-slate-800/50">
             <button
@@ -734,7 +821,7 @@ function TeacherManager() {
                 closeMobileSheet();
                 hasStreams ? showStreamsView(teacher) : showClassroomsView(teacher);
               }}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded-xl hover:bg-blue-100 dark:hover:bg-blue-900/30 active:scale-[0.98] transition-all"
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-cyan-700 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-900/20 rounded-xl hover:bg-cyan-100 dark:hover:bg-cyan-900/30 active:scale-[0.98] transition-all"
             >
               <Users className="w-4 h-4" />
               View {hasStreams ? 'Streams' : 'Classrooms'}
@@ -752,7 +839,6 @@ function TeacherManager() {
     );
   };
 
-  // --- Render Functions ---
   const renderListView = () => (
     <>
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-6 md:mb-8">
@@ -788,7 +874,7 @@ function TeacherManager() {
                 </span>
                 <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
                   hasStreams 
-                    ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' 
+                    ? 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300' 
                     : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
                 }`}>
                   {hasStreams ? 'Streams Enabled' : 'Direct Classroom Assignment'}
@@ -801,7 +887,7 @@ function TeacherManager() {
                   </span>
                   <div className="flex flex-wrap gap-1">
                     {gradeLevels.slice(0, 3).map((level, index) => (
-                      <span key={index} className="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
+                      <span key={index} className="px-2 py-1 text-xs font-semibold rounded-full bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300">
                         {level}
                       </span>
                     ))}
@@ -865,7 +951,6 @@ function TeacherManager() {
             </button>
             {showFilters && (
               <div className="space-y-3">
-                {/* Search */}
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-medium text-slate-700 dark:text-slate-300">
                     Search
@@ -877,7 +962,7 @@ function TeacherManager() {
                       placeholder="Search by name, email, or TSC number..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-10 pr-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full pl-10 pr-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500"
                     />
                   </div>
                 </div>
@@ -889,7 +974,7 @@ function TeacherManager() {
                     <select
                       value={filters.curriculum_specialization}
                       onChange={(e) => setFilters({ ...filters, curriculum_specialization: e.target.value })}
-                      className="px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
                     >
                       <option value="">All Curricula</option>
                       {curriculumOptions.map(opt => (
@@ -904,7 +989,7 @@ function TeacherManager() {
                     <select
                       value={filters.employment_type}
                       onChange={(e) => setFilters({ ...filters, employment_type: e.target.value })}
-                      className="px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
                     >
                       <option value="">All Types</option>
                       <option value="Full-time">Full-time</option>
@@ -937,7 +1022,7 @@ function TeacherManager() {
                     placeholder="Search by name, email, or TSC number..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 sm:pl-12 pr-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full pl-10 sm:pl-12 pr-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500"
                   />
                 </div>
               </div>
@@ -950,7 +1035,7 @@ function TeacherManager() {
                 <select
                   value={filters.curriculum_specialization}
                   onChange={(e) => setFilters({ ...filters, curriculum_specialization: e.target.value })}
-                  className="px-3 sm:px-4 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="px-3 sm:px-4 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
                 >
                   <option value="">All Curricula</option>
                   {curriculumOptions.map(opt => (
@@ -967,7 +1052,7 @@ function TeacherManager() {
                 <select
                   value={filters.specialization}
                   onChange={(e) => setFilters({ ...filters, specialization: e.target.value })}
-                  className="px-3 sm:px-4 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="px-3 sm:px-4 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
                 >
                   <option value="">All Specializations</option>
                   {specializationOptions.map(opt => (
@@ -997,7 +1082,6 @@ function TeacherManager() {
         </div>
       )}
 
-      {/* Table Section - Desktop and Tablet */}
       {!loading && (
         <>
           {/* Desktop/Tablet Table View */}
@@ -1016,6 +1100,7 @@ function TeacherManager() {
                       <th className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 font-medium">Specialization</th>
                       <th className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 font-medium">Curriculum</th>
                       <th className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 font-medium">Employment</th>
+                      <th className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 font-medium">Workload</th>
                       <th className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 font-medium">{hasStreams ? 'Streams' : 'Classrooms'}</th>
                       <th className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 font-medium">Class Teacher</th>
                       <th className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 font-medium text-right">Actions</th>
@@ -1038,7 +1123,7 @@ function TeacherManager() {
                             {teacher.qualification || '-'}
                           </td>
                           <td className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4">
-                            <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
+                            <span className="px-2 py-1 text-xs font-semibold rounded-full bg-cyan-100 dark:bg-cyan-900/30 text-cyan-800 dark:text-cyan-300">
                               {teacher.specialization || 'General'}
                             </span>
                           </td>
@@ -1055,6 +1140,17 @@ function TeacherManager() {
                           </td>
                           <td className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 text-slate-500 dark:text-slate-400 text-xs">
                             {teacher.employment_type || '-'}
+                          </td>
+                          <td className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4">
+                            {selectedAcademicYear ? (
+                              <WorkloadMeter 
+                                teacherId={teacher.id} 
+                                academicYearId={selectedAcademicYear}
+                                compact={true}
+                              />
+                            ) : (
+                              <span className="text-xs text-slate-400">-</span>
+                            )}
                           </td>
                           <td className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 text-slate-500 dark:text-slate-400">
                             {hasStreams ? (
@@ -1074,14 +1170,14 @@ function TeacherManager() {
                             <div className="flex justify-end gap-1">
                               <button 
                                 onClick={() => hasStreams ? showStreamsView(teacher) : showClassroomsView(teacher)} 
-                                className="p-1.5 text-slate-500 hover:text-purple-600 dark:hover:text-purple-400 transition-colors duration-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
+                                className="p-1.5 text-slate-500 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors duration-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
                                 title={hasStreams ? "View Streams" : "View Classrooms"}
                               >
                                 <Users className="w-3.5 h-3.5" />
                               </button>
                               <button 
                                 onClick={() => showEditForm(teacher)} 
-                                className="p-1.5 text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
+                                className="p-1.5 text-slate-500 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors duration-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
                                 title="Edit Teacher"
                               >
                                 <Edit className="w-3.5 h-3.5" />
@@ -1099,7 +1195,7 @@ function TeacherManager() {
                       ))
                     ) : (
                       <tr>
-                        <td colSpan="9" className="px-3 sm:px-4 md:px-6 py-6 sm:py-8 text-center text-slate-500 dark:text-slate-400">
+                        <td colSpan="10" className="px-3 sm:px-4 md:px-6 py-6 sm:py-8 text-center text-slate-500 dark:text-slate-400">
                           {searchTerm || Object.values(filters).some(v => v) 
                             ? 'No teachers match your filters.' 
                             : 'No teachers found.'}
@@ -1135,7 +1231,7 @@ function TeacherManager() {
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-slate-600 dark:text-slate-400">Specialization</span>
-                      <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
+                      <span className="px-2 py-1 text-xs font-semibold rounded-full bg-cyan-100 dark:bg-cyan-900/30 text-cyan-800 dark:text-cyan-300">
                         {teacher.specialization || 'General'}
                       </span>
                     </div>
@@ -1164,7 +1260,6 @@ function TeacherManager() {
     </>
   );
 
-  // New view for showing classrooms assigned to a teacher (for non-stream schools)
   const renderClassroomsView = () => (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-4xl border border-slate-200 dark:border-slate-700">
@@ -1202,7 +1297,7 @@ function TeacherManager() {
                       <div className="flex items-center gap-2">
                         <p className="font-medium text-slate-900 dark:text-white truncate">{classroom.class_name}</p>
                         {classroom.pivot?.is_class_teacher && (
-                          <span className="px-2 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 rounded-full text-xs font-medium">
+                          <span className="px-2 py-1 bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300 rounded-full text-xs font-medium">
                             Class Teacher
                           </span>
                         )}
@@ -1234,69 +1329,79 @@ function TeacherManager() {
     </div>
   );
 
-  // New view for showing streams assigned to a teacher (for stream schools)
   const renderStreamsView = () => (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-4xl border border-slate-200 dark:border-slate-700">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-slate-800/50 rounded-xl shadow-2xl w-full max-w-4xl border border-slate-200 dark:border-slate-700">
+        
+        {/* Header */}
         <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
           <div>
             <h3 className="text-lg sm:text-xl font-semibold text-slate-900 dark:text-white">
               Streams for {selectedTeacher?.user?.full_name || selectedTeacher?.user?.name}
             </h3>
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Teaching: <span className="font-medium">{selectedTeacher?.streamCount || 0}</span> streams | 
-              Class Teacher: <span className="font-medium">{selectedTeacher?.classTeacherStreamCount || 0}</span> streams
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+              Teaching:{' '}
+              <span className="font-medium text-slate-700 dark:text-slate-300">
+                {selectedTeacher?.streamCount || 0}
+              </span>{' '}
+              streams | Class Teacher:{' '}
+              <span className="font-medium text-slate-700 dark:text-slate-300">
+                {selectedTeacher?.classTeacherStreamCount || 0}
+              </span>{' '}
+              streams
             </p>
           </div>
-          <button 
-            onClick={backToList} 
-            className="text-slate-400 hover:text-slate-600 dark:hover:bg-slate-700 transition-colors p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
+          <button
+            onClick={backToList}
+            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
             aria-label="Close"
           >
             <X className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
         </div>
+
+        {/* Body */}
         <div className="p-4 sm:p-6">
           {loading ? (
             <div className="flex justify-center py-8">
-              <Loader className="w-8 h-8 animate-spin text-slate-500" />
+              <Loader className="w-8 h-8 animate-spin text-slate-400" />
             </div>
           ) : (
             <div className="space-y-6">
+
               {/* Teaching Streams */}
               <div>
-                <h4 className="text-md font-medium text-slate-900 dark:text-white mb-3">Teaching Streams</h4>
+                <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-3">
+                  Teaching Streams
+                </h4>
                 <div className="space-y-3">
-                  {selectedTeacher?.teachingStreams && selectedTeacher.teachingStreams.length > 0 ? (
+                  {selectedTeacher?.teachingStreams?.length > 0 ? (
                     selectedTeacher.teachingStreams.map(stream => (
-                      <div 
-                        key={stream.id} 
-                        className="flex justify-between items-center p-4 border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+                      <div
+                        key={stream.id}
+                        className="flex justify-between items-center p-4 bg-slate-50 dark:bg-slate-700/30 border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors"
                       >
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <p className="font-medium text-slate-900 dark:text-white truncate">{stream.name}</p>
-                            <span className="px-2 py-1 bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300 rounded-full text-xs font-medium">
-                              {stream.classroom?.class_name || 'Unknown Classroom'}
+                            <span className="px-2 py-0.5 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 border border-purple-200 dark:border-purple-700/50 rounded-full text-xs font-medium">
+                              {stream.classroom?.class_name || 'Unknown'}
                             </span>
                           </div>
-                          <p className="text-sm text-slate-500 dark:text-slate-400">
+                          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
                             Capacity: {stream.capacity || 0} students
                           </p>
                         </div>
-                        <div className="text-right ml-4 flex-shrink-0">
-                          <div className="flex items-center gap-1 text-slate-500 dark:text-slate-400">
-                            <Users className="w-4 h-4" />
-                            <span>{stream.capacity || 0}</span>
-                          </div>
+                        <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 ml-4 flex-shrink-0">
+                          <Users className="w-4 h-4" />
+                          <span className="text-sm">{stream.capacity || 0}</span>
                         </div>
                       </div>
                     ))
                   ) : (
-                    <div className="text-center py-4 border border-slate-200 dark:border-slate-600 rounded-lg">
-                      <p className="text-slate-500 dark:text-slate-400">
-                        No teaching streams assigned.
-                      </p>
+                    <div className="flex flex-col items-center justify-center py-8 bg-slate-50 dark:bg-slate-700/20 border border-slate-200 dark:border-slate-600 rounded-lg">
+                      <Users className="w-8 h-8 text-slate-400 dark:text-slate-500 mb-2" />
+                      <p className="text-slate-500 dark:text-slate-400 text-sm">No teaching streams assigned.</p>
                     </div>
                   )}
                 </div>
@@ -1304,45 +1409,45 @@ function TeacherManager() {
 
               {/* Class Teacher Streams */}
               <div>
-                <h4 className="text-md font-medium text-slate-900 dark:text-white mb-3">Class Teacher Streams</h4>
+                <h4 className="text-sm font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-3">
+                  Class Teacher Streams
+                </h4>
                 <div className="space-y-3">
-                  {selectedTeacher?.classTeacherStreams && selectedTeacher.classTeacherStreams.length > 0 ? (
+                  {selectedTeacher?.classTeacherStreams?.length > 0 ? (
                     selectedTeacher.classTeacherStreams.map(stream => (
-                      <div 
-                        key={stream.id} 
-                        className="flex justify-between items-center p-4 border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors"
+                      <div
+                        key={stream.id}
+                        className="flex justify-between items-center p-4 bg-slate-50 dark:bg-slate-700/30 border border-slate-200 dark:border-slate-600 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors"
                       >
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <p className="font-medium text-slate-900 dark:text-white truncate">{stream.name}</p>
-                            <span className="px-2 py-1 bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 rounded-full text-xs font-medium">
+                            <span className="px-2 py-0.5 bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-700/50 rounded-full text-xs font-medium">
                               Class Teacher
                             </span>
-                            <span className="px-2 py-1 bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300 rounded-full text-xs font-medium">
-                              {stream.classroom?.class_name || 'Unknown Classroom'}
+                            <span className="px-2 py-0.5 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 border border-purple-200 dark:border-purple-700/50 rounded-full text-xs font-medium">
+                              {stream.classroom?.class_name || 'Unknown'}
                             </span>
                           </div>
-                          <p className="text-sm text-slate-500 dark:text-slate-400">
+                          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
                             Capacity: {stream.capacity || 0} students
                           </p>
                         </div>
-                        <div className="text-right ml-4 flex-shrink-0">
-                          <div className="flex items-center gap-1 text-slate-500 dark:text-slate-400">
-                            <Users className="w-4 h-4" />
-                            <span>{stream.capacity || 0}</span>
-                          </div>
+                        <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 ml-4 flex-shrink-0">
+                          <Users className="w-4 h-4" />
+                          <span className="text-sm">{stream.capacity || 0}</span>
                         </div>
                       </div>
                     ))
                   ) : (
-                    <div className="text-center py-4 border border-slate-200 dark:border-slate-600 rounded-lg">
-                      <p className="text-slate-500 dark:text-slate-400">
-                        No class teacher streams assigned.
-                      </p>
+                    <div className="flex flex-col items-center justify-center py-8 bg-slate-50 dark:bg-slate-700/20 border border-slate-200 dark:border-slate-600 rounded-lg">
+                      <Users className="w-8 h-8 text-slate-400 dark:text-slate-500 mb-2" />
+                      <p className="text-slate-500 dark:text-slate-400 text-sm">No class teacher streams assigned.</p>
                     </div>
                   )}
                 </div>
               </div>
+
             </div>
           )}
         </div>
@@ -1350,7 +1455,6 @@ function TeacherManager() {
     </div>
   );
 
-  // Show loading while auth is initializing
   if (authLoading) {
     return (
       <div className="w-full p-3 sm:p-4 md:p-6 lg:p-8">
@@ -1362,7 +1466,6 @@ function TeacherManager() {
     );
   }
 
-  // Check if user is authenticated and has schoolId
   if (!user || !schoolId) {
     return (
       <div className="w-full p-3 sm:p-4 md:p-6 lg:p-8">
@@ -1392,12 +1495,12 @@ function TeacherManager() {
       {view === 'classrooms' && renderClassroomsView()}
       {view === 'streams' && renderStreamsView()}
       
-      {/* Teacher Form Component */}
       {showForm && (
         <TeacherForm
           formData={formData}
           editingTeacher={selectedTeacher}
           onInputChange={handleInputChange}
+          onArrayChange={handleArrayChange}
           onSubmit={handleSubmit}
           onClose={closeForm}
           isSubmitting={loading}
@@ -1407,7 +1510,6 @@ function TeacherManager() {
         />
       )}
       
-      {/* Modals */}
       {renderDeleteConfirmationModal()}
       {renderMobileBottomSheet()}
     </div>

@@ -1,7 +1,6 @@
-// src/components/TeacherForm.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Search, ChevronDown } from 'lucide-react';
-import { toast } from "react-toastify";
+import { apiRequest } from '../utils/api';
 
 // Searchable Dropdown Component
 const SearchableDropdown = ({ options, value, onChange, placeholder, disabled }) => {
@@ -72,6 +71,7 @@ function TeacherForm({
   formData,
   editingTeacher,
   onInputChange,
+  onArrayChange,
   onSubmit,
   onClose,
   isSubmitting,
@@ -79,6 +79,71 @@ function TeacherForm({
   school,
   specializationOptions = ['Sciences', 'Languages', 'Mathematics', 'Social Studies', 'Technical', 'Arts']
 }) {
+  const [availableSubjects, setAvailableSubjects] = useState([]);
+  const [loadingSubjects, setLoadingSubjects] = useState(false);
+  const [selectedSubjectIds, setSelectedSubjectIds] = useState(
+    formData.subject_ids || []
+  );
+
+  // Sync selected subjects when formData.subject_ids changes (e.g., when editing)
+  useEffect(() => {
+    setSelectedSubjectIds(formData.subject_ids || []);
+  }, [formData.subject_ids]);
+
+  // Fetch subjects when levels/pathways/curriculum change
+  useEffect(() => {
+    const fetchSubjects = async () => {
+      const levels = formData.teaching_levels || [];
+      if (levels.length === 0) {
+        setAvailableSubjects([]);
+        return;
+      }
+      setLoadingSubjects(true);
+      try {
+        const params = new URLSearchParams();
+        if (formData.curriculum_specialization) {
+          params.append('curriculum', formData.curriculum_specialization);
+        }
+        const allSubjects = [];
+        for (const level of levels) {
+          params.set('level', level);
+          params.delete('pathway'); // clear any leftover from previous iteration
+
+          if (level === 'Senior Secondary' && formData.teaching_pathways?.length > 0) {
+            for (const pathway of formData.teaching_pathways) {
+              params.set('pathway', pathway);
+              const res = await apiRequest(`subjects/filter?${params.toString()}`, 'GET');
+              // Robust handling: support both res.data.flat and res.flat
+              const subjectsData = res.flat !== undefined ? res : res.data;
+              allSubjects.push(...(subjectsData?.flat || []));
+            }
+          } else {
+            const res = await apiRequest(`subjects/filter?${params.toString()}`, 'GET');
+            const subjectsData = res.flat !== undefined ? res : res.data;
+            allSubjects.push(...(subjectsData?.flat || []));
+          }
+        }
+        // Deduplicate by id
+        const unique = Array.from(new Map(allSubjects.map(s => [s.id, s])).values());
+        setAvailableSubjects(unique);
+      } catch (e) {
+        console.error('Failed to fetch subjects', e);
+      } finally {
+        setLoadingSubjects(false);
+      }
+    };
+    fetchSubjects();
+  }, [formData.teaching_levels, formData.teaching_pathways, formData.curriculum_specialization]);
+
+  const handleSubjectToggle = (subjectId) => {
+    const updated = selectedSubjectIds.includes(subjectId)
+      ? selectedSubjectIds.filter(id => id !== subjectId)
+      : [...selectedSubjectIds, subjectId];
+    setSelectedSubjectIds(updated);
+    // Immediately notify parent so formData.subject_ids stays in sync
+    onArrayChange('subject_ids', updated);
+  };
+
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     onInputChange(e);
@@ -96,6 +161,22 @@ function TeacherForm({
   const handleSubmit = (e) => {
     e.preventDefault();
     onSubmit(e);
+  };
+
+  const handleTeachingLevelChange = (level) => {
+    const current = formData.teaching_levels || [];
+    const updated = current.includes(level)
+      ? current.filter(l => l !== level)
+      : [...current, level];
+    onArrayChange('teaching_levels', updated);
+  };
+
+  const handleTeachingPathwayChange = (pathway) => {
+    const current = formData.teaching_pathways || [];
+    const updated = current.includes(pathway)
+      ? current.filter(p => p !== pathway)
+      : [...current, pathway];
+    onArrayChange('teaching_pathways', updated);
   };
 
   return (
@@ -152,23 +233,16 @@ function TeacherForm({
               </div>
             )}
 
-            <div>
-              <label htmlFor="specialization" className="block text-sm font-medium text-[#0d141b] dark:text-slate-300 mb-2">
-                Specialization
-              </label>
-              <select 
-                id="specialization"
-                name="specialization" 
-                value={formData.specialization} 
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 text-sm sm:text-base border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
-              >
-                <option value="">Select specialization</option>
-                {specializationOptions.map(opt => (
-                  <option key={opt} value={opt}>{opt}</option>
-                ))}
-              </select>
-            </div>
+            {editingTeacher && formData.specialization && (
+              <div className={school?.primary_curriculum === 'Both' ? '' : 'sm:col-span-2'}>
+                <label className="block text-sm font-medium text-[#0d141b] dark:text-slate-300 mb-2">
+                  Specialization (auto‑generated)
+                </label>
+                <div className="px-3 py-2 bg-slate-100 dark:bg-slate-700 rounded-lg text-sm text-slate-700 dark:text-slate-300">
+                  {formData.specialization}
+                </div>
+              </div>
+            )}
 
             <div>
               <label htmlFor="qualification" className="block text-sm font-medium text-[#0d141b] dark:text-slate-300 mb-2">
@@ -205,6 +279,25 @@ function TeacherForm({
             </div>
 
             <div>
+              <label htmlFor="employment_status" className="block text-sm font-medium text-[#0d141b] dark:text-slate-300 mb-2">
+                Employment Status
+              </label>
+              <select 
+                id="employment_status"
+                name="employment_status" 
+                value={formData.employment_status || 'active'} 
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 text-sm sm:text-base border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+              >
+                <option value="active">Active</option>
+                <option value="on_leave">On Leave</option>
+                <option value="suspended">Suspended</option>
+                <option value="resigned">Resigned</option>
+                <option value="retired">Retired</option>
+              </select>
+            </div>
+
+            <div>
               <label htmlFor="tsc_number" className="block text-sm font-medium text-[#0d141b] dark:text-slate-300 mb-2">
                 TSC Number
               </label>
@@ -217,6 +310,24 @@ function TeacherForm({
                 placeholder="e.g., TSC123456"
                 className="w-full px-3 py-2 text-sm sm:text-base border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white" 
               />
+            </div>
+
+            <div>
+              <label htmlFor="tsc_status" className="block text-sm font-medium text-[#0d141b] dark:text-slate-300 mb-2">
+                TSC Status
+              </label>
+              <select 
+                id="tsc_status"
+                name="tsc_status" 
+                value={formData.tsc_status || ''} 
+                onChange={handleInputChange}
+                className="w-full px-3 py-2 text-sm sm:text-base border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+              >
+                <option value="">Select TSC Status</option>
+                <option value="registered">Registered</option>
+                <option value="pending">Pending</option>
+                <option value="not_registered">Not Registered</option>
+              </select>
             </div>
 
             <div>
@@ -250,7 +361,154 @@ function TeacherForm({
                 className="w-full px-3 py-2 text-sm sm:text-base border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white" 
               />
             </div>
+
+            <div>
+              <label htmlFor="max_weekly_lessons" className="block text-sm font-medium text-[#0d141b] dark:text-slate-300 mb-2">
+                Max Weekly Lessons
+              </label>
+              <input 
+                type="number"
+                id="max_weekly_lessons"
+                name="max_weekly_lessons" 
+                value={formData.max_weekly_lessons} 
+                onChange={handleInputChange}
+                min="1"
+                max="40"
+                placeholder="e.g., 27"
+                className="w-full px-3 py-2 text-sm sm:text-base border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white" 
+              />
+            </div>
+
+            <div>
+              <label htmlFor="min_weekly_lessons" className="block text-sm font-medium text-[#0d141b] dark:text-slate-300 mb-2">
+                Min Weekly Lessons
+              </label>
+              <input 
+                type="number"
+                id="min_weekly_lessons"
+                name="min_weekly_lessons" 
+                value={formData.min_weekly_lessons} 
+                onChange={handleInputChange}
+                min="1"
+                max="40"
+                placeholder="e.g., 20"
+                className="w-full px-3 py-2 text-sm sm:text-base border border-slate-300 dark:border-slate-600 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white" 
+              />
+            </div>
           </div>
+
+          <div>
+            <label className="block text-sm font-medium text-[#0d141b] dark:text-slate-300 mb-2">
+              Teaching Levels
+            </label>
+            <div className="space-y-2">
+              {['Pre-Primary', 'Primary', 'Junior Secondary', 'Senior Secondary'].map(level => (
+                <label key={level} className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={formData.teaching_levels?.includes(level)}
+                    onChange={() => handleTeachingLevelChange(level)}
+                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600"
+                  />
+                  <span className="text-sm text-slate-700 dark:text-slate-300">{level}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {formData.teaching_levels?.includes('Senior Secondary') && (
+            <div>
+              <label className="block text-sm font-medium text-[#0d141b] dark:text-slate-300 mb-2">
+                Teaching Pathways
+              </label>
+              <div className="space-y-2">
+                {['STEM', 'Arts', 'Social Sciences'].map(pathway => (
+                  <label key={pathway} className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={formData.teaching_pathways?.includes(pathway)}
+                      onChange={() => handleTeachingPathwayChange(pathway)}
+                      className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-600"
+                    />
+                    <span className="text-sm text-slate-700 dark:text-slate-300">{pathway}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {formData.teaching_levels?.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-[#0d141b] dark:text-slate-300 mb-2">
+                Qualified Subjects <span className="text-red-500">*</span>
+                <span className="ml-2 text-xs text-slate-400 font-normal">
+                  ({selectedSubjectIds.length} selected — required for specialization)
+                </span>
+              </label>
+              {loadingSubjects ? (
+                <div className="flex items-center gap-2 text-sm text-slate-500">
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                  </svg>
+                  Loading subjects...
+                </div>
+              ) : availableSubjects.length === 0 ? (
+                <p className="text-sm text-slate-400">No subjects found for selected levels.</p>
+              ) : (
+                <div className="border border-slate-300 dark:border-slate-600 rounded-lg max-h-60 overflow-y-auto">
+                  {Object.entries(
+                    availableSubjects.reduce((acc, s) => {
+                      const key = `${s.level} — ${s.category}`;
+                      if (!acc[key]) acc[key] = [];
+                      acc[key].push(s);
+                      return acc;
+                    }, {})
+                  ).map(([group, subjects]) => (
+                    <div key={group}>
+                      <div className="px-3 py-1.5 bg-slate-50 dark:bg-slate-700 text-xs font-semibold text-slate-500 dark:text-slate-400 sticky top-0">
+                        {group}
+                      </div>
+                      {subjects.map(subject => (
+                        <label key={subject.id} className="flex items-center gap-3 px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedSubjectIds.includes(subject.id)}
+                            onChange={() => handleSubjectToggle(subject.id)}
+                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <span className="text-sm text-slate-700 dark:text-slate-300">{subject.name}</span>
+                            {subject.is_core && (
+                              <span className="ml-2 text-xs text-green-600 dark:text-green-400">Core</span>
+                            )}
+                          </div>
+                          {formData.curriculum_specialization === '8-4-4' && selectedSubjectIds.includes(subject.id) && (
+                            <input
+                              type="text"
+                              placeholder="Combo e.g. English/Lit"
+                              className="text-xs px-2 py-1 border border-slate-300 dark:border-slate-600 rounded dark:bg-slate-600 dark:text-white w-36"
+                              onClick={e => e.preventDefault()}
+                              onChange={e => {
+                                onArrayChange('subject_pivot_meta', {
+                                  ...(formData.subject_pivot_meta || {}),
+                                  [subject.id]: {
+                                    ...(formData.subject_pivot_meta?.[subject.id] || {}),
+                                    combination_label: e.target.value
+                                  }
+                                });
+                              }}
+                              value={formData.subject_pivot_meta?.[subject.id]?.combination_label || ''}
+                            />
+                          )}
+                        </label>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 pt-4 border-t border-slate-200 dark:border-slate-700 mt-4 sm:mt-6">
             <button 
