@@ -156,7 +156,7 @@ useEffect(() => {
               {/* Gender */}
               <div>
                 <label className="block text-sm font-medium text-black dark:text-white mb-2">Gender *</label>
-                <select
+                <select      
                   name="gender"
                   value={formData.gender}
                   onChange={handleChange}

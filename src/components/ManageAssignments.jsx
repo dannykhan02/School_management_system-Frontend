@@ -1,24 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, Users, Calendar, User, Layers, Clock, AlertCircle, CheckCircle, Trash2, Loader, AlertTriangle, Info, Pencil, Save, XCircle } from 'lucide-react';
+import { X, Users, Calendar, User, Layers, Clock, AlertCircle, CheckCircle, Trash2, Loader, AlertTriangle, Info, Pencil, Save, XCircle, ChevronDown } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { apiRequest } from '../utils/api';
 import WorkloadMeter from './WorkloadMeter';
 
-// ─── Level mapping for compatibility check ───────────────────────────────────
-const LEVEL_GRADE_MAP = {
-  'Pre-Primary':      ['PP1-PP2'],
-  'Primary':          ['Grade 1-3', 'Grade 4-6', 'Standard 1-4', 'Standard 5-8'],
-  'Junior Secondary': ['Grade 7-9'],
-  'Senior Secondary': ['Grade 10-12'],
-  'Secondary':        ['Form 1-4'],
-};
-
-function levelFromGrade(gradeLevel) {
-  for (const [level, grades] of Object.entries(LEVEL_GRADE_MAP)) {
-    if (grades.includes(gradeLevel)) return level;
-  }
-  return null;
-}
 
 function ManageAssignments({
   isOpen,
@@ -27,8 +12,6 @@ function ManageAssignments({
   hasStreams,
   academicYears,
   teachers,
-  allTeachersCount,      // NEW
-  incompatibleCount,     // NEW
   assignments,
   loading,
   assignmentFormData,
@@ -161,22 +144,22 @@ function ManageAssignments({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[70] p-2 sm:p-4 overflow-y-auto">
-      <div className="bg-white dark:bg-slate-800/50 rounded-xl shadow-2xl w-full max-w-6xl border border-slate-200 dark:border-slate-700 my-4 max-h-[95vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-start justify-center z-[70] p-2 sm:p-4 overflow-y-auto">
+      <div className="bg-white dark:bg-slate-800/50 rounded-xl shadow-2xl w-full max-w-6xl border border-slate-200 dark:border-slate-700 my-4">
 
         {/* ── Header ── */}
-        <div className="sticky top-0 bg-white dark:bg-slate-800/50 z-10 flex items-center justify-between p-4 sm:p-6 border-b border-slate-200 dark:border-slate-700">
-          <div>
-            <h2 className="text-lg sm:text-xl font-semibold text-slate-900 dark:text-white">
+        <div className="sticky top-0 bg-white dark:bg-slate-800 z-10 flex items-center justify-between p-4 sm:p-6 border-b border-slate-200 dark:border-slate-700 rounded-t-xl">
+          <div className="min-w-0 flex-1 mr-4">
+            <h2 className="text-base sm:text-lg lg:text-xl font-semibold text-slate-900 dark:text-white truncate">
               Manage Assignments: {selectedSubject?.name}
             </h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
               Code: {selectedSubject?.code}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700"
+            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 flex-shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
@@ -188,8 +171,8 @@ function ManageAssignments({
               LEFT COLUMN — Create Assignment Form
           ════════════════════════════════════════ */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-              <Users className="w-5 h-5" />
+            <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+              <Users className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
               Create New Assignment
             </h3>
 
@@ -201,12 +184,12 @@ function ManageAssignments({
                   Academic Year <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
-                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                   <select
                     value={assignmentFormData.academic_year_id}
                     onChange={onAcademicYearChange}
                     required
-                    className="w-full pl-10 pr-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                    className="w-full pl-10 pr-8 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 truncate"
                   >
                     <option value="">Select Academic Year</option>
                     {academicYears.map(year => (
@@ -224,35 +207,13 @@ function ManageAssignments({
                   Teacher <span className="text-red-500">*</span>
                 </label>
 
-                {/* NEW: incompatibility notice */}
-                {incompatibleCount > 0 && (
-                  <div className="mb-2 flex items-start gap-2 p-2.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg">
-                    <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
-                    <p className="text-xs text-amber-700 dark:text-amber-300">
-                      <strong>{incompatibleCount} teacher{incompatibleCount !== 1 ? 's' : ''} hidden</strong> — not qualified for{' '}
-                      {selectedSubject?.pathway ? `${selectedSubject.pathway} pathway` : levelFromGrade(selectedSubject?.grade_level) || 'this level'}.
-                      Only showing {allTeachersCount - incompatibleCount} compatible teacher{allTeachersCount - incompatibleCount !== 1 ? 's' : ''}.
-                    </p>
-                  </div>
-                )}
+                <TeacherDropdown
+                  teachers={teachers}
+                  value={assignmentFormData.teacher_id}
+                  onChange={onTeacherSelection}
+                  disabled={!assignmentFormData.academic_year_id}
+                />
 
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <select
-                    value={assignmentFormData.teacher_id}
-                    onChange={onTeacherSelection}
-                    required
-                    disabled={!assignmentFormData.academic_year_id}
-                    className="w-full pl-10 pr-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <option value="">Select Teacher</option>
-                    {teachers.map(teacher => (
-                      <option key={teacher.id} value={teacher.id}>
-                        {teacher.name} — {teacher.specialization || teacher.curriculum_specialization || 'N/A'}
-                      </option>
-                    ))}
-                  </select>
-                </div>
                 {selectedSubject && assignmentFormData.teacher_id && (
                   <SpecializationHint
                     teachers={teachers}
@@ -264,9 +225,9 @@ function ManageAssignments({
 
               {/* Teacher Workload */}
               {hasTeacher && hasAcYear && (
-                <div className="bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-200 dark:border-cyan-800 rounded-lg p-4">
+                <div className="bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-200 dark:border-cyan-800 rounded-lg p-3 sm:p-4">
                   <h4 className="text-sm font-semibold text-slate-900 dark:text-white mb-3 flex items-center gap-2">
-                    <Info className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+                    <Info className="w-4 h-4 text-cyan-600 dark:text-cyan-400 flex-shrink-0" />
                     Current Teacher Workload
                   </h4>
                   <WorkloadMeter
@@ -284,14 +245,14 @@ function ManageAssignments({
                     Stream <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
-                    <Layers className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <Layers className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                     <select
                       name="stream_id"
                       value={assignmentFormData.stream_id}
                       onChange={onAssignmentInputChange}
                       required
                       disabled={!hasTeacher}
-                      className="w-full pl-10 pr-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50"
+                      className="w-full pl-10 pr-8 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50"
                     >
                       <option value="">
                         {!hasTeacher ? 'Select a teacher first' : 'Select Stream'}
@@ -305,7 +266,7 @@ function ManageAssignments({
                   </div>
                   {hasTeacher && teacherStreams.length === 0 && (
                     <p className="mt-1 text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                      <AlertTriangle className="w-3 h-3" />
+                      <AlertTriangle className="w-3 h-3 flex-shrink-0" />
                       No streams found. Make sure streams are configured for this school.
                     </p>
                   )}
@@ -316,14 +277,14 @@ function ManageAssignments({
                     Classroom <span className="text-red-500">*</span>
                   </label>
                   <div className="relative">
-                    <Layers className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <Layers className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                     <select
                       name="classroom_id"
                       value={assignmentFormData.classroom_id}
                       onChange={onAssignmentInputChange}
                       required
                       disabled={!hasTeacher}
-                      className="w-full pl-10 pr-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50"
+                      className="w-full pl-10 pr-8 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50"
                     >
                       <option value="">
                         {!hasTeacher ? 'Select a teacher first' : 'Select Classroom'}
@@ -344,7 +305,7 @@ function ManageAssignments({
                   Weekly Periods <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
-                  <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                   <input
                     type="number"
                     name="weekly_periods"
@@ -362,7 +323,7 @@ function ManageAssignments({
                     }`}
                   />
                 </div>
-                <div className="mt-1 flex items-center justify-between">
+                <div className="mt-1 flex flex-wrap items-center justify-between gap-1">
                   <p className="text-xs text-slate-500 dark:text-slate-400">
                     Recommended: {selectedSubject?.minimum_weekly_periods || 5}–{selectedSubject?.maximum_weekly_periods || 7} periods/week
                   </p>
@@ -429,8 +390,8 @@ function ManageAssignments({
               RIGHT COLUMN — Existing Assignments
           ════════════════════════════════════════ */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-              <Users className="w-5 h-5" />
+            <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+              <Users className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
               Current Assignments ({assignments.length})
             </h3>
 
@@ -447,7 +408,7 @@ function ManageAssignments({
                 </p>
               </div>
             ) : (
-              <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
+              <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1">
                 {assignments.map(assignment => (
                   <AssignmentCard
                     key={assignment.id}
@@ -462,6 +423,116 @@ function ManageAssignments({
 
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────────────
+   SUB-COMPONENT: TeacherDropdown  — custom select that never overflows
+────────────────────────────────────────────────────────────────────────────── */
+function TeacherDropdown({ teachers, value, onChange, disabled }) {
+  const [open, setOpen] = useState(false);
+  const ref = React.useRef(null);
+
+  const selected = teachers.find(t => t.id === parseInt(value));
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const handleSelect = (teacher) => {
+    // Simulate a synthetic event matching what onTeacherSelection expects
+    onChange({ target: { value: String(teacher.id) } });
+    setOpen(false);
+  };
+
+  const handleClear = (e) => {
+    e.stopPropagation();
+    onChange({ target: { value: '' } });
+    setOpen(false);
+  };
+
+  return (
+    <div ref={ref} className="relative">
+      {/* Trigger button */}
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => !disabled && setOpen(o => !o)}
+        className={`w-full flex items-center gap-2 pl-10 pr-3 py-2 text-sm border rounded-lg text-left transition-all
+          ${disabled ? 'opacity-50 cursor-not-allowed bg-slate-100 dark:bg-slate-700/50' : 'bg-white dark:bg-slate-700 cursor-pointer hover:border-cyan-400 dark:hover:border-cyan-500'}
+          ${open ? 'border-cyan-500 ring-2 ring-cyan-500' : 'border-slate-300 dark:border-slate-600'}
+          text-slate-900 dark:text-white`}
+      >
+        <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none flex-shrink-0" />
+        <span className="flex-1 truncate min-w-0">
+          {selected ? selected.name : <span className="text-slate-400 dark:text-slate-500">Select Teacher</span>}
+        </span>
+        <ChevronDown className={`w-4 h-4 text-slate-400 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {/* Dropdown list */}
+      {open && (
+        <div className="absolute z-50 mt-1 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-600 rounded-lg shadow-xl overflow-hidden">
+          {/* Clear option */}
+          <div
+            onClick={handleClear}
+            className="px-3 py-2 text-sm text-slate-400 dark:text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-700/60 cursor-pointer border-b border-slate-100 dark:border-slate-700"
+          >
+            Select Teacher
+          </div>
+          <div className="max-h-56 overflow-y-auto">
+            {teachers.map(teacher => {
+              const spec = teacher.specialization || teacher.curriculum_specialization;
+              const isActive = teacher.id === parseInt(value);
+              return (
+                <div
+                  key={teacher.id}
+                  onClick={() => handleSelect(teacher)}
+                  className={`px-3 py-2.5 cursor-pointer transition-colors border-b border-slate-50 dark:border-slate-700/50 last:border-0
+                    ${isActive
+                      ? 'bg-cyan-50 dark:bg-cyan-900/30'
+                      : 'hover:bg-slate-50 dark:hover:bg-slate-700/60'}`}
+                >
+                  <p className={`text-sm font-medium truncate ${isActive ? 'text-cyan-700 dark:text-cyan-300' : 'text-slate-900 dark:text-white'}`}>
+                    {teacher.name}
+                  </p>
+                  {spec && (
+                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                      {spec}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+            {teachers.length === 0 && (
+              <div className="px-3 py-4 text-sm text-slate-400 dark:text-slate-500 text-center">
+                No compatible teachers available
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Selected teacher detail card */}
+      {selected && (
+        <div className="mt-1.5 px-3 py-2 bg-slate-50 dark:bg-slate-700/50 rounded-lg border border-slate-200 dark:border-slate-600">
+          <p className="text-xs font-medium text-slate-700 dark:text-slate-300 break-words leading-snug">
+            {selected.name}
+          </p>
+          {(selected.specialization || selected.curriculum_specialization) && (
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 break-words leading-snug">
+              {selected.specialization || selected.curriculum_specialization}
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -493,19 +564,21 @@ function SpecializationHint({ teachers, teacherId, subject }) {
 
   if (isMatch) {
     return (
-      <p className="mt-1.5 text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
-        <CheckCircle className="w-3 h-3" />
-        Specialization matches this subject ({subject.category})
+      <p className="mt-1.5 text-xs text-green-600 dark:text-green-400 flex items-start gap-1">
+        <CheckCircle className="w-3 h-3 flex-shrink-0 mt-0.5" />
+        <span>Specialization matches this subject ({subject.category})</span>
       </p>
     );
   }
 
   return (
-    <p className="mt-1.5 text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
-      <AlertTriangle className="w-3 h-3" />
-      Teacher specializes in <strong className="mx-0.5">{teacher.specialization || 'Unknown'}</strong>
-      — this subject is <strong className="ml-0.5">{subject.category}</strong>.
-      Assignment is still allowed with a warning.
+    <p className="mt-1.5 text-xs text-amber-600 dark:text-amber-400 flex items-start gap-1">
+      <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-0.5" />
+      <span>
+        Teacher specializes in <strong className="mx-0.5">{teacher.specialization || 'Unknown'}</strong>
+        — this subject is <strong className="ml-0.5">{subject.category}</strong>.
+        Assignment is still allowed with a warning.
+      </span>
     </p>
   );
 }
@@ -557,7 +630,7 @@ function ValidationPanel({ formComplete, missingFields, validating, validationRe
     return (
       <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 space-y-3">
         <div className="flex items-center gap-2">
-          <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
+          <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" />
           <h4 className="text-sm font-semibold text-green-900 dark:text-green-100">
             Assignment Valid — ready to create
           </h4>
@@ -587,11 +660,11 @@ function ValidationPanel({ formComplete, missingFields, validating, validationRe
         {warnings.length > 0 && (
           <div className="space-y-1.5 pt-1 border-t border-green-200 dark:border-green-700">
             <p className="text-xs font-medium text-amber-700 dark:text-amber-400 flex items-center gap-1">
-              <AlertTriangle className="w-3.5 h-3.5" />
+              <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
               Warnings (assignment still allowed):
             </p>
             {warnings.map((w, i) => (
-              <p key={i} className="text-xs text-amber-600 dark:text-amber-400 ml-5">• {w.message}</p>
+              <p key={i} className="text-xs text-amber-600 dark:text-amber-400 ml-5 break-words">• {w.message}</p>
             ))}
           </div>
         )}
@@ -602,7 +675,7 @@ function ValidationPanel({ formComplete, missingFields, validating, validationRe
   return (
     <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 space-y-3">
       <div className="flex items-center gap-2">
-        <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+        <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0" />
         <h4 className="text-sm font-semibold text-red-900 dark:text-red-100">
           Cannot create this assignment
         </h4>
@@ -648,22 +721,22 @@ function ErrorItem({ error }) {
       hint:  'Reduce the weekly periods, or choose a different teacher with more capacity.',
     },
     specialization_mismatch: {
-      title: 'Subject outside teacher\'s specialization',
-      hint:  'This teacher\'s specialization does not match this subject\'s category.',
+      title: "Subject outside teacher's specialization",
+      hint:  "This teacher's specialization does not match this subject's category.",
     },
     insufficient_periods: {
       title: 'Not enough timetable slots',
-      hint:  'The teacher\'s timetable doesn\'t have enough free periods.',
+      hint:  "The teacher's timetable doesn't have enough free periods.",
     },
     api_error: {
       title: 'Validation service unavailable',
       hint:  'Could not connect to the server. Check your connection and try again.',
     },
-    level_mismatch: {   // NEW
+    level_mismatch: {
       title: "Teacher not qualified for this level",
       hint: "This teacher's teaching levels don't include the level required by this subject.",
     },
-    pathway_mismatch: { // NEW
+    pathway_mismatch: {
       title: "Teacher not qualified for this pathway",
       hint: "This teacher's teaching pathways don't include the pathway required by this subject.",
     },
@@ -674,15 +747,15 @@ function ErrorItem({ error }) {
   return (
     <div className="flex items-start gap-2 text-sm">
       <AlertCircle className="w-4 h-4 text-red-500 dark:text-red-400 flex-shrink-0 mt-0.5" />
-      <div>
-        <p className="font-medium text-red-800 dark:text-red-200">
+      <div className="min-w-0">
+        <p className="font-medium text-red-800 dark:text-red-200 break-words">
           {known?.title || error.message}
         </p>
         {known && (
-          <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">{known.hint}</p>
+          <p className="text-xs text-red-600 dark:text-red-400 mt-0.5 break-words">{known.hint}</p>
         )}
         {known && error.message && (
-          <p className="text-xs text-red-500/70 dark:text-red-500/60 mt-0.5 italic">{error.message}</p>
+          <p className="text-xs text-red-500/70 dark:text-red-500/60 mt-0.5 italic break-words">{error.message}</p>
         )}
       </div>
     </div>
@@ -718,7 +791,6 @@ function AssignmentCard({ assignment, hasStreams, onDelete }) {
   const typeLabel = (t) =>
     (t || 'main_teacher').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
-  // ── Cancel edit — restore original values ─────────────────────────────────
   const handleCancel = () => {
     setEditData({
       weekly_periods:  assignment.weekly_periods  ?? 5,
@@ -727,7 +799,6 @@ function AssignmentCard({ assignment, hasStreams, onDelete }) {
     setIsEditing(false);
   };
 
-  // ── Save edit ─────────────────────────────────────────────────────────────
   const handleSave = async () => {
     const periods = parseInt(editData.weekly_periods);
     if (isNaN(periods) || periods < 1) {
@@ -742,8 +813,6 @@ function AssignmentCard({ assignment, hasStreams, onDelete }) {
         assignment_type: editData.assignment_type,
       });
 
-      // Mutate the assignment in-place so the card reflects the new values
-      // without needing a full refetch — parent will refetch on next open anyway
       assignment.weekly_periods  = periods;
       assignment.assignment_type = editData.assignment_type;
 
@@ -761,17 +830,15 @@ function AssignmentCard({ assignment, hasStreams, onDelete }) {
     <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-lg p-4 hover:shadow-md transition-shadow">
 
       {/* ── Top row: name + location + action buttons ── */}
-      <div className="flex items-start justify-between mb-3">
+      <div className="flex items-start justify-between mb-3 gap-2">
         <div className="flex-1 min-w-0">
-          <h4 className="font-semibold text-slate-900 dark:text-white truncate">{teacherName}</h4>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5 truncate">{location}</p>
+          <h4 className="font-semibold text-slate-900 dark:text-white break-words">{teacherName}</h4>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5 break-words">{location}</p>
         </div>
 
-        {/* Buttons — show different sets depending on editing state */}
-        <div className="flex items-center gap-1 ml-2 flex-shrink-0">
+        <div className="flex items-center gap-1 flex-shrink-0">
           {isEditing ? (
             <>
-              {/* Save */}
               <button
                 onClick={handleSave}
                 disabled={saving}
@@ -782,7 +849,6 @@ function AssignmentCard({ assignment, hasStreams, onDelete }) {
                   ? <Loader className="w-3.5 h-3.5 animate-spin" />
                   : <Save className="w-3.5 h-3.5" />}
               </button>
-              {/* Cancel */}
               <button
                 onClick={handleCancel}
                 disabled={saving}
@@ -794,7 +860,6 @@ function AssignmentCard({ assignment, hasStreams, onDelete }) {
             </>
           ) : (
             <>
-              {/* Edit */}
               <button
                 onClick={() => setIsEditing(true)}
                 title="Edit assignment"
@@ -802,7 +867,6 @@ function AssignmentCard({ assignment, hasStreams, onDelete }) {
               >
                 <Pencil className="w-3.5 h-3.5" />
               </button>
-              {/* Delete */}
               <button
                 onClick={() => onDelete(assignment.id)}
                 title="Delete assignment"
@@ -817,12 +881,12 @@ function AssignmentCard({ assignment, hasStreams, onDelete }) {
 
       {/* ── View mode: summary row ── */}
       {!isEditing && (
-        <div className="flex items-center gap-4 text-sm">
+        <div className="flex flex-wrap items-center gap-3 text-sm">
           <div>
             <span className="text-slate-500 dark:text-slate-400">Periods/week: </span>
             <span className="font-semibold text-slate-900 dark:text-white">{assignment.weekly_periods}</span>
           </div>
-          <span className="text-xs px-2 py-1 bg-cyan-100 dark:bg-cyan-900/30 text-cyan-800 dark:text-cyan-300 rounded-full">
+          <span className="text-xs px-2 py-1 bg-cyan-100 dark:bg-cyan-900/30 text-cyan-800 dark:text-cyan-300 rounded-full whitespace-nowrap">
             {typeLabel(assignment.assignment_type)}
           </span>
         </div>
@@ -835,13 +899,12 @@ function AssignmentCard({ assignment, hasStreams, onDelete }) {
             Edit Assignment
           </p>
 
-          {/* Weekly Periods */}
           <div>
             <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
               Weekly Periods
             </label>
             <div className="relative">
-              <Clock className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+              <Clock className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
               <input
                 type="number"
                 min="1"
@@ -853,7 +916,6 @@ function AssignmentCard({ assignment, hasStreams, onDelete }) {
             </div>
           </div>
 
-          {/* Assignment Type */}
           <div>
             <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
               Assignment Type
@@ -869,7 +931,6 @@ function AssignmentCard({ assignment, hasStreams, onDelete }) {
             </select>
           </div>
 
-          {/* Inline save/cancel buttons (also available at top-right) */}
           <div className="flex gap-2 pt-1">
             <button
               onClick={handleCancel}
@@ -896,7 +957,7 @@ function AssignmentCard({ assignment, hasStreams, onDelete }) {
       {/* ── Outside-specialisation warning badge ── */}
       {assignment.is_outside_specialization && (
         <div className="mt-2 flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
-          <AlertTriangle className="w-3 h-3" />
+          <AlertTriangle className="w-3 h-3 flex-shrink-0" />
           Outside specialization
         </div>
       )}
