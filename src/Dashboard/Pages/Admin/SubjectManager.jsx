@@ -599,27 +599,60 @@ function SubjectManager() {
     setAssignmentFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // UPDATED: handleCreateAssignment now checks for _refreshOnly flag
   const handleCreateAssignment = async (e) => {
     e.preventDefault();
-    if (!assignmentFormData.academic_year_id) { toast.error('Please select an academic year'); return; }
-    if (!assignmentFormData.teacher_id)        { toast.error('Please select a teacher'); return; }
-    if (hasStreams  && !assignmentFormData.stream_id)    { toast.error('Please select a stream'); return; }
-    if (!hasStreams && !assignmentFormData.classroom_id) { toast.error('Please select a classroom'); return; }
+
+    // ---- NEW: handle refresh signal from ManageAssignments ----
+    if (e._refreshOnly) {
+      await fetchAssignments(selectedSubject.id);
+      return;
+    }
+    // -----------------------------------------------------------
+
+    if (!assignmentFormData.academic_year_id) { 
+      toast.error('Please select an academic year'); 
+      return; 
+    }
+    if (!assignmentFormData.teacher_id) { 
+      toast.error('Please select a teacher'); 
+      return; 
+    }
+    if (hasStreams && !assignmentFormData.stream_id) { 
+      toast.error('Please select a stream'); 
+      return; 
+    }
+    if (!hasStreams && !assignmentFormData.classroom_id) { 
+      toast.error('Please select a classroom'); 
+      return; 
+    }
 
     setLoading(true);
     try {
-      await apiRequest('subject-assignments', 'POST', { ...assignmentFormData, subject_id: selectedSubject.id });
+      await apiRequest('subject-assignments', 'POST', { 
+        ...assignmentFormData, 
+        subject_id: selectedSubject.id 
+      });
       toast.success('Assignment created successfully');
       await fetchAssignments(selectedSubject.id);
-      setSelectedTeacher(null); setTeacherClassrooms([]); setTeacherStreams([]);
+      // Reset form state
+      setSelectedTeacher(null);
+      setTeacherClassrooms([]);
+      setTeacherStreams([]);
       setAssignmentFormData(prev => ({
-        teacher_id: '', classroom_id: '', stream_id: '',
-        academic_year_id: prev.academic_year_id, term_id: selectedAcademicYearInfo?.term_id || '',
-        weekly_periods: 5, assignment_type: 'main_teacher',
+        teacher_id: '',
+        classroom_id: '',
+        stream_id: '',
+        academic_year_id: prev.academic_year_id,
+        term_id: selectedAcademicYearInfo?.term_id || '',
+        weekly_periods: 5,
+        assignment_type: 'main_teacher',
       }));
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to create assignment.');
-    } finally { setLoading(false); }
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   const handleDeleteAssignment = (assignmentId) => {
