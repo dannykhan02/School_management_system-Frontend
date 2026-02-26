@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { apiRequest } from '../../../utils/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import { 
@@ -24,11 +24,24 @@ import {
   GraduationCap,
   FlaskConical,
   Palette,
-  Globe
+  Globe,
+  MoreHorizontal
 } from 'lucide-react';
 import { toast } from "react-toastify";
 import ManageAssignments from '../../../components/ManageAssignments';
 import BulkAssignmentModal from '../../../components/BulkAssignmentModal';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared design tokens — mirrors ClassroomManager & StreamManager
+// ─────────────────────────────────────────────────────────────────────────────
+const CLS = {
+  input:      'border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 rounded-lg',
+  primary:    'bg-black dark:bg-white text-white dark:text-black hover:bg-gray-800 dark:hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-all font-semibold',
+  secondary:  'border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 transition-all font-medium',
+  // ── Delete-modal pill buttons ─────────────────────────────────────────────
+  cancelPill: 'px-5 py-2 rounded-full text-sm font-semibold bg-slate-600 hover:bg-slate-500 dark:bg-slate-600 dark:hover:bg-slate-500 text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed',
+  deletePill: 'px-5 py-2 rounded-full text-sm font-bold bg-red-600 hover:bg-red-700 active:bg-red-800 text-white shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5',
+};
 
 // ─── Helper: derive level from grade_level ────────────────────────────────────
 const LEVEL_GRADE_MAP = {
@@ -58,22 +71,22 @@ const getCurriculumBadgeColor = (type) =>
 
 const getCategoryBadgeColor = (category) => {
   const map = {
-    Languages:    'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300',
-    Mathematics:  'bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300',
-    Sciences:     'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-300',
-    Humanities:   'bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-300',
-    Technical:    'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300',
+    Languages:       'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300',
+    Mathematics:     'bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300',
+    Sciences:        'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-300',
+    Humanities:      'bg-orange-50 text-orange-700 dark:bg-orange-900/20 dark:text-orange-300',
+    Technical:       'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300',
     'Creative Arts': 'bg-pink-50 text-pink-700 dark:bg-pink-900/20 dark:text-pink-300',
-    'Physical Ed':'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300',
+    'Physical Ed':   'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300',
   };
   return map[category] || 'bg-gray-100 text-gray-700 dark:bg-gray-900/20 dark:text-gray-300';
 };
 
 const getPathwayBadgeColor = (pathway) => {
   const map = {
-    STEM:             'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300',
-    Arts:             'bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300',
-    'Social Sciences':'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-300',
+    STEM:              'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300',
+    Arts:              'bg-purple-50 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300',
+    'Social Sciences': 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-300',
   };
   return map[pathway] || 'bg-gray-100 text-gray-700 dark:bg-gray-900/20 dark:text-gray-300';
 };
@@ -99,16 +112,73 @@ const EMPTY_FORM = {
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ROW ACTION DROPDOWN — mirrors ClassroomManager & StreamManager
+// ─────────────────────────────────────────────────────────────────────────────
+function RowActionsMenu({ subject, onEdit, onManageAssignments, onDelete }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    };
+    if (open) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
+
+  const handle = (fn) => { setOpen(false); fn(); };
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="p-1.5 rounded-lg text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+        title="More actions"
+      >
+        <MoreHorizontal className="w-4 h-4" />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-8 z-50 w-52 bg-slate-800/90 backdrop-blur-sm border border-slate-700/60 rounded-xl shadow-2xl py-1.5">
+          <button
+            onClick={() => handle(onEdit)}
+            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-700/60 transition-colors text-left"
+          >
+            <Edit className="w-4 h-4 text-amber-400" />
+            Edit Subject
+          </button>
+          <button
+            onClick={() => handle(onManageAssignments)}
+            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-700/60 transition-colors text-left"
+          >
+            <Users className="w-4 h-4 text-cyan-400" />
+            Manage Assignments
+          </button>
+          <div className="my-1 border-t border-slate-700/60" />
+          <button
+            onClick={() => handle(onDelete)}
+            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-400 hover:bg-red-900/30 transition-colors text-left"
+          >
+            <Trash2 className="w-4 h-4" />
+            Delete Subject
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 function SubjectManager() {
   const { schoolId, loading: authLoading } = useAuth();
 
   // ── Core data ──────────────────────────────────────────────────────────────
-  const [subjects,          setSubjects]          = useState([]);
-  const [filteredSubjects,  setFilteredSubjects]  = useState([]);
-  const [teachers,          setTeachers]          = useState([]);
-  const [streams,           setStreams]            = useState([]);
-  const [academicYears,     setAcademicYears]      = useState([]);
-  const [assignments,       setAssignments]        = useState([]);
+  const [subjects,         setSubjects]         = useState([]);
+  const [filteredSubjects, setFilteredSubjects] = useState([]);
+  const [teachers,         setTeachers]         = useState([]);
+  const [streams,          setStreams]           = useState([]);
+  const [academicYears,    setAcademicYears]     = useState([]);
+  const [assignments,      setAssignments]       = useState([]);
 
   // ── UI state ───────────────────────────────────────────────────────────────
   const [loading,    setLoading]    = useState(true);
@@ -124,15 +194,15 @@ function SubjectManager() {
     cbc_grade_levels: [], legacy_grade_levels: [],
     senior_secondary_pathways: [], categories: [],
   });
-  const [constantsLoading, setConstantsLoading] = useState(true);
+  const [constantsLoading,    setConstantsLoading]    = useState(true);
 
   // ── Filters ────────────────────────────────────────────────────────────────
-  const [searchTerm,       setSearchTerm]       = useState('');
-  const [filterCategory,   setFilterCategory]   = useState('all');
-  const [filterCoreStatus, setFilterCoreStatus] = useState('all');
-  const [filterGradeLevel, setFilterGradeLevel] = useState('all');
-  const [filterPathway,    setFilterPathway]    = useState('all');
-  const [showFilters,      setShowFilters]      = useState(false);
+  const [searchTerm,         setSearchTerm]         = useState('');
+  const [filterCategory,     setFilterCategory]     = useState('all');
+  const [filterCoreStatus,   setFilterCoreStatus]   = useState('all');
+  const [filterGradeLevel,   setFilterGradeLevel]   = useState('all');
+  const [filterPathway,      setFilterPathway]      = useState('all');
+  const [showFilters,        setShowFilters]        = useState(false);
   const [filtersInitialized, setFiltersInitialized] = useState(false);
 
   // ── Subject form ───────────────────────────────────────────────────────────
@@ -150,75 +220,60 @@ function SubjectManager() {
   const [selectedAcademicYearInfo, setSelectedAcademicYearInfo] = useState(null);
   const [selectedTeacher,          setSelectedTeacher]          = useState(null);
   const [teacherClassrooms,        setTeacherClassrooms]        = useState([]);
-  const [teacherStreams,            setTeacherStreams]            = useState([]);
-  const [assignmentFormData, setAssignmentFormData] = useState({
+  const [teacherStreams,            setTeacherStreams]           = useState([]);
+  const [assignmentFormData,       setAssignmentFormData]       = useState({
     teacher_id: '', classroom_id: '', stream_id: '',
     academic_year_id: '', term_id: '', weekly_periods: 5, assignment_type: 'main_teacher',
   });
 
   // ── Modal state ────────────────────────────────────────────────────────────
-  const [deleteModal, setDeleteModal] = useState({ isOpen: false, subjectId: null, subjectName: '' });
+  const [deleteModal,           setDeleteModal]           = useState({ isOpen: false, subjectId: null, subjectName: '' });
   const [deleteAssignmentModal, setDeleteAssignmentModal] = useState({ isOpen: false, assignmentId: null, assignmentInfo: '' });
-  const [showBulkModal, setShowBulkModal] = useState(false);
-  const [mobileSheet,   setMobileSheet]   = useState({ isOpen: false, subject: null });
+  const [showBulkModal,         setShowBulkModal]         = useState(false);
+  const [mobileSheet,           setMobileSheet]           = useState({ isOpen: false, subject: null });
 
   // ─── Available grade levels for the current school ────────────────────────
   const availableGradeLevels = React.useMemo(() => {
     const grades = [];
     for (const level of schoolLevels) {
       const gradeList = LEVEL_GRADE_MAP[level] || [];
-      // Only push grades that exist in the seeded subjects
-      gradeList.forEach(g => {
-        if (!grades.includes(g)) grades.push(g);
-      });
+      gradeList.forEach(g => { if (!grades.includes(g)) grades.push(g); });
     }
     return grades;
   }, [schoolLevels]);
 
   // ─── Grade levels available for the form (filtered by school) ────────────
   const formGradeLevels = React.useMemo(() => {
-    // Combine cbc + legacy based on what the school has
     const isCBC = school?.primary_curriculum === 'CBC' || school?.primary_curriculum === 'Both';
     const is844 = school?.primary_curriculum === '8-4-4' || school?.primary_curriculum === 'Both';
     let all = [];
     if (isCBC) all = [...all, ...constants.cbc_grade_levels];
     if (is844) all = [...all, ...constants.legacy_grade_levels];
-    // Filter further to only levels the school offers
     return all.filter(g => {
       const level = levelFromGrade(g);
       return level && schoolLevels.includes(level);
     });
   }, [school, constants, schoolLevels]);
 
-  // Whether the current form grade_level is Senior Secondary
   const isSeniorSecondary = levelFromGrade(formData.grade_level) === 'Senior Secondary';
 
   // ─── Teachers compatible with the currently selected subject ──────────────
   const compatibleTeachers = React.useMemo(() => {
     if (!selectedSubject) return teachers;
-
-    const subjectLevel = levelFromGrade(selectedSubject.grade_level);
+    const subjectLevel   = levelFromGrade(selectedSubject.grade_level);
     const subjectPathway = selectedSubject.pathway;
-
     return teachers.filter(teacher => {
-      const tData = teacher.assignments; // raw teacher object is stored here
-      const teachingLevels = tData?.teaching_levels || [];
+      const tData           = teacher.assignments;
+      const teachingLevels  = tData?.teaching_levels || [];
       const teachingPathways = tData?.teaching_pathways || [];
-
-      // If teacher has no teaching_levels set, allow (backwards compat)
       if (teachingLevels.length === 0) return true;
-
-      // Must teach this level
       if (subjectLevel && !teachingLevels.includes(subjectLevel)) return false;
-
-      // If subject has pathway, teacher must teach that pathway
       if (subjectPathway && teachingPathways.length > 0 && !teachingPathways.includes(subjectPathway)) return false;
-
       return true;
     });
   }, [teachers, selectedSubject]);
 
-  const allTeachersCount = teachers.length;
+  const allTeachersCount  = teachers.length;
   const incompatibleCount = teachers.length - compatibleTeachers.length;
 
   // ─── Data fetching ────────────────────────────────────────────────────────
@@ -240,10 +295,9 @@ function SubjectManager() {
       const s = response.data || response;
       setSchool(s);
       setHasStreams(s?.has_streams || false);
-
       const levels = [];
-      if (s?.has_pre_primary)    levels.push('Pre-Primary');
-      if (s?.has_primary)        levels.push('Primary');
+      if (s?.has_pre_primary)      levels.push('Pre-Primary');
+      if (s?.has_primary)          levels.push('Primary');
       if (s?.has_junior_secondary) levels.push('Junior Secondary');
       if (s?.has_senior_secondary) levels.push('Senior Secondary');
       if (s?.has_secondary && !s?.has_junior_secondary && !s?.has_senior_secondary)
@@ -337,11 +391,10 @@ function SubjectManager() {
     try {
       let url = `subjects/search?name=${encodeURIComponent(name)}`;
       if (school?.primary_curriculum) url += `&curriculum_type=${encodeURIComponent(school.primary_curriculum)}`;
-      if (formData.grade_level) url += `&grade_level=${encodeURIComponent(formData.grade_level)}`;
-      if (formData.pathway) url += `&pathway=${encodeURIComponent(formData.pathway)}`;
-
+      if (formData.grade_level)        url += `&grade_level=${encodeURIComponent(formData.grade_level)}`;
+      if (formData.pathway)            url += `&pathway=${encodeURIComponent(formData.pathway)}`;
       const response = await apiRequest(url, 'GET');
-      const results = response.data || [];
+      const results  = response.data || [];
       setSubjectSearchResults(results);
       setShowSubjectSuggestions(results.length > 0);
       setSubjectExists(results.length > 0);
@@ -365,7 +418,7 @@ function SubjectManager() {
     setSubjectExists(true);
   }, []);
 
-  // ─── Teacher/classroom selection ──────────────────────────────────────────
+  // ─── Teacher / classroom selection ───────────────────────────────────────
   const handleTeacherSelection = async (teacherId) => {
     setAssignmentFormData(prev => ({ ...prev, teacher_id: teacherId, classroom_id: '', stream_id: '' }));
     if (!teacherId) { setSelectedTeacher(null); setTeacherStreams([]); setTeacherClassrooms([]); return; }
@@ -377,22 +430,30 @@ function SubjectManager() {
     if (hasStreams) {
       try {
         const response = await apiRequest(`teachers/${teacher.id}`, 'GET');
-        const data = response?.data || response;
+        const data     = response?.data || response;
         const ctStreams = data.classTeacherStreams || data.class_teacher_streams || [];
-        const ctIds = new Set(ctStreams.map(s => s.id || s.stream_id));
-
+        const ctIds    = new Set(ctStreams.map(s => s.id || s.stream_id));
         const allStreams = streams
           .map(s => ({
             id: s.id,
-            name: s.classroom?.class_name ? `${s.classroom.class_name} - ${s.name || `Stream ${s.id}`}` : (s.name || `Stream ${s.id}`),
+            name: s.classroom?.class_name
+              ? `${s.classroom.class_name} - ${s.name || `Stream ${s.id}`}`
+              : (s.name || `Stream ${s.id}`),
             is_class_teacher: ctIds.has(s.id),
           }))
-          .sort((a, b) => (a.is_class_teacher === b.is_class_teacher ? a.name.localeCompare(b.name) : a.is_class_teacher ? -1 : 1));
-
+          .sort((a, b) =>
+            a.is_class_teacher === b.is_class_teacher
+              ? a.name.localeCompare(b.name)
+              : a.is_class_teacher ? -1 : 1
+          );
         setTeacherStreams(allStreams);
         setTeacherClassrooms([]);
       } catch {
-        setTeacherStreams(streams.map(s => ({ id: s.id, name: s.classroom?.class_name ? `${s.classroom.class_name} - ${s.name}` : s.name, is_class_teacher: false })));
+        setTeacherStreams(streams.map(s => ({
+          id: s.id,
+          name: s.classroom?.class_name ? `${s.classroom.class_name} - ${s.name}` : s.name,
+          is_class_teacher: false,
+        })));
         setTeacherClassrooms([]);
       }
     } else {
@@ -417,7 +478,6 @@ function SubjectManager() {
   useEffect(() => { if (schoolId) fetchSchoolInfo(); }, [schoolId, fetchSchoolInfo]);
   useEffect(() => { if (school !== null) fetchInitialData(); }, [school, fetchInitialData]);
 
-  // Auto-clear pathway when grade_level changes away from Senior Secondary
   useEffect(() => {
     if (!isSeniorSecondary && formData.pathway) {
       setFormData(prev => ({ ...prev, pathway: '' }));
@@ -427,7 +487,6 @@ function SubjectManager() {
   // ─── Filter subjects ──────────────────────────────────────────────────────
   useEffect(() => {
     let filtered = [...subjects];
-
     if (searchTerm) {
       const t = searchTerm.toLowerCase();
       filtered = filtered.filter(s => s.name?.toLowerCase().includes(t) || s.code?.toLowerCase().includes(t));
@@ -444,21 +503,12 @@ function SubjectManager() {
         return true;
       });
     }
-    if (filterGradeLevel !== 'all') {
-      filtered = filtered.filter(s => s.grade_level === filterGradeLevel);
-    }
-    if (filterPathway !== 'all') {
-      filtered = filtered.filter(s => s.pathway === filterPathway);
-    }
-    if (filterCategory !== 'all') {
-      filtered = filtered.filter(s => s.category === filterCategory);
-    }
+    if (filterGradeLevel !== 'all') filtered = filtered.filter(s => s.grade_level === filterGradeLevel);
+    if (filterPathway   !== 'all') filtered = filtered.filter(s => s.pathway === filterPathway);
+    if (filterCategory  !== 'all') filtered = filtered.filter(s => s.category === filterCategory);
     if (filterCoreStatus !== 'all') {
-      filtered = filtered.filter(s =>
-        filterCoreStatus === 'core' ? s.is_core : !s.is_core
-      );
+      filtered = filtered.filter(s => filterCoreStatus === 'core' ? s.is_core : !s.is_core);
     }
-
     setFilteredSubjects(filtered);
   }, [subjects, searchTerm, filterCategory, filterCoreStatus, filterGradeLevel, filterPathway, school, schoolLevels]);
 
@@ -469,7 +519,7 @@ function SubjectManager() {
       const response = await apiRequest(`subject-assignments?subject_id=${subjectId}`, 'GET');
       setAssignments(Array.isArray(response) ? response : (response?.data || []));
     } catch { toast.error('Could not fetch assignments.'); setAssignments([]); }
-    finally { setLoading(false); }
+    finally  { setLoading(false); }
   };
 
   // ─── View handlers ────────────────────────────────────────────────────────
@@ -522,37 +572,25 @@ function SubjectManager() {
   // ─── Form input handler ───────────────────────────────────────────────────
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
-    const newValue = type === 'checkbox' ? checked : value;
-
-    setFormData(prev => ({ ...prev, [name]: newValue }));
-
+    setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
     if (name === 'name') searchSubjectsByName(value);
   };
 
   // ─── CRUD ─────────────────────────────────────────────────────────────────
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    // Client-side validation
-    if (!formData.grade_level) {
-      toast.error('Please select a grade level.');
-      return;
-    }
+    if (!formData.grade_level) { toast.error('Please select a grade level.'); return; }
     if (isSeniorSecondary && !formData.pathway) {
-      toast.error('A pathway is required for Senior Secondary subjects.');
-      return;
+      toast.error('A pathway is required for Senior Secondary subjects.'); return;
     }
-
     setSubmitting(true);
     try {
       const payload = {
         ...formData,
         school_id: schoolId,
         curriculum_type: school.primary_curriculum,
-        // Only send pathway for Senior Secondary
         pathway: isSeniorSecondary ? formData.pathway : null,
       };
-
       if (view === 'edit') {
         await apiRequest(`subjects/${selectedSubject.id}`, 'PUT', payload);
         toast.success('Subject updated successfully');
@@ -599,60 +637,32 @@ function SubjectManager() {
     setAssignmentFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  // UPDATED: handleCreateAssignment now checks for _refreshOnly flag
   const handleCreateAssignment = async (e) => {
     e.preventDefault();
+    if (e._refreshOnly) { await fetchAssignments(selectedSubject.id); return; }
 
-    // ---- NEW: handle refresh signal from ManageAssignments ----
-    if (e._refreshOnly) {
-      await fetchAssignments(selectedSubject.id);
-      return;
-    }
-    // -----------------------------------------------------------
-
-    if (!assignmentFormData.academic_year_id) { 
-      toast.error('Please select an academic year'); 
-      return; 
-    }
-    if (!assignmentFormData.teacher_id) { 
-      toast.error('Please select a teacher'); 
-      return; 
-    }
-    if (hasStreams && !assignmentFormData.stream_id) { 
-      toast.error('Please select a stream'); 
-      return; 
-    }
-    if (!hasStreams && !assignmentFormData.classroom_id) { 
-      toast.error('Please select a classroom'); 
-      return; 
-    }
+    if (!assignmentFormData.academic_year_id) { toast.error('Please select an academic year'); return; }
+    if (!assignmentFormData.teacher_id)        { toast.error('Please select a teacher');        return; }
+    if (hasStreams && !assignmentFormData.stream_id)    { toast.error('Please select a stream');    return; }
+    if (!hasStreams && !assignmentFormData.classroom_id){ toast.error('Please select a classroom'); return; }
 
     setLoading(true);
     try {
-      await apiRequest('subject-assignments', 'POST', { 
-        ...assignmentFormData, 
-        subject_id: selectedSubject.id 
-      });
+      await apiRequest('subject-assignments', 'POST', { ...assignmentFormData, subject_id: selectedSubject.id });
       toast.success('Assignment created successfully');
       await fetchAssignments(selectedSubject.id);
-      // Reset form state
       setSelectedTeacher(null);
       setTeacherClassrooms([]);
       setTeacherStreams([]);
       setAssignmentFormData(prev => ({
-        teacher_id: '',
-        classroom_id: '',
-        stream_id: '',
+        teacher_id: '', classroom_id: '', stream_id: '',
         academic_year_id: prev.academic_year_id,
         term_id: selectedAcademicYearInfo?.term_id || '',
-        weekly_periods: 5,
-        assignment_type: 'main_teacher',
+        weekly_periods: 5, assignment_type: 'main_teacher',
       }));
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to create assignment.');
-    } finally { 
-      setLoading(false); 
-    }
+    } finally { setLoading(false); }
   };
 
   const handleDeleteAssignment = (assignmentId) => {
@@ -677,46 +687,30 @@ function SubjectManager() {
   };
 
   // ─── Mobile sheet ─────────────────────────────────────────────────────────
-  const openMobileSheet = (subject) => { setMobileSheet({ isOpen: true, subject }); document.body.style.overflow = 'hidden'; };
+  const openMobileSheet  = (subject) => { setMobileSheet({ isOpen: true, subject }); document.body.style.overflow = 'hidden'; };
   const closeMobileSheet = () => { setMobileSheet({ isOpen: false, subject: null }); document.body.style.overflow = ''; };
 
-  // ─── Canonical grade order (lowest → highest) ────────────────────────────
+  // ─── Grade / pathway sort helpers ────────────────────────────────────────
   const GRADE_ORDER = [
-    'PP1-PP2',
-    'Grade 1-3',
-    'Grade 4-6',
-    'Grade 7-9',
-    'Grade 10-12',
-    'Standard 1-4',
-    'Standard 5-8',
-    'Form 1-4',
-    'Unknown',
+    'PP1-PP2','Grade 1-3','Grade 4-6','Grade 7-9','Grade 10-12',
+    'Standard 1-4','Standard 5-8','Form 1-4','Unknown',
   ];
-
   const PATHWAY_ORDER = ['All', 'STEM', 'Arts', 'Social Sciences'];
 
-  /**
-   * Normalises legacy grade_level strings like
-   * "Grade 10-12 (Senior Secondary - STEM Pathway)" -> "Grade 10-12"
-   * Clean values like "Grade 7-9" pass through unchanged.
-   */
   const normalizeGradeLevel = (raw) => {
     if (!raw) return 'Unknown';
     return raw.replace(/\s*\(.*?\)\s*/g, '').trim() || raw;
   };
 
   const gradeSort = (a, b) => {
-    const na = normalizeGradeLevel(a);
-    const nb = normalizeGradeLevel(b);
-    const ai = GRADE_ORDER.indexOf(na);
-    const bi = GRADE_ORDER.indexOf(nb);
+    const na = normalizeGradeLevel(a), nb = normalizeGradeLevel(b);
+    const ai = GRADE_ORDER.indexOf(na),  bi = GRADE_ORDER.indexOf(nb);
     if (ai === -1 && bi === -1) return na.localeCompare(nb);
     if (ai === -1) return 1;
     if (bi === -1) return -1;
     return ai - bi;
   };
 
-  // ─── Subjects grouped by NORMALISED grade then pathway (sorted) ──────────
   const groupedSubjects = React.useMemo(() => {
     const groups = {};
     for (const s of filteredSubjects) {
@@ -726,25 +720,21 @@ function SubjectManager() {
       if (!groups[grade][pathway]) groups[grade][pathway] = [];
       groups[grade][pathway].push(s);
     }
-
     return Object.entries(groups)
       .sort(([a], [b]) => gradeSort(a, b))
       .map(([grade, pathwayGroups]) => ({
         grade,
         pathwayGroups: Object.entries(pathwayGroups)
           .sort(([a], [b]) => {
-            const ai = PATHWAY_ORDER.indexOf(a);
-            const bi = PATHWAY_ORDER.indexOf(b);
+            const ai = PATHWAY_ORDER.indexOf(a), bi = PATHWAY_ORDER.indexOf(b);
             return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
           })
           .map(([pathway, subs]) => ({ pathway, subs })),
       }));
   }, [filteredSubjects]);
 
-  // ─── Grade levels for the filter dropdown (normalised + sorted) ──────────
   const existingGradeLevels = React.useMemo(() =>
-    [...new Set(subjects.map(s => normalizeGradeLevel(s.grade_level)).filter(g => g !== 'Unknown'))]
-      .sort(gradeSort),
+    [...new Set(subjects.map(s => normalizeGradeLevel(s.grade_level)).filter(g => g !== 'Unknown'))].sort(gradeSort),
     [subjects]
   );
 
@@ -754,28 +744,31 @@ function SubjectManager() {
   );
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // RENDER HELPERS
+  // MODALS
   // ═══════════════════════════════════════════════════════════════════════════
 
+  // ── Delete Subject Modal ──────────────────────────────────────────────────
   const renderDeleteConfirmationModal = () => {
     if (!deleteModal.isOpen) return null;
     return (
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[70] p-4">
-        <div className="bg-white dark:bg-slate-800/50 rounded-xl shadow-2xl w-full max-w-md border border-slate-200 dark:border-slate-700">
-          <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-700">
+        <div className="bg-white dark:bg-slate-800/50 rounded-2xl shadow-2xl w-full max-w-md border border-slate-200 dark:border-slate-700">
+          <div className="p-5 sm:p-6 border-b border-slate-200 dark:border-slate-700">
             <div className="flex items-start gap-3 sm:gap-4">
               <div className="p-2 sm:p-3 rounded-full bg-red-50 dark:bg-red-900/20 flex-shrink-0">
                 <AlertCircle className="w-5 h-5 sm:w-6 sm:h-6 text-red-500" />
               </div>
               <div>
                 <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white">Delete Subject</h3>
-                <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-                  Are you sure you want to delete <span className="font-semibold text-slate-900 dark:text-white">"{deleteModal.subjectName}"</span>? This cannot be undone.
+                <p className="mt-1.5 text-sm text-slate-600 dark:text-slate-400">
+                  Are you sure you want to delete{' '}
+                  <span className="font-semibold text-slate-900 dark:text-white">"{deleteModal.subjectName}"</span>?
+                  {' '}This cannot be undone.
                 </p>
               </div>
             </div>
           </div>
-          <div className="px-4 sm:px-6 pt-4">
+          <div className="px-5 sm:px-6 pt-4">
             <div className="bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900/30 rounded-lg p-3 flex gap-2">
               <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
               <p className="text-xs text-red-800 dark:text-red-300">
@@ -783,15 +776,18 @@ function SubjectManager() {
               </p>
             </div>
           </div>
-          <div className="p-4 sm:p-6 flex flex-col-reverse sm:flex-row gap-2 justify-end">
-            <button onClick={() => setDeleteModal({ isOpen: false, subjectId: null, subjectName: '' })} disabled={loading}
-              className="w-full sm:w-auto px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-700 hover:bg-slate-50 font-medium transition-all disabled:opacity-50">
-              Keep Subject
+          <div className="p-5 sm:p-6 flex items-center justify-end gap-3">
+            <button
+              onClick={() => setDeleteModal({ isOpen: false, subjectId: null, subjectName: '' })}
+              disabled={loading}
+              className={CLS.cancelPill}
+            >
+              Cancel
             </button>
-            <button onClick={confirmDelete} disabled={loading}
-              className="w-full sm:w-auto px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg font-medium transition-all disabled:opacity-50 flex items-center justify-center gap-1.5">
-              {loading ? <><svg className="animate-spin h-3 w-3" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>Deleting...</>
-              : <><Trash2 className="w-3.5 h-3.5" />Delete Subject</>}
+            <button onClick={confirmDelete} disabled={loading} className={CLS.deletePill}>
+              {loading
+                ? <><svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>Deleting…</>
+                : <><Trash2 className="w-3.5 h-3.5" />Delete Subject</>}
             </button>
           </div>
         </div>
@@ -799,30 +795,37 @@ function SubjectManager() {
     );
   };
 
+  // ── Delete Assignment Modal ───────────────────────────────────────────────
   const renderDeleteAssignmentModal = () => {
     if (!deleteAssignmentModal.isOpen) return null;
     return (
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[70] p-4">
-        <div className="bg-white dark:bg-slate-800/50 rounded-xl shadow-2xl w-full max-w-md border border-slate-200 dark:border-slate-700">
-          <div className="p-4 sm:p-6 border-b border-slate-200 dark:border-slate-700">
+        <div className="bg-white dark:bg-slate-800/50 rounded-2xl shadow-2xl w-full max-w-md border border-slate-200 dark:border-slate-700">
+          <div className="p-5 sm:p-6 border-b border-slate-200 dark:border-slate-700">
             <div className="flex items-start gap-3 sm:gap-4">
               <div className="p-2 sm:p-3 rounded-full bg-red-50 dark:bg-red-900/20 flex-shrink-0">
                 <AlertCircle className="w-5 h-5 sm:w-6 sm:h-6 text-red-500" />
               </div>
               <div>
                 <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white">Delete Assignment</h3>
-                <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">Are you sure you want to delete this assignment? This cannot be undone.</p>
+                <p className="mt-1.5 text-sm text-slate-600 dark:text-slate-400">
+                  Are you sure you want to delete this assignment? This cannot be undone.
+                </p>
               </div>
             </div>
           </div>
-          <div className="p-4 sm:p-6 flex flex-col-reverse sm:flex-row gap-2 justify-end">
-            <button onClick={() => setDeleteAssignmentModal({ isOpen: false, assignmentId: null, assignmentInfo: '' })} disabled={loading}
-              className="w-full sm:w-auto px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-700 hover:bg-slate-50 font-medium transition-all disabled:opacity-50">
-              Keep Assignment
+          <div className="p-5 sm:p-6 flex items-center justify-end gap-3">
+            <button
+              onClick={() => setDeleteAssignmentModal({ isOpen: false, assignmentId: null, assignmentInfo: '' })}
+              disabled={loading}
+              className={CLS.cancelPill}
+            >
+              Cancel
             </button>
-            <button onClick={confirmDeleteAssignment} disabled={loading}
-              className="w-full sm:w-auto px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg font-medium transition-all disabled:opacity-50 flex items-center justify-center gap-1.5">
-              {loading ? 'Deleting...' : <><Trash2 className="w-3.5 h-3.5" />Delete</>}
+            <button onClick={confirmDeleteAssignment} disabled={loading} className={CLS.deletePill}>
+              {loading
+                ? <><svg className="animate-spin h-3.5 w-3.5" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>Deleting…</>
+                : <><Trash2 className="w-3.5 h-3.5" />Delete</>}
             </button>
           </div>
         </div>
@@ -830,6 +833,7 @@ function SubjectManager() {
     );
   };
 
+  // ─── Mobile Bottom Sheet ──────────────────────────────────────────────────
   const renderMobileBottomSheet = () => {
     if (!mobileSheet.isOpen || !mobileSheet.subject) return null;
     const s = mobileSheet.subject;
@@ -850,7 +854,6 @@ function SubjectManager() {
             </button>
           </div>
           <div className="overflow-y-auto px-6 py-4 space-y-3" style={{ maxHeight: 'calc(85vh - 280px)' }}>
-            {/* Grade + Pathway row */}
             <div className="flex flex-wrap gap-2">
               {s.grade_level && (
                 <span className={`flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full ${getGradeLevelBadgeColor()}`}>
@@ -872,16 +875,22 @@ function SubjectManager() {
             </div>
           </div>
           <div className="border-t border-slate-200 dark:border-slate-700 p-4 space-y-2">
-            <button onClick={() => { closeMobileSheet(); showEditForm(s); }}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 rounded-xl hover:bg-slate-200 transition-all">
+            <button
+              onClick={() => { closeMobileSheet(); showEditForm(s); }}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 rounded-xl hover:bg-slate-200 transition-all"
+            >
               <Edit className="w-4 h-4" />Edit Subject
             </button>
-            <button onClick={() => { closeMobileSheet(); showManageAssignmentsView(s); }}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-cyan-700 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-900/20 rounded-xl hover:bg-cyan-100 dark:hover:bg-cyan-900/30 active:scale-[0.98] transition-all">
+            <button
+              onClick={() => { closeMobileSheet(); showManageAssignmentsView(s); }}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-cyan-700 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-900/20 rounded-xl hover:bg-cyan-100 dark:hover:bg-cyan-900/30 active:scale-[0.98] transition-all"
+            >
               <Users className="w-4 h-4" />Manage Assignments
             </button>
-            <button onClick={() => handleDelete(s.id)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-xl hover:bg-red-100 transition-all">
+            <button
+              onClick={() => handleDelete(s.id)}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-xl hover:bg-red-100 transition-all"
+            >
               <Trash2 className="w-4 h-4" />Delete Subject
             </button>
           </div>
@@ -890,7 +899,9 @@ function SubjectManager() {
     );
   };
 
-  // ─── List view ────────────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════════
+  // LIST VIEW
+  // ═══════════════════════════════════════════════════════════════════════════
   const renderListView = () => (
     <>
       {/* Header */}
@@ -941,7 +952,6 @@ function SubjectManager() {
       {/* Filters */}
       {!loading && (
         <div className="bg-white dark:bg-slate-800/50 rounded-lg sm:rounded-xl border border-slate-200 dark:border-slate-700 p-3 sm:p-4 mb-4 md:mb-6">
-          {/* Mobile toggle */}
           <button onClick={() => setShowFilters(!showFilters)} className="md:hidden w-full flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Filter className="w-4 h-4 text-slate-600" />
@@ -952,7 +962,6 @@ function SubjectManager() {
           </button>
 
           <div className={`${showFilters ? '' : 'hidden'} md:block`}>
-            {/* Desktop header */}
             <div className="hidden md:flex items-center gap-2 mb-4">
               <Filter className="w-5 h-5 text-slate-600 dark:text-slate-400" />
               <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Filters</h3>
@@ -960,7 +969,6 @@ function SubjectManager() {
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-              {/* Search */}
               <div className="col-span-2 md:col-span-3 lg:col-span-2 flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Search</label>
                 <div className="relative">
@@ -969,8 +977,6 @@ function SubjectManager() {
                     className="w-full pl-9 pr-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500" />
                 </div>
               </div>
-
-              {/* Grade Level filter */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Grade Level</label>
                 <select value={filterGradeLevel} onChange={e => setFilterGradeLevel(e.target.value)}
@@ -979,8 +985,6 @@ function SubjectManager() {
                   {existingGradeLevels.map(g => <option key={g} value={g}>{g}</option>)}
                 </select>
               </div>
-
-              {/* Pathway filter — only show if school has Senior Secondary */}
               {(schoolLevels.includes('Senior Secondary') || existingPathways.length > 0) && (
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Pathway</label>
@@ -991,8 +995,6 @@ function SubjectManager() {
                   </select>
                 </div>
               )}
-
-              {/* Category */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Category</label>
                 <select value={filterCategory} onChange={e => setFilterCategory(e.target.value)}
@@ -1001,13 +1003,11 @@ function SubjectManager() {
                   {constants.categories.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
-
-              {/* Core/Elective */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Type</label>
                 <select value={filterCoreStatus} onChange={e => setFilterCoreStatus(e.target.value)}
                   className="px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500">
-                  <option value="all">Core & Elective</option>
+                  <option value="all">Core &amp; Elective</option>
                   <option value="core">Core Only</option>
                   <option value="elective">Elective Only</option>
                 </select>
@@ -1058,7 +1058,6 @@ function SubjectManager() {
         </div>
       )}
 
-      {/* Loading */}
       {loading && (
         <div className="flex flex-col items-center justify-center py-12">
           <Loader className="w-10 h-10 text-gray-600 dark:text-gray-400 animate-spin" />
@@ -1066,9 +1065,9 @@ function SubjectManager() {
         </div>
       )}
 
-      {/* ── Desktop: Grouped table (by grade → pathway) ── */}
       {!loading && (
         <>
+          {/* ── Desktop grouped table ───────────────────────────────────────── */}
           <div className="hidden md:block space-y-6">
             {filteredSubjects.length === 0 ? (
               <div className="bg-white dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 p-12 text-center">
@@ -1082,22 +1081,18 @@ function SubjectManager() {
             ) : (
               groupedSubjects.map(({ grade: gradeLevel, pathwayGroups }) => (
                 <div key={gradeLevel} className="bg-white dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
-                  {/* Grade level header */}
+                  {/* Grade-level header */}
                   <div className="flex items-center gap-3 px-6 py-3 bg-slate-50 dark:bg-slate-700/50 border-b border-slate-200 dark:border-slate-700">
                     <GraduationCap className="w-5 h-5 text-teal-600 dark:text-teal-400" />
                     <h3 className="text-base font-bold text-slate-900 dark:text-white">{gradeLevel}</h3>
-                    <span className="text-xs text-slate-500 dark:text-slate-400">
-                      — {levelFromGrade(gradeLevel) || 'N/A'}
-                    </span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400">— {levelFromGrade(gradeLevel) || 'N/A'}</span>
                     <span className="ml-auto text-xs text-slate-400">
                       {pathwayGroups.reduce((sum, { subs }) => sum + subs.length, 0)} subject{pathwayGroups.reduce((sum, { subs }) => sum + subs.length, 0) !== 1 ? 's' : ''}
                     </span>
                   </div>
 
-                  {/* Pathway sub-groups */}
                   {pathwayGroups.map(({ pathway, subs }, pi) => (
                     <div key={pathway}>
-                      {/* Pathway header (only when more than one pathway or not 'All') */}
                       {(pathwayGroups.length > 1 || pathway !== 'All') && (
                         <div className={`flex items-center gap-2 px-6 py-2 bg-white dark:bg-slate-800/30 border-b border-slate-100 dark:border-slate-700/50 ${pi > 0 ? 'border-t border-slate-200 dark:border-slate-700' : ''}`}>
                           <span className={`flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full ${pathway === 'All' ? 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300' : getPathwayBadgeColor(pathway)}`}>
@@ -1106,8 +1101,6 @@ function SubjectManager() {
                           <span className="text-xs text-slate-400">{subs.length} subject{subs.length !== 1 ? 's' : ''}</span>
                         </div>
                       )}
-
-                      {/* Subjects table */}
                       <table className="w-full text-sm text-left">
                         <thead className="bg-slate-50/50 dark:bg-slate-700/20 text-slate-500 dark:text-slate-400 text-xs">
                           <tr>
@@ -1115,8 +1108,8 @@ function SubjectManager() {
                             <th className="px-4 py-2.5 font-medium">Code</th>
                             <th className="px-4 py-2.5 font-medium">Category</th>
                             <th className="px-4 py-2.5 font-medium">Type</th>
-                            <th className="px-4 py-2.5 font-medium">Assignments</th>
-                            <th className="px-4 py-2.5 font-medium text-right">Actions</th>
+                            {/* ── "Actions" col replaces the old Assignments + icon columns ── */}
+                            <th className="px-4 py-2.5 font-medium text-right w-16">Actions</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
@@ -1137,23 +1130,14 @@ function SubjectManager() {
                                   <Award className="w-3 h-3" />{subject.is_core ? 'Core' : 'Elective'}
                                 </span>
                               </td>
-                              <td className="px-4 py-3">
-                                <button onClick={() => showManageAssignmentsView(subject)}
-                                  className="flex items-center gap-1 text-cyan-600 hover:text-cyan-700 dark:text-cyan-400 text-xs font-medium transition-colors">
-                                  <Users className="w-3.5 h-3.5" />Manage
-                                </button>
-                              </td>
+                              {/* ── RowActionsMenu replaces old inline icon buttons ── */}
                               <td className="px-4 py-3 text-right">
-                                <div className="flex justify-end gap-1">
-                                  <button onClick={() => showEditForm(subject)}
-                                    className="p-1.5 text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700">
-                                    <Edit className="w-3.5 h-3.5" />
-                                  </button>
-                                  <button onClick={() => handleDelete(subject.id)}
-                                    className="p-1.5 text-slate-400 hover:text-red-600 dark:hover:text-red-400 transition-colors rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700">
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
+                                <RowActionsMenu
+                                  subject={subject}
+                                  onEdit={() => showEditForm(subject)}
+                                  onManageAssignments={() => showManageAssignmentsView(subject)}
+                                  onDelete={() => handleDelete(subject.id)}
+                                />
                               </td>
                             </tr>
                           ))}
@@ -1166,7 +1150,7 @@ function SubjectManager() {
             )}
           </div>
 
-          {/* ── Mobile: Card list ── */}
+          {/* ── Mobile card list ────────────────────────────────────────────── */}
           <div className="md:hidden space-y-3">
             {filteredSubjects.length > 0 ? filteredSubjects.map(subject => (
               <button key={subject.id} onClick={() => openMobileSheet(subject)}
@@ -1178,7 +1162,6 @@ function SubjectManager() {
                   </div>
                   <ChevronRight className="w-5 h-5 text-slate-400 flex-shrink-0 ml-2" />
                 </div>
-                {/* Grade + Pathway chips */}
                 <div className="flex flex-wrap gap-1.5 mb-2">
                   {subject.grade_level && (
                     <span className={`flex items-center gap-0.5 px-1.5 py-0.5 text-xs font-semibold rounded-full ${getGradeLevelBadgeColor()}`}>
@@ -1213,11 +1196,12 @@ function SubjectManager() {
     </>
   );
 
-  // ─── Form view ────────────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FORM VIEW
+  // ═══════════════════════════════════════════════════════════════════════════
   const renderFormView = () => (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[70] p-2 sm:p-4">
       <div className="bg-white dark:bg-slate-800/50 rounded-xl shadow-2xl w-full max-w-2xl border border-slate-200 dark:border-slate-700 max-h-[92vh] overflow-y-auto">
-        {/* Modal header */}
         <div className="flex items-center justify-between p-4 sm:p-6 border-b border-slate-200 dark:border-slate-700 sticky top-0 bg-white dark:bg-slate-800/50 z-10">
           <h2 className="text-lg sm:text-xl font-semibold text-[#0d141b] dark:text-white">
             {view === 'edit' ? 'Edit Subject' : 'Create New Subject'}
@@ -1228,7 +1212,7 @@ function SubjectManager() {
         </div>
 
         <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-5">
-          {/* ── Step 1: Grade Level ── */}
+          {/* Grade Level */}
           <div className="space-y-1.5">
             <label htmlFor="grade_level" className="block text-sm font-semibold text-[#0d141b] dark:text-slate-300">
               Grade Level <span className="text-red-500">*</span>
@@ -1238,15 +1222,9 @@ function SubjectManager() {
               <select id="grade_level" name="grade_level" value={formData.grade_level} onChange={handleInputChange} required
                 className="w-full pl-9 pr-3 py-2.5 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-[#0d141b] dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 appearance-none transition-all">
                 <option value="">Select grade level</option>
-                {formGradeLevels.length > 0 ? (
-                  formGradeLevels.map(g => (
-                    <option key={g} value={g}>{g} — {levelFromGrade(g)}</option>
-                  ))
-                ) : (
-                  availableGradeLevels.map(g => (
-                    <option key={g} value={g}>{g} — {levelFromGrade(g)}</option>
-                  ))
-                )}
+                {(formGradeLevels.length > 0 ? formGradeLevels : availableGradeLevels).map(g => (
+                  <option key={g} value={g}>{g} — {levelFromGrade(g)}</option>
+                ))}
               </select>
               <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
             </div>
@@ -1257,10 +1235,10 @@ function SubjectManager() {
             )}
           </div>
 
-          {/* ── Step 2: Pathway (only for Senior Secondary) ── */}
+          {/* Pathway (Senior Secondary only) */}
           {isSeniorSecondary && (
             <div className="space-y-1.5">
-              <label htmlFor="pathway" className="block text-sm font-semibold text-[#0d141b] dark:text-slate-300">
+              <label className="block text-sm font-semibold text-[#0d141b] dark:text-slate-300">
                 Pathway <span className="text-red-500">*</span>
                 <span className="text-xs font-normal text-slate-500 ml-1">(required for Senior Secondary)</span>
               </label>
@@ -1270,19 +1248,19 @@ function SubjectManager() {
                   .map(p => (
                     <button key={p} type="button"
                       onClick={() => setFormData(prev => ({ ...prev, pathway: p }))}
-                      className={`flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg border-2 text-sm font-semibold transition-all ${formData.pathway === p
-                        ? `border-current ${getPathwayBadgeColor(p)} ring-2 ring-offset-1 ring-current`
-                        : 'border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-500'
+                      className={`flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg border-2 text-sm font-semibold transition-all ${
+                        formData.pathway === p
+                          ? `border-current ${getPathwayBadgeColor(p)} ring-2 ring-offset-1 ring-current`
+                          : 'border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-slate-500'
                       }`}>
                       {getPathwayIcon(p)}{p}
                     </button>
-                  ))
-                }
+                  ))}
               </div>
             </div>
           )}
 
-          {/* ── Step 3: Name + Code ── */}
+          {/* Name + Code */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5 relative">
               <label htmlFor="name" className="block text-sm font-semibold text-[#0d141b] dark:text-slate-300">
@@ -1294,8 +1272,6 @@ function SubjectManager() {
                   className="w-full px-3 py-2.5 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-[#0d141b] dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-all" />
                 {searchLoading && <Loader className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 animate-spin" />}
               </div>
-
-              {/* Suggestions dropdown */}
               {showSubjectSuggestions && subjectSearchResults.length > 0 && (
                 <div className="absolute z-20 w-full mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                   <div className="px-3 py-1.5 border-b border-slate-100 dark:border-slate-700">
@@ -1317,13 +1293,9 @@ function SubjectManager() {
                     </div>
                   ))}
                   <button onClick={() => setShowSubjectSuggestions(false)}
-                    className="w-full px-3 py-1.5 text-xs text-slate-400 hover:text-slate-600 text-center">
-                    Dismiss
-                  </button>
+                    className="w-full px-3 py-1.5 text-xs text-slate-400 hover:text-slate-600 text-center">Dismiss</button>
                 </div>
               )}
-
-              {/* Already exists warning */}
               {subjectExists && !showSubjectSuggestions && (
                 <div className="mt-1.5 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg p-2.5 flex items-start gap-2">
                   <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
@@ -1334,7 +1306,6 @@ function SubjectManager() {
                 </div>
               )}
             </div>
-
             <div className="space-y-1.5">
               <label htmlFor="code" className="block text-sm font-semibold text-[#0d141b] dark:text-slate-300">
                 Subject Code <span className="text-red-500">*</span>
@@ -1345,7 +1316,7 @@ function SubjectManager() {
             </div>
           </div>
 
-          {/* ── Step 4: Category + is_core ── */}
+          {/* Category + is_core */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <label htmlFor="category" className="block text-sm font-semibold text-[#0d141b] dark:text-slate-300">
@@ -1365,13 +1336,16 @@ function SubjectManager() {
                 </span>
               )}
             </div>
-
             <div className="flex items-center md:items-end pb-1">
               <label className="flex items-center gap-3 cursor-pointer group">
                 <div className="relative flex-shrink-0">
                   <input type="checkbox" id="is_core" name="is_core" checked={formData.is_core} onChange={handleInputChange} className="sr-only peer" />
-                  <div className="w-5 h-5 border-2 border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 flex items-center justify-center peer-checked:bg-blue-600 peer-checked:border-blue-600 group-hover:border-slate-400 transition-all">
-                    {formData.is_core && <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>}
+                  <div className="w-5 h-5 border-2 border-slate-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 flex items-center justify-center peer-checked:bg-cyan-500 peer-checked:border-cyan-500 group-hover:border-slate-400 transition-all">
+                    {formData.is_core && (
+                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
                   </div>
                 </div>
                 <div>
@@ -1399,7 +1373,7 @@ function SubjectManager() {
             </div>
           )}
 
-          {/* Actions */}
+          {/* Form actions */}
           <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
             <button type="button" onClick={backToList} disabled={submitting}
               className="px-4 py-2.5 text-sm border border-slate-300 dark:border-slate-600 rounded-lg text-[#0d141b] dark:text-slate-300 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 transition-all disabled:opacity-50">
@@ -1408,9 +1382,14 @@ function SubjectManager() {
             <button type="submit" disabled={submitting}
               className="px-5 py-2.5 text-sm bg-black dark:bg-white text-white dark:text-black rounded-lg hover:bg-gray-800 dark:hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 min-w-[100px]">
               {submitting
-                ? <><svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg>Saving...</>
-                : view === 'edit' ? 'Update Subject' : 'Create Subject'
-              }
+                ? <>
+                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    Saving...
+                  </>
+                : view === 'edit' ? 'Update Subject' : 'Create Subject'}
             </button>
           </div>
         </form>
@@ -1418,7 +1397,9 @@ function SubjectManager() {
     </div>
   );
 
-  // ─── Main render ──────────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════════
+  // MAIN RENDER
+  // ═══════════════════════════════════════════════════════════════════════════
   if (authLoading) {
     return (
       <div className="w-full p-3 sm:p-4 md:p-6 lg:p-8 flex flex-col items-center justify-center py-16">
@@ -1436,18 +1417,20 @@ function SubjectManager() {
           <p className="mt-4 text-slate-500 dark:text-slate-400">Loading Subjects...</p>
         </div>
       )}
+
       {!loading && view === 'list' && renderListView()}
       {(view === 'create' || view === 'edit') && renderFormView()}
 
+      {/* ManageAssignments panel */}
       <ManageAssignments
         isOpen={view === 'manage-assignments'}
         onClose={backToList}
         selectedSubject={selectedSubject}
         hasStreams={hasStreams}
         academicYears={academicYears}
-        teachers={compatibleTeachers}               
-        allTeachersCount={allTeachersCount}         
-        incompatibleCount={incompatibleCount}       
+        teachers={compatibleTeachers}
+        allTeachersCount={allTeachersCount}
+        incompatibleCount={incompatibleCount}
         assignments={assignments}
         loading={loading}
         assignmentFormData={assignmentFormData}
@@ -1462,10 +1445,12 @@ function SubjectManager() {
         onDeleteAssignment={handleDeleteAssignment}
       />
 
+      {/* Modals */}
       {renderDeleteConfirmationModal()}
       {renderDeleteAssignmentModal()}
       {renderMobileBottomSheet()}
 
+      {/* BulkAssignmentModal */}
       <BulkAssignmentModal
         isOpen={showBulkModal}
         onClose={() => setShowBulkModal(false)}
