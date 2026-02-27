@@ -1,63 +1,51 @@
 import React, { useEffect, useState } from 'react';
-import { 
-  User, 
-  Save, 
-  Loader, 
-  Mail, 
-  Phone, 
-  UserCircle, 
-  Shield, 
-  Calendar, 
-  X, 
+import {
+  User,
+  Save,
+  Loader,
+  Mail,
+  Phone,
+  UserCircle,
+  Calendar,
+  X,
   Check,
   Info,
   ChevronDown,
   ChevronUp,
   LogOut,
   Smartphone,
-  AlertTriangle
+  AlertTriangle,
+  Shield,
+  Globe,
+  Crown
 } from 'lucide-react';
 import { apiRequest } from '../../../utils/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 function UserProfile() {
-  const [profile, setProfile] = useState({
-    school_id: null,
-    role_id: '',
-    role: '',
-    full_name: '',
-    email: '',
-    phone: '',
-    gender: '',
-    status: '',
-    email_verified_at: null,
-    must_change_password: false,
-    created_at: '',
-    updated_at: ''
-  });
-  
+  const [profile, setProfile] = useState(null);
+
   const [editableProfile, setEditableProfile] = useState({
     full_name: '',
     email: '',
     phone: '',
     gender: ''
   });
-  
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [message, setMessage] = useState({ text: '', type: '' });
   const [validationErrors, setValidationErrors] = useState({});
   const [showMoreInfo, setShowMoreInfo] = useState(false);
-  
+
   // Session management state
   const [activeSessions, setActiveSessions] = useState(null);
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
-  
-  // Auth context and navigation
+
   const { logout } = useAuth();
   const navigate = useNavigate();
 
@@ -70,38 +58,17 @@ function UserProfile() {
     try {
       setLoading(true);
       const response = await apiRequest('auth/user', 'GET');
-      console.log('Profile API Response:', response);
-      
-      const mappedProfile = {
-        school_id: response.school_id || null,
-        role_id: response.role_id || '',
-        role: response.role || '',
+      setProfile(response);
+      setEditableProfile({
         full_name: response.full_name || '',
         email: response.email || '',
         phone: response.phone || '',
-        gender: response.gender || '',
-        status: response.status || '',
-        email_verified_at: response.email_verified_at || null,
-        must_change_password: response.must_change_password || false,
-        created_at: response.created_at || '',
-        updated_at: response.updated_at || '',
-        active_sessions: response.active_sessions || 0
-      };
-      
-      setProfile(mappedProfile);
-      setEditableProfile({
-        full_name: mappedProfile.full_name || '',
-        email: mappedProfile.email || '',
-        phone: mappedProfile.phone || '',
-        gender: mappedProfile.gender || ''
+        gender: response.gender || ''
       });
       setMessage({ text: '', type: '' });
     } catch (error) {
       console.error('Failed to fetch profile:', error);
-      setMessage({
-        text: 'Failed to load profile. Please try again.',
-        type: 'error'
-      });
+      setMessage({ text: 'Failed to load profile. Please try again.', type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -111,7 +78,6 @@ function UserProfile() {
     try {
       setSessionsLoading(true);
       const response = await apiRequest('auth/active-sessions', 'GET');
-      console.log('Active sessions response:', response);
       setActiveSessions(response);
     } catch (error) {
       console.error('Failed to fetch active sessions:', error);
@@ -126,23 +92,12 @@ function UserProfile() {
       setShowLogoutConfirm(true);
       return;
     }
-
     try {
       setLoggingOut(true);
-      
       await apiRequest('auth/logout-all', 'POST');
-      
       await logout();
-      
-      setMessage({
-        text: 'Successfully logged out from all devices. Redirecting...',
-        type: 'success'
-      });
-      
-      setTimeout(() => {
-        navigate('/login');
-      }, 1000);
-      
+      setMessage({ text: 'Successfully logged out from all devices. Redirecting...', type: 'success' });
+      setTimeout(() => navigate('/login'), 1000);
     } catch (error) {
       console.error('Failed to logout from all devices:', error);
       setMessage({
@@ -154,103 +109,57 @@ function UserProfile() {
     }
   };
 
-  const handleCancelLogout = () => {
-    setShowLogoutConfirm(false);
-  };
+  const handleCancelLogout = () => setShowLogoutConfirm(false);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setEditableProfile(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setEditableProfile(prev => ({ ...prev, [name]: value }));
     if (validationErrors[name]) {
-      setValidationErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
+      setValidationErrors(prev => ({ ...prev, [name]: '' }));
     }
   };
 
   const validateForm = () => {
     const errors = {};
-    
-    if (!editableProfile.full_name?.trim()) {
-      errors.full_name = 'Full name is required';
-    }
-    
+    if (!editableProfile.full_name?.trim()) errors.full_name = 'Full name is required';
     if (!editableProfile.email?.trim()) {
       errors.email = 'Email is required';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editableProfile.email)) {
       errors.email = 'Please enter a valid email address';
     }
-    
     if (editableProfile.phone && editableProfile.phone.length > 20) {
       errors.phone = 'Phone number is too long';
     }
-    
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
     if (!validateForm()) {
-      setMessage({
-        text: 'Please fix the validation errors',
-        type: 'error'
-      });
+      setMessage({ text: 'Please fix the validation errors', type: 'error' });
       return;
     }
-    
     setSaving(true);
     setMessage({ text: '', type: '' });
-
     try {
       const response = await apiRequest('user/profile', 'PATCH', editableProfile);
-      console.log('Update response:', response);
-      
       if (response.user) {
-        const updatedProfile = {
-          school_id: response.user.school_id || profile.school_id,
-          role_id: response.user.role_id || profile.role_id,
-          role: response.user.role || profile.role,
+        setProfile(prev => ({ ...prev, ...response.user }));
+        setEditableProfile({
           full_name: response.user.full_name || editableProfile.full_name,
           email: response.user.email || editableProfile.email,
           phone: response.user.phone || editableProfile.phone,
           gender: response.user.gender || editableProfile.gender,
-          status: response.user.status || profile.status,
-          email_verified_at: response.user.email_verified_at || profile.email_verified_at,
-          must_change_password: response.user.must_change_password || profile.must_change_password,
-          created_at: response.user.created_at || profile.created_at,
-          updated_at: response.user.updated_at || new Date().toISOString(),
-          active_sessions: response.user.active_sessions || profile.active_sessions
-        };
-        
-        setProfile(updatedProfile);
+        });
       }
-      
       setIsEditing(false);
-      setMessage({
-        text: response.message || 'Profile updated successfully!',
-        type: 'success'
-      });
-      
-      setTimeout(() => {
-        setMessage({ text: '', type: '' });
-      }, 5000);
+      setMessage({ text: response.message || 'Profile updated successfully!', type: 'success' });
+      setTimeout(() => setMessage({ text: '', type: '' }), 5000);
     } catch (error) {
       console.error('Failed to update profile:', error);
-      
-      if (error.errors) {
-        setValidationErrors(error.errors);
-      }
-      
-      setMessage({
-        text: error.message || 'Failed to update profile. Please try again.',
-        type: 'error'
-      });
+      if (error.errors) setValidationErrors(error.errors);
+      setMessage({ text: error.message || 'Failed to update profile. Please try again.', type: 'error' });
     } finally {
       setSaving(false);
     }
@@ -258,10 +167,10 @@ function UserProfile() {
 
   const handleCancel = () => {
     setEditableProfile({
-      full_name: profile.full_name || '',
-      email: profile.email || '',
-      phone: profile.phone || '',
-      gender: profile.gender || ''
+      full_name: profile?.full_name || '',
+      email: profile?.email || '',
+      phone: profile?.phone || '',
+      gender: profile?.gender || ''
     });
     setIsEditing(false);
     setValidationErrors({});
@@ -271,70 +180,50 @@ function UserProfile() {
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+      year: 'numeric', month: 'long', day: 'numeric',
+      hour: '2-digit', minute: '2-digit'
     });
   };
 
   const getStatusBadge = (status) => {
-    const styles = status === 'active' 
-      ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-      : 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400';
-    
+    const isActive = status === 'active';
     return (
-      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${styles}`}>
-        <span className={`w-2 h-2 rounded-full ${status === 'active' ? 'bg-green-600 dark:bg-green-400' : 'bg-red-600 dark:bg-red-400'}`}></span>
-        {status?.charAt(0).toUpperCase() + status?.slice(1) || 'N/A'}
+      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${
+        isActive
+          ? 'bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-900/30 dark:text-cyan-300 dark:border-cyan-800'
+          : 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800'
+      }`}>
+        <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-cyan-500 dark:bg-cyan-400' : 'bg-red-500 dark:bg-red-400'}`}></span>
+        {status ? status.charAt(0).toUpperCase() + status.slice(1) : 'N/A'}
       </span>
     );
   };
 
-  const calculateDaysAgo = (dateString) => {
-    if (!dateString) return 'N/A';
-    const diffTime = Math.abs(new Date() - new Date(dateString));
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-    return diffDays === 0 ? 'Today' : `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
+  const getRoleDisplay = (role) => {
+    if (!role) return 'No Role Assigned';
+    return role.replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   };
 
-  const getRoleDisplay = () => {
-    const role = profile.role;
-    
-    if (typeof role === 'string') {
-      return role.replace('-', ' ').toUpperCase();
-    }
-    
-    if (typeof role === 'number') {
-      const roleMap = {
-        1: 'ADMIN',
-        2: 'TEACHER',
-        3: 'STUDENT',
-        4: 'PARENT',
-        5: 'SUPER ADMIN'
-      };
-      return roleMap[role] || `ROLE ${role}`;
-    }
-    
-    return 'No Role Assigned';
-  };
-
+  // ── Loading ──
   if (loading) {
     return (
       <div className="w-full min-h-screen flex items-center justify-center py-8 px-4">
         <div className="flex flex-col items-center gap-4">
-          <Loader className="w-12 h-12 text-slate-600 dark:text-slate-400 animate-spin" />
-          <p className="text-slate-600 dark:text-slate-400">Loading profile...</p>
+          <Loader className="w-10 h-10 text-[#4c739a] animate-spin" />
+          <p className="text-[#4c739a] dark:text-slate-400 text-sm">Loading profile...</p>
         </div>
       </div>
     );
   }
 
+  const totalSessions = activeSessions?.total_sessions ?? profile?.active_sessions ?? 0;
+  const currentSession = profile?.current_session;
+
   return (
     <div className="w-full py-4 sm:py-6 md:py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header Section */}
+
+        {/* ── Header ── */}
         <div className="mb-6 sm:mb-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex flex-col gap-2">
@@ -345,11 +234,10 @@ function UserProfile() {
                 View and update your personal information
               </p>
             </div>
-            
             {!isEditing && (
               <button
                 onClick={() => setIsEditing(true)}
-                className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-lg sm:rounded-xl h-10 sm:h-11 px-4 sm:px-6 bg-black dark:bg-white text-white dark:text-black text-sm font-bold hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors"
+                className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl h-10 sm:h-11 px-5 bg-black dark:bg-white text-white dark:text-black text-sm font-bold hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors"
               >
                 <User className="w-4 h-4" />
                 <span>Edit Profile</span>
@@ -358,144 +246,148 @@ function UserProfile() {
           </div>
         </div>
 
-        {/* Message Display */}
+        {/* ── Message Banner ── */}
         {message.text && (
-          <div className={`mb-4 sm:mb-6 p-3 sm:p-4 rounded-lg sm:rounded-xl flex items-start gap-3 ${
-            message.type === 'success' 
-              ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 border border-green-200 dark:border-green-800' 
-              : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400 border border-red-200 dark:border-red-800'
+          <div className={`mb-5 p-3 sm:p-4 rounded-xl flex items-start gap-3 border ${
+            message.type === 'success'
+              ? 'bg-cyan-50 dark:bg-cyan-900/20 text-cyan-800 dark:text-cyan-300 border-cyan-200 dark:border-cyan-800/40'
+              : 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-400 border-red-200 dark:border-red-800'
           }`}>
-            {message.type === 'success' ? (
-              <Check className="w-5 h-5 flex-shrink-0 mt-0.5" />
-            ) : (
-              <X className="w-5 h-5 flex-shrink-0 mt-0.5" />
-            )}
-            <p className="text-sm sm:text-base flex-1">{message.text}</p>
-            <button
-              onClick={() => setMessage({ text: '', type: '' })}
-              className="flex-shrink-0 hover:opacity-70 transition-opacity"
-            >
+            {message.type === 'success'
+              ? <Check className="w-5 h-5 flex-shrink-0 mt-0.5" />
+              : <X className="w-5 h-5 flex-shrink-0 mt-0.5" />}
+            <p className="text-sm flex-1">{message.text}</p>
+            <button onClick={() => setMessage({ text: '', type: '' })} className="flex-shrink-0 hover:opacity-60 transition-opacity">
               <X className="w-4 h-4" />
             </button>
           </div>
         )}
 
-        {/* Main Content Grid */}
+        {/* ── Grid ── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-          {/* Left Column - Profile Overview */}
+
+          {/* ────── LEFT COLUMN ────── */}
           <div className="lg:col-span-1 space-y-4 sm:space-y-6">
+
             {/* Profile Card */}
-            <div className="bg-white dark:bg-slate-800/50 rounded-lg sm:rounded-xl border border-slate-200 dark:border-slate-700 p-4 sm:p-6">
+            <div className="bg-white dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 p-5 sm:p-6">
               <div className="flex flex-col items-center text-center">
-                <div className="w-20 h-20 sm:w-24 sm:h-24 bg-gradient-to-br from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 rounded-full flex items-center justify-center mb-4">
-                  <User className="w-10 h-10 sm:w-12 sm:h-12 text-white dark:text-slate-900" />
+                {/* Avatar — cyan accent, mirrors SuperAdminContactCard admin avatar */}
+                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full flex items-center justify-center mb-4 bg-cyan-50 dark:bg-cyan-900/30 border-2 border-cyan-100 dark:border-cyan-800/50">
+                  <User className="w-10 h-10 sm:w-12 sm:h-12 text-cyan-600 dark:text-cyan-400" />
                 </div>
                 <h2 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mb-1">
-                  {profile.full_name || 'N/A'}
+                  {profile?.full_name || 'N/A'}
                 </h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
-                  {getRoleDisplay()}
-                </p>
-                {getStatusBadge(profile.status)}
-              </div>
-
-              <div className="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700 space-y-3">
-                <div className="flex items-center gap-3 text-sm">
-                  <Mail className="w-4 h-4 text-slate-500 dark:text-slate-400 flex-shrink-0" />
-                  <span className="text-slate-900 dark:text-white break-all">
-                    {profile.email || 'No email'}
+                {/* Role pill — cyan accent */}
+                <div className="flex items-center gap-1.5 mb-3">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300">
+                    <Crown className="w-3 h-3" />
+                    {getRoleDisplay(profile?.role)}
                   </span>
                 </div>
-                {profile.phone && (
+                {getStatusBadge(profile?.status)}
+              </div>
+
+              <div className="mt-5 pt-5 border-t border-slate-200 dark:border-slate-700 space-y-3">
+                <div className="flex items-center gap-3 text-sm">
+                  <Mail className="w-4 h-4 text-cyan-500 dark:text-cyan-400 flex-shrink-0" />
+                  <span className="text-slate-800 dark:text-slate-200 break-all">{profile?.email || '—'}</span>
+                </div>
+                {profile?.phone && (
                   <div className="flex items-center gap-3 text-sm">
-                    <Phone className="w-4 h-4 text-slate-500 dark:text-slate-400 flex-shrink-0" />
-                    <span className="text-slate-900 dark:text-white">
-                      {profile.phone}
-                    </span>
+                    <Phone className="w-4 h-4 text-cyan-500 dark:text-cyan-400 flex-shrink-0" />
+                    <span className="text-slate-800 dark:text-slate-200">{profile.phone}</span>
                   </div>
                 )}
-                {profile.gender && (
+                {profile?.gender && (
                   <div className="flex items-center gap-3 text-sm">
-                    <UserCircle className="w-4 h-4 text-slate-500 dark:text-slate-400 flex-shrink-0" />
-                    <span className="text-slate-900 dark:text-white capitalize">
-                      {profile.gender}
-                    </span>
+                    <UserCircle className="w-4 h-4 text-cyan-500 dark:text-cyan-400 flex-shrink-0" />
+                    <span className="text-slate-800 dark:text-slate-200 capitalize">{profile.gender}</span>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Session Management Card */}
-            <div className="bg-white dark:bg-slate-800/50 rounded-lg sm:rounded-xl border border-slate-200 dark:border-slate-700 p-4 sm:p-6">
+            {/* Active Sessions Card */}
+            <div className="bg-white dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 p-5 sm:p-6">
               <div className="flex items-center gap-2 mb-4">
-                <Smartphone className="w-5 h-5 text-slate-500 dark:text-slate-400" />
-                <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
-                  Active Sessions
-                </h3>
+                {/* Cyan accent icon — mirrors SuperAdminContactCard shield */}
+                <div className="p-1 rounded-full bg-cyan-50 dark:bg-cyan-900/30 flex-shrink-0">
+                  <Smartphone className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+                </div>
+                <h3 className="text-base font-bold text-slate-900 dark:text-white">Active Sessions</h3>
               </div>
 
               {sessionsLoading ? (
                 <div className="flex items-center justify-center py-4">
-                  <Loader className="w-6 h-6 text-slate-400 animate-spin" />
+                  <Loader className="w-5 h-5 text-cyan-500 animate-spin" />
                 </div>
-              ) : activeSessions ? (
+              ) : (
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-700/30 rounded-lg">
-                    <span className="text-sm text-slate-600 dark:text-slate-400">Total Devices</span>
-                    <span className="text-lg font-bold text-slate-900 dark:text-white">
-                      {activeSessions.total_sessions || 0}
-                    </span>
+                  {/* Session count tile — cyan accent */}
+                  <div className="flex items-center justify-between p-3 bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-100 dark:border-cyan-900/50 rounded-lg">
+                    <span className="text-sm text-cyan-700 dark:text-cyan-300 font-medium">Total Devices</span>
+                    <span className="text-lg font-bold text-cyan-700 dark:text-cyan-300">{totalSessions}</span>
                   </div>
 
+                  {/* Current session details */}
+                  {currentSession && (
+                    <div className="space-y-2 text-xs text-slate-500 dark:text-slate-400">
+                      {currentSession.ip_address && (
+                        <div className="flex items-center gap-2">
+                          <Globe className="w-3.5 h-3.5 text-cyan-500 flex-shrink-0" />
+                          <span>IP: {currentSession.ip_address}</span>
+                        </div>
+                      )}
+                      {currentSession.created_at && (
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-3.5 h-3.5 text-cyan-500 flex-shrink-0" />
+                          <span>Since: {formatDate(currentSession.created_at)}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Logout all */}
                   {!showLogoutConfirm ? (
                     <button
                       onClick={handleLogoutAllDevices}
-                      disabled={loggingOut || !activeSessions.total_sessions}
-                      className="w-full flex items-center justify-center gap-2 rounded-lg h-10 px-4 bg-red-600 text-white text-sm font-bold hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={loggingOut || totalSessions === 0}
+                      className="w-full flex items-center justify-center gap-2 rounded-lg h-10 px-4 bg-red-600 text-white text-sm font-bold hover:bg-red-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       <LogOut className="w-4 h-4" />
                       <span>Logout All Devices</span>
                     </button>
                   ) : (
                     <div className="space-y-3">
-                      <div className="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+                      {/* Amber warning — matches SuperAdminContactCard info box style */}
+                      <div className="p-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/40 rounded-lg">
                         <div className="flex items-start gap-2">
-                          <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+                          <AlertTriangle className="w-4 h-4 text-amber-500 dark:text-amber-400 flex-shrink-0 mt-0.5" />
                           <div>
-                            <p className="text-sm font-medium text-yellow-800 dark:text-yellow-300">
-                              Are you sure?
-                            </p>
-                            <p className="text-xs text-yellow-700 dark:text-yellow-400 mt-1">
-                              This will log you out from all {activeSessions.total_sessions} device{activeSessions.total_sessions !== 1 ? 's' : ''}.
+                            <p className="text-sm font-semibold text-amber-700 dark:text-amber-300">Are you sure?</p>
+                            <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+                              This will end all {totalSessions} active session{totalSessions !== 1 ? 's' : ''}.
                             </p>
                           </div>
                         </div>
                       </div>
-                      
                       <div className="flex gap-2">
                         <button
                           onClick={handleCancelLogout}
                           disabled={loggingOut}
-                          className="flex-1 flex items-center justify-center gap-2 rounded-lg h-10 px-4 border-2 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white text-sm font-bold hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                          className="flex-1 flex items-center justify-center rounded-lg h-9 px-3 border-2 border-slate-300 dark:border-slate-600 text-slate-800 dark:text-white text-sm font-semibold hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                         >
                           Cancel
                         </button>
                         <button
                           onClick={handleLogoutAllDevices}
                           disabled={loggingOut}
-                          className="flex-1 flex items-center justify-center gap-2 rounded-lg h-10 px-4 bg-red-600 text-white text-sm font-bold hover:bg-red-700 transition-colors disabled:opacity-50"
+                          className="flex-1 flex items-center justify-center gap-1.5 rounded-lg h-9 px-3 bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors disabled:opacity-50"
                         >
-                          {loggingOut ? (
-                            <>
-                              <Loader className="w-4 h-4 animate-spin" />
-                              <span>Logging out...</span>
-                            </>
-                          ) : (
-                            <>
-                              <LogOut className="w-4 h-4" />
-                              <span>Confirm</span>
-                            </>
-                          )}
+                          {loggingOut ? <Loader className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />}
+                          <span>{loggingOut ? 'Logging out...' : 'Confirm'}</span>
                         </button>
                       </div>
                     </div>
@@ -504,217 +396,159 @@ function UserProfile() {
                   <button
                     onClick={fetchActiveSessions}
                     disabled={sessionsLoading}
-                    className="w-full text-xs text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
+                    className="w-full text-xs text-[#4c739a] dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition-colors"
                   >
                     Refresh Sessions
                   </button>
                 </div>
-              ) : (
-                <p className="text-sm text-slate-500 dark:text-slate-400 text-center py-4">
-                  Unable to load sessions
-                </p>
               )}
             </div>
 
-            {/* Account Information Card */}
-            <div className="bg-white dark:bg-slate-800/50 rounded-lg sm:rounded-xl border border-slate-200 dark:border-slate-700 p-4 sm:p-6">
+            {/* Account Information — matches SchoolStructureInfo card style exactly */}
+            <div className="bg-slate-50 dark:bg-slate-800/50 border border-cyan-100 dark:border-slate-700 rounded-xl p-4 sm:p-5">
               <button
                 onClick={() => setShowMoreInfo(!showMoreInfo)}
-                className="w-full flex items-center justify-between text-left"
+                className="w-full flex items-center justify-between text-left mb-2"
               >
                 <div className="flex items-center gap-2">
-                  <Info className="w-5 h-5 text-slate-500 dark:text-slate-400" />
-                  <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white">
+                  <div className="p-1 rounded-full bg-cyan-50 dark:bg-cyan-900/30 flex-shrink-0">
+                    <Info className="w-4 h-4 sm:w-5 sm:h-5 text-cyan-600 dark:text-cyan-400" />
+                  </div>
+                  <h3 className="text-sm sm:text-base font-medium text-slate-700 dark:text-slate-300">
                     Account Information
                   </h3>
                 </div>
-                {showMoreInfo ? (
-                  <ChevronUp className="w-5 h-5 text-slate-500 dark:text-slate-400" />
-                ) : (
-                  <ChevronDown className="w-5 h-5 text-slate-500 dark:text-slate-400" />
-                )}
+                {showMoreInfo
+                  ? <ChevronUp className="w-4 h-4 text-[#4c739a]" />
+                  : <ChevronDown className="w-4 h-4 text-[#4c739a]" />}
               </button>
 
-              {showMoreInfo && (
-                <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">Role</span>
-                    <span className="text-sm font-medium text-slate-900 dark:text-white">
-                      {getRoleDisplay()}
-                    </span>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">Email Status</span>
-                    <div className="text-sm font-medium text-slate-900 dark:text-white">
-                      {profile.email_verified_at ? 'Verified' : 'Pending'}
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">Password Status</span>
-                    <div className="text-sm font-medium text-slate-900 dark:text-white">
-                      {profile.must_change_password ? 'Change Required' : 'Updated'}
-                    </div>
-                  </div>
+              <p className="text-sm text-slate-600 dark:text-slate-400 mb-3">
+                Account details and security status for your profile.
+              </p>
 
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">Account Created</span>
-                    <span className="text-sm font-medium text-slate-900 dark:text-white">
-                      {formatDate(profile.created_at)}
-                    </span>
-                  </div>
+              {showMoreInfo && (
+                <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-700 space-y-3">
+                  <InfoRow label="Role" value={getRoleDisplay(profile?.role)} />
+                  <InfoRow
+                    label="Email Status"
+                    value={profile?.email_verified_at ? 'Verified' : 'Not Verified'}
+                  />
+                  <InfoRow
+                    label="Password"
+                    value={profile?.must_change_password ? 'Change Required' : 'Up to Date'}
+                    warn={profile?.must_change_password}
+                  />
+                  <InfoRow label="School ID" value={profile?.school_id ?? '—'} />
                 </div>
               )}
             </div>
           </div>
 
-          {/* Right Column - Editable Profile Form */}
-          <div className="lg:col-span-2">
-            <div className="bg-white dark:bg-slate-800/50 rounded-lg sm:rounded-xl border border-slate-200 dark:border-slate-700 p-4 sm:p-6">
+          {/* ────── RIGHT COLUMN ────── */}
+          <div className="lg:col-span-2 space-y-4 sm:space-y-6">
+
+            {/* Password warning — amber accent, matches SuperAdminContactCard locked-fields box */}
+            {profile?.must_change_password && (
+              <div className="p-3 sm:p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/40 rounded-xl">
+                <div className="flex gap-2 sm:gap-3">
+                  <Shield className="w-5 h-5 text-amber-500 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold text-amber-700 dark:text-amber-300">
+                      Password Change Required
+                    </p>
+                    <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+                      For security reasons, you must update your password as soon as possible.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Personal Information Form */}
+            <div className="bg-white dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 p-5 sm:p-6">
               <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mb-6">
                 {isEditing ? 'Edit Personal Information' : 'Personal Information'}
               </h3>
 
               <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Editable Fields */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-                  <div className="space-y-2">
-                    <label htmlFor="full_name" className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300">
-                      Full Name *
-                    </label>
-                    {isEditing ? (
-                      <div>
-                        <input
-                          type="text"
-                          id="full_name"
-                          name="full_name"
-                          value={editableProfile.full_name}
-                          onChange={handleInputChange}
-                          className={`w-full px-3 sm:px-4 py-2 sm:py-3 rounded-lg border ${
-                            validationErrors.full_name 
-                              ? 'border-red-500 dark:border-red-500' 
-                              : 'border-slate-300 dark:border-slate-600'
-                          } bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base`}
-                          required
-                        />
-                        {validationErrors.full_name && (
-                          <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                            {validationErrors.full_name}
-                          </p>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="p-3 bg-slate-50 dark:bg-slate-700/30 rounded-lg border border-slate-200 dark:border-slate-700">
-                        <p className="text-slate-900 dark:text-white font-medium text-sm sm:text-base">
-                          {profile.full_name || 'N/A'}
-                        </p>
-                      </div>
-                    )}
-                  </div>
 
-                  <div className="space-y-2">
-                    <label htmlFor="email" className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300">
-                      Email *
-                    </label>
-                    {isEditing ? (
-                      <div>
-                        <input
-                          type="email"
-                          id="email"
-                          name="email"
-                          value={editableProfile.email}
-                          onChange={handleInputChange}
-                          className={`w-full px-3 sm:px-4 py-2 sm:py-3 rounded-lg border ${
-                            validationErrors.email 
-                              ? 'border-red-500 dark:border-red-500' 
-                              : 'border-slate-300 dark:border-slate-600'
-                          } bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base`}
-                          required
-                        />
-                        {validationErrors.email && (
-                          <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                            {validationErrors.email}
-                          </p>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="p-3 bg-slate-50 dark:bg-slate-700/30 rounded-lg border border-slate-200 dark:border-slate-700">
-                        <p className="text-slate-900 dark:text-white font-medium text-sm sm:text-base break-all">
-                          {profile.email || 'N/A'}
-                        </p>
-                      </div>
-                    )}
-                  </div>
+                  <FormField
+                    label="Full Name" required
+                    error={validationErrors.full_name}
+                    isEditing={isEditing}
+                    displayValue={profile?.full_name || 'N/A'}
+                  >
+                    <input
+                      type="text" id="full_name" name="full_name"
+                      value={editableProfile.full_name}
+                      onChange={handleInputChange}
+                      className={inputCls(!!validationErrors.full_name)}
+                      required
+                    />
+                  </FormField>
 
-                  <div className="space-y-2">
-                    <label htmlFor="phone" className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300">
-                      Phone Number
-                    </label>
-                    {isEditing ? (
-                      <div>
-                        <input
-                          type="tel"
-                          id="phone"
-                          name="phone"
-                          value={editableProfile.phone}
-                          onChange={handleInputChange}
-                          className={`w-full px-3 sm:px-4 py-2 sm:py-3 rounded-lg border ${
-                            validationErrors.phone 
-                              ? 'border-red-500 dark:border-red-500' 
-                              : 'border-slate-300 dark:border-slate-600'
-                          } bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base`}
-                        />
-                        {validationErrors.phone && (
-                          <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                            {validationErrors.phone}
-                          </p>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="p-3 bg-slate-50 dark:bg-slate-700/30 rounded-lg border border-slate-200 dark:border-slate-700">
-                        <p className="text-slate-900 dark:text-white font-medium text-sm sm:text-base">
-                          {profile.phone || 'Not provided'}
-                        </p>
-                      </div>
-                    )}
-                  </div>
+                  <FormField
+                    label="Email" required
+                    error={validationErrors.email}
+                    isEditing={isEditing}
+                    displayValue={profile?.email || 'N/A'}
+                  >
+                    <input
+                      type="email" id="email" name="email"
+                      value={editableProfile.email}
+                      onChange={handleInputChange}
+                      className={inputCls(!!validationErrors.email)}
+                      required
+                    />
+                  </FormField>
 
-                  <div className="space-y-2">
-                    <label htmlFor="gender" className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300">
-                      Gender
-                    </label>
-                    {isEditing ? (
-                      <select
-                        id="gender"
-                        name="gender"
-                        value={editableProfile.gender}
-                        onChange={handleInputChange}
-                        className="w-full px-3 sm:px-4 py-2 sm:py-3 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
-                      >
-                        <option value="">Select Gender</option>
-                        <option value="male">Male</option>
-                        <option value="female">Female</option>
-                        <option value="other">Other</option>
-                      </select>
-                    ) : (
-                      <div className="p-3 bg-slate-50 dark:bg-slate-700/30 rounded-lg border border-slate-200 dark:border-slate-700">
-                        <p className="text-slate-900 dark:text-white font-medium text-sm sm:text-base capitalize">
-                          {profile.gender || 'Not specified'}
-                        </p>
-                      </div>
-                    )}
-                  </div>
+                  <FormField
+                    label="Phone Number"
+                    error={validationErrors.phone}
+                    isEditing={isEditing}
+                    displayValue={profile?.phone || 'Not provided'}
+                  >
+                    <input
+                      type="tel" id="phone" name="phone"
+                      value={editableProfile.phone}
+                      onChange={handleInputChange}
+                      className={inputCls(!!validationErrors.phone)}
+                    />
+                  </FormField>
+
+                  <FormField
+                    label="Gender"
+                    isEditing={isEditing}
+                    displayValue={
+                      profile?.gender
+                        ? profile.gender.charAt(0).toUpperCase() + profile.gender.slice(1)
+                        : 'Not specified'
+                    }
+                  >
+                    <select
+                      id="gender" name="gender"
+                      value={editableProfile.gender}
+                      onChange={handleInputChange}
+                      className={inputCls(false)}
+                    >
+                      <option value="">Select Gender</option>
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </FormField>
+
                 </div>
 
-                {/* Action Buttons */}
                 {isEditing && (
-                  <div className="flex flex-col sm:flex-row justify-end gap-3 pt-6 border-t border-slate-200 dark:border-slate-700">
+                  <div className="flex flex-col sm:flex-row justify-end gap-3 pt-5 border-t border-slate-200 dark:border-slate-700">
                     <button
                       type="button"
                       onClick={handleCancel}
                       disabled={saving}
-                      className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-lg h-10 sm:h-11 px-4 sm:px-6 border-2 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white text-sm font-bold hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl h-10 sm:h-11 px-5 border-2 border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 transition-all font-medium text-sm disabled:opacity-50"
                     >
                       <X className="w-4 h-4" />
                       <span>Cancel</span>
@@ -722,18 +556,12 @@ function UserProfile() {
                     <button
                       type="submit"
                       disabled={saving}
-                      className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-lg h-10 sm:h-11 px-4 sm:px-6 bg-black dark:bg-white text-white dark:text-black text-sm font-bold hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-xl h-10 sm:h-11 px-5 bg-black dark:bg-white text-white dark:text-black text-sm font-semibold hover:bg-gray-800 dark:hover:bg-gray-200 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       {saving ? (
-                        <>
-                          <Loader className="w-4 h-4 animate-spin" />
-                          <span>Saving...</span>
-                        </>
+                        <><Loader className="w-4 h-4 animate-spin" /><span>Saving...</span></>
                       ) : (
-                        <>
-                          <Save className="w-4 h-4" />
-                          <span>Save Changes</span>
-                        </>
+                        <><Save className="w-4 h-4" /><span>Save Changes</span></>
                       )}
                     </button>
                   </div>
@@ -742,51 +570,91 @@ function UserProfile() {
             </div>
 
             {/* Account Summary */}
-            <div className="mt-4 sm:mt-6 bg-white dark:bg-slate-800/50 rounded-lg sm:rounded-xl border border-slate-200 dark:border-slate-700 p-4 sm:p-6">
-              <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-slate-500 dark:text-slate-400" />
+            <div className="bg-white dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 p-5 sm:p-6">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-cyan-500 dark:text-cyan-400" />
                 Account Summary
               </h3>
-              
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Account Age</p>
-                    <p className="text-sm font-medium text-slate-900 dark:text-white">
-                      {profile.created_at ? 
-                        `${Math.floor((new Date() - new Date(profile.created_at)) / (1000 * 60 * 60 * 24))} days` 
-                        : '0 days'}
-                    </p>
-                  </div>
-                  
-                  <div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Last Updated</p>
-                    <p className="text-sm font-medium text-slate-900 dark:text-white">
-                      {calculateDaysAgo(profile.updated_at)}
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Email Status</p>
-                    <p className="text-sm font-medium text-slate-900 dark:text-white">
-                      {profile.email_verified_at ? 'Verified' : 'Pending'}
-                    </p>
-                  </div>
-                  
-                  <div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Security</p>
-                    <p className="text-sm font-medium text-slate-900 dark:text-white">
-                      {profile.must_change_password ? 'Action Required' : 'Secure'}
-                    </p>
-                  </div>
-                </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <SummaryTile
+                  label="Active Sessions"
+                  value={totalSessions}
+                  accent="cyan"
+                />
+                <SummaryTile
+                  label="Email Verified"
+                  value={profile?.email_verified_at ? 'Yes' : 'No'}
+                  accent={profile?.email_verified_at ? 'cyan' : 'amber'}
+                />
+                <SummaryTile
+                  label="Password Status"
+                  value={profile?.must_change_password ? 'Change Required' : 'Secure'}
+                  accent={profile?.must_change_password ? 'amber' : 'cyan'}
+                />
               </div>
             </div>
+
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ─────────────── helpers ─────────────── */
+
+function inputCls(hasError) {
+  return `w-full px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl border ${
+    hasError
+      ? 'border-red-500 dark:border-red-500'
+      : 'border-slate-300 dark:border-slate-600'
+  } bg-white dark:bg-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent text-sm shadow-sm`;
+}
+
+function FormField({ label, required, error, isEditing, displayValue, children }) {
+  return (
+    <div className="space-y-1.5">
+      <label className="block text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300">
+        {label}{required && <span className="text-red-500 ml-0.5">*</span>}
+      </label>
+      {isEditing ? (
+        <div>
+          {children}
+          {error && (
+            <p className="mt-1 text-xs text-red-600 dark:text-red-400">{error}</p>
+          )}
+        </div>
+      ) : (
+        <div className="px-3 py-2.5 bg-slate-50 dark:bg-slate-700/30 rounded-xl border border-slate-200 dark:border-slate-700">
+          <p className="text-slate-900 dark:text-white font-medium text-sm break-all">{displayValue}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function InfoRow({ label, value, warn }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">{label}</span>
+      <span className={`text-sm font-medium ${warn ? 'text-amber-600 dark:text-amber-400' : 'text-slate-900 dark:text-white'}`}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function SummaryTile({ label, value, accent = 'cyan' }) {
+  const styles = {
+    cyan:  'bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-100 dark:border-cyan-900/50 text-cyan-700 dark:text-cyan-300',
+    amber: 'bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/40 text-amber-700 dark:text-amber-400',
+  };
+  return (
+    <div className={`p-3 rounded-xl ${styles[accent]}`}>
+      <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">{label}</p>
+      <p className={`text-sm font-semibold ${accent === 'cyan' ? 'text-cyan-700 dark:text-cyan-300' : 'text-amber-700 dark:text-amber-400'}`}>
+        {value}
+      </p>
     </div>
   );
 }

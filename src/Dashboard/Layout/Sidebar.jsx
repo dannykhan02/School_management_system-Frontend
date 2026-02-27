@@ -32,7 +32,6 @@ const Sidebar = () => {
 
   const sidebarItems = getNavigationItems(user?.role);
 
-  // Check if school has streams enabled
   useEffect(() => {
     const checkSchoolStreams = async () => {
       if (user?.school_id) {
@@ -50,9 +49,7 @@ const Sidebar = () => {
     checkSchoolStreams();
   }, [user?.school_id]);
 
-  // Filter navigation items based on stream availability
   const filteredSidebarItems = sidebarItems.map(item => {
-    // If item requires streams and school doesn't have streams, hide it
     if (item.requiresStreams && !schoolHasStreams) {
       return null;
     }
@@ -61,7 +58,7 @@ const Sidebar = () => {
 
   return (
     <>
-      {/* Backdrop with blur for mobile - z-index below header */}
+      {/* Backdrop - starts below header on mobile */}
       {isSidebarOpen && (
         <div
           className="fixed inset-0 bg-black/50 backdrop-blur-sm z-30 lg:hidden transition-opacity"
@@ -76,16 +73,16 @@ const Sidebar = () => {
           bg-white dark:bg-slate-800/50 
           border-r border-slate-200 dark:border-slate-700
           fixed
-          top-0
           left-0
           z-40
-          h-screen
           transition-all duration-300 ease-in-out
           ${isSidebarOpen ? "translate-x-0 shadow-lg" : "-translate-x-full lg:translate-x-0"}
-          ${collapsed ? "lg:w-16 w-16" : "lg:w-64 w-64"}
+          ${collapsed ? "lg:w-16 w-64" : "lg:w-64 w-64"}
+          top-16 h-[calc(100vh-64px)]
+          lg:top-0 lg:h-screen
         `}
       >
-        {/* HEADER - Fixed height 64px to match header */}
+        {/* HEADER */}
         <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700 h-16 flex-shrink-0">
           {!collapsed ? (
             <>
@@ -98,7 +95,7 @@ const Sidebar = () => {
                 </span>
               </div>
 
-              {/* Collapse button - visible on desktop when expanded */}
+              {/* Collapse button - desktop only */}
               <button
                 className="hidden lg:flex p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-slate-600 dark:text-slate-400 flex-shrink-0 ml-auto"
                 onClick={() => setCollapsed(!collapsed)}
@@ -108,7 +105,7 @@ const Sidebar = () => {
                 <ChevronLeft size={20} />
               </button>
 
-              {/* Close button - only visible on mobile */}
+              {/* Close button - mobile only */}
               <button
                 className="lg:hidden p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-slate-600 dark:text-slate-400 flex-shrink-0 ml-auto"
                 onClick={toggleSidebar}
@@ -119,7 +116,6 @@ const Sidebar = () => {
               </button>
             </>
           ) : (
-            /* When collapsed - show only expand button centered */
             <button
               className="hidden lg:flex p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-slate-600 dark:text-slate-400 mx-auto"
               onClick={() => setCollapsed(!collapsed)}
@@ -187,7 +183,7 @@ const Sidebar = () => {
           })}
         </nav>
 
-        {/* FOOTER BUTTONS - Larger when collapsed */}
+        {/* FOOTER */}
         <div className={`border-t border-slate-200 dark:border-slate-700 flex-shrink-0 ${collapsed ? "p-2 space-y-2" : "p-4 space-y-2"}`}>
           <button
             onClick={toggleDarkMode}

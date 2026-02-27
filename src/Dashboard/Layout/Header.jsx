@@ -48,7 +48,7 @@ const Header = () => {
 
   return (
     <header 
-      className="fixed top-0 right-0 z-20 bg-white border-b border-gray-200 dark:bg-black dark:border-gray-800 h-16 transition-all duration-300 ease-in-out"
+      className="fixed top-0 right-0 z-50 bg-white border-b border-gray-200 dark:bg-black dark:border-gray-800 h-16 transition-all duration-300 ease-in-out"
       style={{
         left: `${sidebarWidth}px`
       }}

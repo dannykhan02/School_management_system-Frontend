@@ -1,15 +1,76 @@
 import React, { useEffect, useState } from "react";
-import { Save, School, Upload, AlertCircle, X, Eye, EyeOff, History, CheckSquare, Square, ChevronDown, ChevronUp, GraduationCap, Award, Shield, Users, Loader, MapPin, Mail, Phone } from "lucide-react";
+import {
+  Save, School, Upload, AlertCircle, X, Eye, EyeOff, History,
+  CheckSquare, Square, ChevronDown, ChevronUp, GraduationCap, Award,
+  Shield, Users, Loader, MapPin, Mail, Phone, FlaskConical, Palette, Globe
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { apiRequest } from "../../../utils/api";
 import { toast } from "react-toastify";
 import SuperAdminContactCard from "../../../components/SuperAdminContactCard";
 import SchoolStructureInfo from "../../../components/SchoolStructureInfo";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// COLOR HELPERS — mirrored from ClassroomManager, StreamManager, SubjectManager,
+// TeacherManager so the School Profile uses the same design language.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Level badge colours — identical to ClassroomManager / StreamManager */
+const LEVEL_COLOURS = {
+  'Pre-Primary':      'bg-pink-50 text-pink-700 border-pink-200 dark:bg-pink-900/10 dark:text-pink-300 dark:border-pink-800/40',
+  'Primary':          'bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-900/10 dark:text-cyan-300 dark:border-cyan-800/40',
+  'Junior Secondary': 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/10 dark:text-amber-300 dark:border-amber-800/40',
+  'Senior Secondary': 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/10 dark:text-amber-300 dark:border-amber-800/40',
+  'Secondary':        'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-900/10 dark:text-orange-300 dark:border-orange-800/40',
+};
+
+/** Curriculum badge colours — mirrored from SubjectManager / TeacherManager */
+const getCurriculumBadgeColor = (type) => {
+  if (type === 'CBC')   return 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/10 dark:text-cyan-300';
+  if (type === '8-4-4') return 'bg-amber-100 text-amber-800 dark:bg-amber-900/10 dark:text-amber-300';
+  if (type === 'Both')  return 'bg-pink-100 text-pink-800 dark:bg-pink-900/10 dark:text-pink-300';
+  return 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-300';
+};
+
+/** Pathway badge colours — mirrored from SubjectManager */
+const getPathwayBadgeColor = (pathway) => {
+  const map = {
+    STEM:              'bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-900/10 dark:text-cyan-300 dark:border-cyan-800/40',
+    Arts:              'bg-pink-50 text-pink-700 border-pink-200 dark:bg-pink-900/10 dark:text-pink-300 dark:border-pink-800/40',
+    'Social Sciences': 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/10 dark:text-amber-300 dark:border-amber-800/40',
+  };
+  return map[pathway] || 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600';
+};
+
+const getPathwayIcon = (pathway) => {
+  if (pathway === 'STEM')            return <FlaskConical className="w-3 h-3" />;
+  if (pathway === 'Arts')            return <Palette className="w-3 h-3" />;
+  if (pathway === 'Social Sciences') return <Globe className="w-3 h-3" />;
+  return null;
+};
+
+/** Level badge component — matches ClassroomManager's ClassroomLevelBadge */
+const LevelBadge = ({ level }) => {
+  if (!level) return null;
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full border ${LEVEL_COLOURS[level] || 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+      <GraduationCap className="w-3 h-3" />{level}
+    </span>
+  );
+};
+
+/** Grade-level tag — identical to SubjectManager's getGradeLevelBadgeColor */
+const GradeLevelTag = ({ label }) => (
+  <span className="px-2 py-1 bg-cyan-50 text-cyan-700 dark:bg-cyan-900/10 dark:text-cyan-300 text-xs rounded-full border border-cyan-200 dark:border-cyan-800/40 font-medium">
+    {label}
+  </span>
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MAIN COMPONENT
+// ─────────────────────────────────────────────────────────────────────────────
 function EditSchoolProfile() {
   const navigate = useNavigate();
-
-  console.log("✅ EditSchoolProfile component is rendering");
 
   const [formData, setFormData] = useState({
     schoolName: "",
@@ -86,17 +147,12 @@ function EditSchoolProfile() {
   };
 
   useEffect(() => {
-    console.log("🔍 EditSchoolProfile useEffect running");
     const fetchSchool = async () => {
       try {
-        console.log("📡 Fetching school data from API...");
         setIsLoading(true);
         const response = await apiRequest('schools/my-school', "GET");
-        console.log("✅ API Response received:", response);
-        console.log("📊 School data:", response.data);
         
         if (!response.data) {
-          console.error("❌ No data received from API");
           toast.error("No school data found");
           setIsLoading(false);
           return;
@@ -104,7 +160,6 @@ function EditSchoolProfile() {
 
         const data = response.data;
         setSchoolId(data.id);
-        console.log("🏫 School ID:", data.id);
 
         const schoolData = {
           schoolName: data.name || "",
@@ -126,20 +181,14 @@ function EditSchoolProfile() {
           grade_levels: data.grade_levels || [],
         };
 
-        console.log("📝 Setting form data:", schoolData);
         setFormData(schoolData);
         setOriginalData(schoolData);
 
         if (data.logo) {
-          console.log("🖼️ Setting logo preview");
           setLogoPreview(data.logo);
           setLogoError(false);
         }
-        
-        console.log("✅ School data loaded successfully");
       } catch (err) {
-        console.error("❌ Failed to fetch school:", err);
-        console.error("Error details:", err.response || err.message);
         toast.error("Failed to load school data. Please check your connection.");
       } finally {
         setIsLoading(false);
@@ -148,10 +197,6 @@ function EditSchoolProfile() {
 
     fetchSchool();
   }, []);
-
-  useEffect(() => {
-    console.log("🔄 Form data updated:", formData);
-  }, [formData]);
 
   // Check if field should be locked in edit mode
   const isFieldLocked = (fieldName) => {
@@ -412,7 +457,6 @@ function EditSchoolProfile() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("📤 Submitting form data...");
     setErrors({});
     setIsSubmitting(true);
 
@@ -450,24 +494,17 @@ function EditSchoolProfile() {
       if (logoFile) formDataToSend.append("logo", logoFile);
       formDataToSend.append("_method", "PUT");
 
-      console.log("📝 Updating school with ID:", schoolId);
-      console.log("📦 FormData being sent:", Object.fromEntries(formDataToSend));
-      
-      // Use schoolId from state
       const response = await apiRequest(`schools/${schoolId}`, "POST", formDataToSend);
-      console.log("✅ Update successful:", response);
       
       toast.success("School profile updated successfully");
       setHasUnsavedChanges(false);
       setTimeout(() => navigate("/admin/dashboard"), 1500);
     } catch (err) {
-      console.error("❌ Update failed:", err);
       if (err.status === 422) {
         setErrors(err.data.errors || { general: err.data.message });
         toast.error("Validation failed. Please check the form.");
       } else {
         toast.error("Failed to update school. Please try again.");
-        console.error("Failed to update school:", err.data || err.message);
       }
     } finally {
       setIsSubmitting(false);
@@ -629,10 +666,7 @@ function EditSchoolProfile() {
                       src={logoPreview} 
                       alt="School Logo" 
                       className="w-full h-full object-contain p-2 sm:p-3 bg-white dark:bg-slate-900"
-                      onError={(e) => {
-                        console.error('Failed to load image:', logoPreview);
-                        setLogoError(true);
-                      }}
+                      onError={() => setLogoError(true)}
                     />
                   ) : (
                     <div className="w-full h-full bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800/30 dark:to-slate-700/20 flex items-center justify-center">
@@ -802,13 +836,20 @@ function EditSchoolProfile() {
                             ? 'Streams setting cannot be changed once curriculum levels are selected or after school is saved.'
                             : 'Check this box if your school uses stream-based organization (e.g., Class A, Class B, etc.). This will allow you to create streams and assign teachers and students to them.'}
                         </p>
-                        {formData.has_streams && (
-                          <div className="mt-2 p-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded">
-                            <p className="text-xs text-green-700 dark:text-green-300">
-                              ✓ Stream functionality is enabled for this school
-                            </p>
-                          </div>
-                        )}
+                        {/* Stream status badge - matching SchoolProfile colors */}
+                        <div className="mt-2">
+                          {formData.has_streams ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-cyan-100 text-cyan-800 dark:bg-cyan-900/10 dark:text-cyan-300">
+                              <CheckSquare className="w-3 h-3" />
+                              Streams Enabled
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/10 dark:text-amber-300">
+                              <Square className="w-3 h-3" />
+                              Streams Disabled
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -969,12 +1010,11 @@ function EditSchoolProfile() {
               {/* CBC Levels */}
               {shouldShowCBCLevels() && (
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-medium text-[#0d141b] dark:text-white mb-4">CBC Levels</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-medium text-[#0d141b] dark:text-white">CBC Levels</h3>
+                    <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${getCurriculumBadgeColor('CBC')}`}>CBC</span>
                     {isFieldLocked('has_pre_primary') && (
-                      <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                        Locked
-                      </span>
+                      <span className="text-xs text-slate-500 dark:text-slate-400 font-medium ml-auto">Locked</span>
                     )}
                   </div>
                   
@@ -1120,6 +1160,23 @@ function EditSchoolProfile() {
                           </div>
                         ))}
                       </div>
+                      {/* Display selected pathways as badges */}
+                      {formData.senior_secondary_pathways.length > 0 && (
+                        <div className="mt-3">
+                          <p className="text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2">Selected Pathways:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {formData.senior_secondary_pathways.map((pathway, idx) => (
+                              <span
+                                key={idx}
+                                className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full border ${getPathwayBadgeColor(pathway)}`}
+                              >
+                                {getPathwayIcon(pathway)}
+                                {pathway}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1128,12 +1185,11 @@ function EditSchoolProfile() {
               {/* 8-4-4 Levels */}
               {shouldShow844Secondary() && (
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-medium text-[#0d141b] dark:text-white mb-4">8-4-4 Levels</h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-medium text-[#0d141b] dark:text-white">8-4-4 Levels</h3>
+                    <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${getCurriculumBadgeColor('8-4-4')}`}>8-4-4</span>
                     {isFieldLocked('has_secondary') && (
-                      <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                        Locked
-                      </span>
+                      <span className="text-xs text-slate-500 dark:text-slate-400 font-medium ml-auto">Locked</span>
                     )}
                   </div>
                   
@@ -1344,7 +1400,10 @@ function EditSchoolProfile() {
                     </div>
                     
                     <div className="space-y-4">
-                      <h3 className="text-lg font-medium text-blue-700 dark:text-blue-300">CBC Grade Levels</h3>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-lg font-medium text-[#0d141b] dark:text-white">CBC Grade Levels</h3>
+                        <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${getCurriculumBadgeColor('CBC')}`}>CBC</span>
+                      </div>
                       {['Pre-Primary', 'Primary', 'Junior Secondary'].map(level => {
                         const levelGrades = cbcGradeLevels.filter(g => g.level === level);
                         if (levelGrades.length === 0) return null;
@@ -1407,7 +1466,10 @@ function EditSchoolProfile() {
                     </div>
                     
                     <div className="space-y-4">
-                      <h3 className="text-lg font-medium text-green-700 dark:text-green-300">8-4-4 Class Levels</h3>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-lg font-medium text-[#0d141b] dark:text-white">8-4-4 Class Levels</h3>
+                        <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${getCurriculumBadgeColor('8-4-4')}`}>8-4-4</span>
+                      </div>
                       {['Primary', 'Secondary'].map(level => {
                         const levelClasses = classLevels.filter(c => c.level === level);
                         if (levelClasses.length === 0) return null;
@@ -1487,13 +1549,23 @@ function EditSchoolProfile() {
                     <span className="font-medium text-[#4c739a] dark:text-slate-400">City:</span>
                     <span className="ml-2 text-[#0d141b] dark:text-white">{formData.city || "N/A"}</span>
                   </div>
-                  <div>
+                  <div className="sm:col-span-2">
                     <span className="font-medium text-[#4c739a] dark:text-slate-400">Curriculum:</span>
                     <span className="ml-2 text-[#0d141b] dark:text-white">{formData.primary_curriculum}</span>
+                    {formData.primary_curriculum && (
+                      <span className={`ml-2 px-2 py-0.5 text-xs font-semibold rounded-full ${getCurriculumBadgeColor(formData.primary_curriculum)}`}>
+                        {formData.primary_curriculum}
+                      </span>
+                    )}
                   </div>
                   <div className="sm:col-span-2">
                     <span className="font-medium text-[#4c739a] dark:text-slate-400">Streams:</span>
-                    <span className="ml-2 text-[#0d141b] dark:text-white">
+                    <span className={`ml-2 inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-full ${
+                      formData.has_streams 
+                        ? 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900/10 dark:text-cyan-300' 
+                        : 'bg-amber-100 text-amber-800 dark:bg-amber-900/10 dark:text-amber-300'
+                    }`}>
+                      {formData.has_streams ? <CheckSquare className="w-3 h-3" /> : <Square className="w-3 h-3" />}
                       {formData.has_streams ? "Enabled" : "Disabled"}
                     </span>
                   </div>
@@ -1501,19 +1573,19 @@ function EditSchoolProfile() {
                     <span className="font-medium text-[#4c739a] dark:text-slate-400">Levels:</span>
                     <div className="ml-2 flex flex-wrap gap-2 mt-1">
                       {formData.has_pre_primary && (
-                        <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs rounded-full">Pre-Primary</span>
+                        <LevelBadge level="Pre-Primary" />
                       )}
                       {formData.has_primary && (
-                        <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs rounded-full">Primary</span>
+                        <LevelBadge level="Primary" />
                       )}
                       {formData.has_junior_secondary && (
-                        <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs rounded-full">Junior Secondary</span>
+                        <LevelBadge level="Junior Secondary" />
                       )}
                       {formData.has_senior_secondary && (
-                        <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-xs rounded-full">Senior Secondary</span>
+                        <LevelBadge level="Senior Secondary" />
                       )}
                       {formData.has_secondary && (
-                        <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-xs rounded-full">Secondary</span>
+                        <LevelBadge level="Secondary" />
                       )}
                     </div>
                   </div>
@@ -1522,8 +1594,22 @@ function EditSchoolProfile() {
                       <span className="font-medium text-[#4c739a] dark:text-slate-400">Grade/Class Levels:</span>
                       <div className="ml-2 flex flex-wrap gap-1 mt-1">
                         {formData.grade_levels.map((level, index) => (
-                          <span key={index} className="px-2 py-1 bg-slate-100 dark:bg-slate-900/30 text-slate-700 dark:text-slate-300 text-xs rounded-full">
-                            {level}
+                          <GradeLevelTag key={index} label={level} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {formData.senior_secondary_pathways && formData.senior_secondary_pathways.length > 0 && (
+                    <div className="sm:col-span-2">
+                      <span className="font-medium text-[#4c739a] dark:text-slate-400">Pathways:</span>
+                      <div className="ml-2 flex flex-wrap gap-2 mt-1">
+                        {formData.senior_secondary_pathways.map((pathway, index) => (
+                          <span
+                            key={index}
+                            className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold rounded-full border ${getPathwayBadgeColor(pathway)}`}
+                          >
+                            {getPathwayIcon(pathway)}
+                            {pathway}
                           </span>
                         ))}
                       </div>

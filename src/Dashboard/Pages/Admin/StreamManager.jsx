@@ -115,7 +115,6 @@ const CLS = {
   card:       'bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700',
   secondary:  'border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 transition-all font-medium',
   primary:    'bg-black dark:bg-white text-white dark:text-black hover:bg-gray-800 dark:hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-all font-semibold',
-  // Pill buttons — matching SubjectManager delete modal
   cancelPill: 'px-5 py-2 rounded-full text-sm font-semibold bg-slate-600 hover:bg-slate-500 dark:bg-slate-600 dark:hover:bg-slate-500 text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed',
   deletePill: 'px-5 py-2 rounded-full text-sm font-bold bg-red-600 hover:bg-red-700 active:bg-red-800 text-white shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5',
 };
@@ -172,34 +171,41 @@ function RowActionsMenu({ stream, onEdit, onManageStaff, onAssignClassTeacher, o
 function StreamManager() {
   const { user, loading: authLoading } = useAuth();
   
-  const [streams, setStreams] = useState([]);
-  const [classrooms, setClassrooms] = useState([]);
-  const [teachers, setTeachers] = useState([]);
+  const [streams, setStreams]                   = useState([]);
+  const [classrooms, setClassrooms]             = useState([]);
+  const [teachers, setTeachers]                 = useState([]);
   const [allClassTeachers, setAllClassTeachers] = useState([]);
-  const [streamDetails, setStreamDetails] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [view, setView] = useState('list');
-  const [schoolHasStreams, setSchoolHasStreams] = useState(false);
-  const [schoolInfo, setSchoolInfo] = useState(null);
+  const [streamDetails, setStreamDetails]       = useState(null);
+
+  // ── Two separate loading flags ──────────────────────────────────────────
+  // `initializing` stays true until the very first full data load completes,
+  // preventing premature "No teachers" banners from flashing.
+  const [initializing, setInitializing]         = useState(true);
+  const [loading, setLoading]                   = useState(false);
+  // ────────────────────────────────────────────────────────────────────────
+
+  const [view, setView]                         = useState('list');
+  const [schoolHasStreams, setSchoolHasStreams]  = useState(false);
+  const [schoolInfo, setSchoolInfo]             = useState(null);
   
-  const [selectedStream, setSelectedStream] = useState(null);
-  const [formData, setFormData] = useState({ 
+  const [selectedStream, setSelectedStream]     = useState(null);
+  const [formData, setFormData]                 = useState({ 
     name: '', class_id: '', class_teacher_id: '', capacity: '' 
   });
 
-  const [selectedTeachers, setSelectedTeachers] = useState([]);
-  const [isSavingTeachers, setIsSavingTeachers] = useState(false);
+  const [selectedTeachers, setSelectedTeachers]     = useState([]);
+  const [isSavingTeachers, setIsSavingTeachers]     = useState(false);
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [levelFilter, setLevelFilter] = useState('all');
-  const [showFilters, setShowFilters] = useState(false);
-  const [deleteModal, setDeleteModal] = useState({ isOpen: false, streamId: null, streamName: '' });
-  const [showClassTeacherModal, setShowClassTeacherModal] = useState(false);
+  const [searchTerm, setSearchTerm]             = useState('');
+  const [levelFilter, setLevelFilter]           = useState('all');
+  const [showFilters, setShowFilters]           = useState(false);
+  const [deleteModal, setDeleteModal]           = useState({ isOpen: false, streamId: null, streamName: '' });
+  const [showClassTeacherModal, setShowClassTeacherModal]                 = useState(false);
   const [selectedStreamForClassTeacher, setSelectedStreamForClassTeacher] = useState(null);
-  const [mobileSheet, setMobileSheet] = useState({ isOpen: false, stream: null });
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragStartY, setDragStartY] = useState(0);
-  const [dragOffset, setDragOffset] = useState(0);
+  const [mobileSheet, setMobileSheet]           = useState({ isOpen: false, stream: null });
+  const [isDragging, setIsDragging]             = useState(false);
+  const [dragStartY, setDragStartY]             = useState(0);
+  const [dragOffset, setDragOffset]             = useState(0);
   const [removeClassTeacherModal, setRemoveClassTeacherModal] = useState({
     isOpen: false, streamId: null, streamName: '', teacherName: ''
   });
@@ -208,23 +214,29 @@ function StreamManager() {
 
   useEffect(() => { if (schoolId) fetchSchoolInfo(); }, [schoolId]);
 
+  // ── fetchSchoolInfo: keeps initializing=true until everything is done ──
   const fetchSchoolInfo = async () => {
+    setInitializing(true);
     setLoading(true);
     try {
-      const response = await apiRequest(`schools/${schoolId}`, 'GET');
+      const response  = await apiRequest(`schools/${schoolId}`, 'GET');
       const schoolData = response?.data || response || {};
       setSchoolInfo(schoolData);
       setSchoolHasStreams(schoolData.has_streams || false);
-      if (schoolData.has_streams) fetchInitialData();
+      if (schoolData.has_streams) {
+        await fetchInitialData(); // await so initializing waits for all data
+      }
     } catch (error) {
       toast.error(error?.response?.data?.message || error?.message || 'Failed to load school information');
     } finally {
       setLoading(false);
+      setInitializing(false); // only clear AFTER everything has loaded
     }
   };
 
-  const fetchInitialData = async () => {
-    setLoading(true);
+  // ── fetchInitialData: used both on boot and on manual refresh ───────────
+  const fetchInitialData = async (showSpinner = false) => {
+    if (showSpinner) setLoading(true);
     try {
       const [streamsResponse, classroomsResponse, teachersResponse] = await Promise.all([
         apiRequest('streams', 'GET'),
@@ -246,9 +258,12 @@ function StreamManager() {
       toast.error(error?.response?.data?.message || error?.message || 'Failed to load data');
       setStreams([]); setClassrooms([]); setTeachers([]);
     } finally {
-      setLoading(false);
+      if (showSpinner) setLoading(false);
     }
   };
+
+  // ── Manual refresh button handler ───────────────────────────────────────
+  const handleRefresh = () => fetchInitialData(true);
 
   // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -310,7 +325,7 @@ function StreamManager() {
 
   const backToList = () => {
     setView('list'); setSelectedStream(null); setStreamDetails(null);
-    setSelectedTeachers([]); fetchInitialData();
+    setSelectedTeachers([]); fetchInitialData(true);
   };
 
   const handleInputChange = (e) => {
@@ -382,7 +397,7 @@ function StreamManager() {
       await apiRequest(`streams/${deleteModal.streamId}`, 'DELETE');
       toast.success(`${deleteModal.streamName} deleted successfully`);
       setDeleteModal({ isOpen: false, streamId: null, streamName: '' });
-      fetchInitialData();
+      fetchInitialData(true);
     } catch (error) {
       toast.error(error?.response?.data?.message || 'Failed to delete stream');
     } finally { setLoading(false); }
@@ -394,7 +409,7 @@ function StreamManager() {
     try {
       await apiRequest(`streams/${streamId}/assign-class-teacher`, 'POST', { teacher_id: parseInt(teacherId, 10) });
       toast.success('Class teacher assigned successfully');
-      fetchInitialData();
+      fetchInitialData(true);
     } catch (error) {
       const errorMessage = error?.response?.data?.message || 'Failed to assign class teacher';
       const validationErrors = error?.response?.data?.errors;
@@ -420,7 +435,7 @@ function StreamManager() {
       await apiRequest(`streams/${streamId}/remove-class-teacher`, 'DELETE');
       toast.success('Class teacher removed successfully');
       setRemoveClassTeacherModal({ isOpen: false, streamId: null, streamName: '', teacherName: '' });
-      fetchInitialData();
+      fetchInitialData(true);
     } catch (error) {
       toast.error(error?.response?.data?.message || 'Failed to remove class teacher');
     } finally { setLoading(false); }
@@ -532,7 +547,12 @@ function StreamManager() {
           <button onClick={showCreateForm} className="hidden md:flex items-center gap-2 bg-black text-white px-4 py-3 rounded-lg font-medium transition-colors duration-200 hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200">
             <Plus className="w-4 h-4" />New Stream
           </button>
-          <button onClick={fetchInitialData} disabled={loading} className="bg-black text-white px-3 sm:px-4 py-2 sm:py-3 rounded-lg font-medium transition-colors duration-200 hover:bg-gray-800 disabled:opacity-50 text-sm dark:bg-white dark:text-black dark:hover:bg-gray-200" title="Refresh data">
+          <button
+            onClick={handleRefresh}
+            disabled={loading}
+            className="bg-black text-white px-3 sm:px-4 py-2 sm:py-3 rounded-lg font-medium transition-colors duration-200 hover:bg-gray-800 disabled:opacity-50 text-sm dark:bg-white dark:text-black dark:hover:bg-gray-200"
+            title="Refresh data"
+          >
             <RefreshCw className={`w-4 h-4 inline-block ${loading ? 'animate-spin' : ''}`} />
           </button>
         </div>
@@ -543,7 +563,9 @@ function StreamManager() {
         <button onClick={showAllClassTeachersView} className="bg-slate-700 text-white px-3 py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 text-sm dark:bg-slate-600 col-span-2"><UserCheck className="w-4 h-4" />View Class Teachers</button>
       </div>
 
-      {!loading && teachers.length === 0 && (
+      {/* ── "No teachers" warning — only shown AFTER initializing is done
+           and teachers are genuinely empty, never during the first load ── */}
+      {!initializing && !loading && teachers.length === 0 && (
         <div className="mb-4 p-3 sm:p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
           <div className="flex gap-2">
             <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
@@ -1085,7 +1107,7 @@ function StreamManager() {
     );
   };
 
-  // ── Delete Stream Modal — pill buttons ───────────────────────────────────
+  // ── Delete Stream Modal ──────────────────────────────────────────────────
   const renderDeleteConfirmationModal = () => {
     if (!deleteModal.isOpen) return null;
     return (
@@ -1133,7 +1155,7 @@ function StreamManager() {
     );
   };
 
-  // ── Remove Class Teacher Modal — pill buttons ────────────────────────────
+  // ── Remove Class Teacher Modal ───────────────────────────────────────────
   const renderRemoveClassTeacherModal = () => {
     if (!removeClassTeacherModal.isOpen) return null;
     return (
@@ -1280,7 +1302,19 @@ function StreamManager() {
     );
   }
 
-  if (!loading && !schoolHasStreams) {
+  // Show full-page spinner while the very first data load is in progress.
+  // This replaces the old `loading && view === 'list'` partial spinner and
+  // completely prevents any premature banners from appearing.
+  if (initializing) {
+    return (
+      <div className="w-full p-3 sm:p-4 md:p-6 lg:p-8 flex flex-col items-center justify-center py-16">
+        <Loader className="w-10 sm:w-12 h-10 sm:h-12 text-[#4c739a] animate-spin" />
+        <p className="mt-4 text-sm sm:text-base text-[#4c739a] dark:text-slate-400">Loading Streams...</p>
+      </div>
+    );
+  }
+
+  if (!schoolHasStreams) {
     return (
       <div className="w-full p-3 sm:p-4 md:p-6 lg:p-8">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
@@ -1296,17 +1330,10 @@ function StreamManager() {
 
   return (
     <div className="w-full p-3 sm:p-4 md:p-6 lg:p-8">
-      {loading && view === 'list' && (
-        <div className="flex flex-col items-center justify-center py-12 md:py-16">
-          <Loader className="w-10 sm:w-12 h-10 sm:h-12 text-[#4c739a] animate-spin" />
-          <p className="mt-4 text-sm sm:text-base text-[#4c739a] dark:text-slate-400">Loading Streams...</p>
-        </div>
-      )}
-
-      {!loading && view === 'list'            && renderListView()}
-      {(view === 'create' || view === 'edit') && renderFormView()}
-      {view === 'manage-teachers'             && renderManageTeachersView()}
-      {view === 'all-class-teachers'          && renderAllClassTeachersView()}
+      {!initializing && view === 'list'            && renderListView()}
+      {(view === 'create' || view === 'edit')      && renderFormView()}
+      {view === 'manage-teachers'                  && renderManageTeachersView()}
+      {view === 'all-class-teachers'               && renderAllClassTeachersView()}
 
       {renderClassTeacherModal()}
       {renderMobileBottomSheet()}

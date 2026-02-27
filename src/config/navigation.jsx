@@ -1,160 +1,165 @@
 import { 
-  Users, 
-  Book, 
-  Calendar,
-  Home,
-  FileText,
+  Users,
+  CalendarDays,
+  LayoutDashboard,
+  ScrollText,
   BarChart3,
-  Crown,
-  DoorOpen,
-  Waves,
-  BookOpen,
-  GraduationCap,
-  Building2,
-  Shield,
-  User // Add this import
+  Layers3,
+  NotebookPen,
+  LibraryBig,
+  School,
+  ShieldCheck,
+  CircleUserRound,
+  FlipHorizontal2,
+  BookMarked,
+  UserRoundPlus,
+  ClipboardCheck,
+  UsersRound,
+  PartyPopper,
+  TrendingUp,
+  Landmark,
 } from "lucide-react";
 
 export const NAVIGATION_ITEMS = {
   super_admin: [
     { 
       name: "Schools", 
-      icon: Building2,
+      icon: Landmark,           // iconic building — evokes institutions/schools better than Building2
       href: "/super_admin/dashboard" 
     },
     { 
       name: "Roles", 
-      icon: Shield,
+      icon: ShieldCheck,        // filled checkmark on shield — implies verified permissions
       href: "/super_admin/roles" 
     },
     { 
-      name: "User Profile", 
-      icon: User,
+      name: "My Profile", 
+      icon: CircleUserRound,
       href: "/super_admin/user-profile" 
     },
   ],
   admin: [
     { 
       name: "School Profile", 
-      icon: Home,
+      icon: School,             // dedicated school icon — more specific than a generic Home
       href: "/admin/dashboard" 
     },
     { 
       name: "Academic Year", 
-      icon: Calendar,
+      icon: CalendarDays,       // calendar with date grid lines — more detailed than plain Calendar
       href: "/admin/academic-year" 
     },
     { 
       name: "Classrooms", 
-      icon: DoorOpen,
+      icon: LayoutDashboard,    // grid layout — evokes rooms/sections at a glance
       href: "/admin/classrooms" 
     },
     { 
       name: "Streams", 
-      icon: Waves,
+      icon: Layers3,            // stacked layers — conveys grouped/tiered streams clearly
       href: "/admin/streams",
-      requiresStreams: true // This item requires streams to be enabled
+      requiresStreams: true
     },
     { 
       name: "Subjects", 
-      icon: BookOpen,
+      icon: LibraryBig,         // open library shelves — richer than a plain book
       href: "/admin/subjects" 
     },
     { 
       name: "Teachers", 
-      icon: GraduationCap,
+      icon: UsersRound,         // grouped people silhouette — distinct from single-user icons
       href: "/admin/teachers" 
     },
     { 
       name: "Add Users", 
-      icon: Users,
+      icon: UserRoundPlus,      // user with a plus — unambiguous add-user action
       href: "/admin/new-user" 
     },
     { 
-      name: "User Profile", 
-      icon: User,
+      name: "My Profile", 
+      icon: CircleUserRound,
       href: "/admin/user-profile" 
     },
   ],
   teacher: [
     { 
       name: "Dashboard", 
-      icon: Home,
+      icon: LayoutDashboard,    // structured grid — standard but polished dashboard icon
       href: "/teacher/dashboard" 
     },
     { 
       name: "My Classes", 
-      icon: Book,
+      icon: BookMarked,         // bookmarked book — implies an assigned/personal class list
       href: "/teacher/classes" 
     },
     { 
       name: "Streams", 
-      icon: Waves,
+      icon: Layers3,            // consistent with admin streams
       href: "/teacher/streams",
-      requiresStreams: true // This item requires streams to be enabled
+      requiresStreams: true
     },
     { 
       name: "Attendance", 
-      icon: Calendar,
+      icon: ClipboardCheck,     // clipboard with checkmark — classic attendance/register icon
       href: "/teacher/attendance" 
     },
     { 
       name: "Grades", 
-      icon: FileText,
+      icon: NotebookPen,        // notebook with pen — evokes marking/grading work
       href: "/teacher/grades" 
     },
     { 
-      name: "User Profile", 
-      icon: User,
+      name: "My Profile", 
+      icon: CircleUserRound,
       href: "/teacher/user-profile" 
     },
   ],
   student: [
     { 
       name: "Dashboard", 
-      icon: Home,
+      icon: LayoutDashboard,
       href: "/student/dashboard" 
     },
     { 
       name: "My Courses", 
-      icon: BookOpen,
+      icon: LibraryBig,         // rich library icon — fits a course/subject catalogue
       href: "/student/courses" 
     },
     { 
       name: "Grades", 
-      icon: FileText,
+      icon: TrendingUp,         // upward trend line — aspirational, implies academic progress
       href: "/student/grades" 
     },
     { 
-      name: "User Profile", 
-      icon: User,
+      name: "My Profile", 
+      icon: CircleUserRound,
       href: "/student/user-profile" 
     },
   ],
   parent: [
     { 
       name: "Dashboard", 
-      icon: Home,
+      icon: LayoutDashboard,
       href: "/parent/dashboard" 
     },
     { 
       name: "My Children", 
-      icon: Users,
+      icon: UsersRound,         // grouped users — better than generic Users for a family context
       href: "/parent/children" 
     },
     { 
       name: "Events", 
-      icon: Calendar,
+      icon: PartyPopper,        // celebratory — fitting for school events/activities
       href: "/parent/events" 
     },
     { 
       name: "Reports", 
-      icon: FileText,
+      icon: ScrollText,         // scroll document — more formal/report-like than FileText
       href: "/parent/reports" 
     },
     { 
-      name: "User Profile", 
-      icon: User,
+      name: "My Profile", 
+      icon: CircleUserRound,
       href: "/parent/user-profile" 
     },
   ],

@@ -12,7 +12,6 @@ const SuperAdminContactCard = ({ show, onClose }) => {
       setLoadingSuperAdmins(true);
       setSuperAdminError('');
       const response = await apiRequest('users/super-admins', 'GET');
-      console.log('Super admins API response:', response);
       
       // Handle different response structures
       if (response && response.data) {
@@ -23,7 +22,6 @@ const SuperAdminContactCard = ({ show, onClose }) => {
         } else if (response.data.data && Array.isArray(response.data.data)) {
           setSuperAdmins(response.data.data);
         } else {
-          console.warn('Unexpected response structure:', response.data);
           setSuperAdmins([]);
         }
       } else if (Array.isArray(response)) {
@@ -31,11 +29,9 @@ const SuperAdminContactCard = ({ show, onClose }) => {
       } else if (response && response.super_admins) {
         setSuperAdmins(response.super_admins || []);
       } else {
-        console.warn('Unexpected API response:', response);
         setSuperAdmins([]);
       }
     } catch (error) {
-      console.error('Failed to fetch super admins:', error);
       setSuperAdminError('Failed to load super admin contacts. Please try again later.');
       setSuperAdmins([]);
     } finally {
@@ -79,8 +75,9 @@ const SuperAdminContactCard = ({ show, onClose }) => {
       <div className="bg-white dark:bg-slate-800/50 rounded-xl shadow-2xl w-full max-w-md md:max-w-lg lg:max-w-xl border border-slate-200 dark:border-slate-700 max-h-[90vh] flex flex-col">
         <div className="p-4 sm:p-5 md:p-6 border-b border-slate-200 dark:border-slate-700 flex-shrink-0">
           <div className="flex items-start gap-3 md:gap-4">
-            <div className="p-2.5 rounded-full bg-slate-100 dark:bg-slate-700 flex-shrink-0 mt-0.5">
-              <Shield className="w-5 h-5 sm:w-6 sm:h-6 text-slate-600 dark:text-slate-300" />
+            {/* Shield icon — cyan accent */}
+            <div className="p-2.5 rounded-full bg-cyan-50 dark:bg-cyan-900/30 flex-shrink-0 mt-0.5">
+              <Shield className="w-5 h-5 sm:w-6 sm:h-6 text-cyan-600 dark:text-cyan-400" />
             </div>
             <div className="flex-1 min-w-0">
               <h3 
@@ -105,11 +102,12 @@ const SuperAdminContactCard = ({ show, onClose }) => {
         </div>
 
         <div className="px-4 sm:px-5 md:px-6 pt-4 flex-shrink-0">
-          <div className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-3 sm:p-4">
+          {/* Info box — amber accent border + icon */}
+          <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/40 rounded-lg p-3 sm:p-4">
             <div className="flex gap-2 sm:gap-3">
-              <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-slate-600 dark:text-slate-400 flex-shrink-0 mt-0.5" />
+              <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500 dark:text-amber-400 flex-shrink-0 mt-0.5" />
               <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300">
-                <strong className="font-semibold">Locked Fields:</strong> School Type, Primary/Secondary Curriculum, Curriculum Levels, Grade/Class Levels, Stream Configuration
+                <strong className="font-semibold text-amber-700 dark:text-amber-400">Locked Fields:</strong> School Type, Primary/Secondary Curriculum, Curriculum Levels, Grade/Class Levels, Stream Configuration
               </p>
             </div>
           </div>
@@ -118,7 +116,7 @@ const SuperAdminContactCard = ({ show, onClose }) => {
         <div className="p-4 sm:p-5 md:p-6 flex-grow overflow-y-auto">
           {loadingSuperAdmins ? (
             <div className="flex flex-col items-center justify-center py-8 md:py-10">
-              <Loader className="w-8 h-8 md:w-10 md:h-10 animate-spin text-slate-600 dark:text-slate-400" />
+              <Loader className="w-8 h-8 md:w-10 md:h-10 animate-spin text-cyan-500 dark:text-cyan-400" />
               <p className="mt-3 text-sm md:text-base text-slate-500 dark:text-slate-400">Loading super admins...</p>
             </div>
           ) : superAdminError ? (
@@ -128,8 +126,9 @@ const SuperAdminContactCard = ({ show, onClose }) => {
             </div>
           ) : superAdmins.length > 0 ? (
             <div className="space-y-4 md:space-y-5">
+              {/* Section heading — cyan accent */}
               <div className="flex items-center gap-2 mb-4">
-                <Users className="w-5 h-5 text-slate-400 flex-shrink-0" />
+                <Users className="w-5 h-5 text-cyan-500 dark:text-cyan-400 flex-shrink-0" />
                 <h4 className="text-sm sm:text-base font-semibold text-slate-700 dark:text-slate-300">
                   Available Super Administrators ({superAdmins.length})
                 </h4>
@@ -142,8 +141,9 @@ const SuperAdminContactCard = ({ show, onClose }) => {
                     className="p-4 border border-slate-200 dark:border-slate-600 rounded-lg transition-colors hover:bg-slate-50 dark:hover:bg-slate-700/20"
                   >
                     <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center bg-slate-100 dark:bg-slate-700 flex-shrink-0">
-                        <Shield className="w-5 h-5 sm:w-6 sm:h-6 text-slate-600 dark:text-slate-300" />
+                      {/* Admin avatar — cyan accent */}
+                      <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full flex items-center justify-center bg-cyan-50 dark:bg-cyan-900/30 flex-shrink-0">
+                        <Shield className="w-5 h-5 sm:w-6 sm:h-6 text-cyan-600 dark:text-cyan-400" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <h5 className="font-medium text-slate-900 dark:text-white text-sm sm:text-base mb-3">
@@ -153,7 +153,8 @@ const SuperAdminContactCard = ({ show, onClose }) => {
                         <div className="space-y-2.5">
                           {(admin.email || admin.Email) && (
                             <div className="flex items-start gap-2">
-                              <Mail className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 flex-shrink-0 mt-0.5" />
+                              {/* Mail icon — cyan accent */}
+                              <Mail className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-cyan-500 dark:text-cyan-400 flex-shrink-0 mt-0.5" />
                               <a 
                                 href={`mailto:${admin.email || admin.Email}`}
                                 className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:underline break-all"
@@ -166,7 +167,8 @@ const SuperAdminContactCard = ({ show, onClose }) => {
                           
                           {(admin.phone || admin.Phone) && (
                             <div className="flex items-start gap-2">
-                              <Phone className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 flex-shrink-0 mt-0.5" />
+                              {/* Phone icon — cyan accent */}
+                              <Phone className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-cyan-500 dark:text-cyan-400 flex-shrink-0 mt-0.5" />
                               <a 
                                 href={`tel:${admin.phone || admin.Phone}`}
                                 className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:underline"
