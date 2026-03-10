@@ -1,4 +1,4 @@
-// AcademicYearSetup.jsx - Enhanced with bulk term creation + Sort By in filters
+// AcademicYearSetup.jsx — Grouped year view + full audit fixes
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import AcademicYearForm from '../../../components/AcademicYearForm';
 import { apiRequest } from '../../../utils/api';
@@ -21,6 +21,7 @@ import {
   Layers,
   MoreHorizontal,
   ArrowUpDown,
+
 } from 'lucide-react';
 import DisplayDate from '../../../utils/DisplayDate';
 import { toast } from 'react-toastify';
@@ -51,21 +52,21 @@ function RowActionsMenu({ onEdit, onDelete }) {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-8 z-50 w-48 bg-slate-800/90 backdrop-blur-sm border border-slate-700/60 rounded-xl shadow-2xl py-1.5 animate-in fade-in slide-in-from-top-1 duration-100">
+        <div className="absolute right-0 top-8 z-50 w-48 bg-white dark:bg-slate-800/95 backdrop-blur-sm border border-slate-200 dark:border-slate-700/60 rounded-xl shadow-xl dark:shadow-2xl py-1.5">
           <button
             onClick={() => handle(onEdit)}
-            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-700/60 transition-colors text-left"
+            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-colors text-left"
           >
             <Edit className="w-4 h-4 text-amber-400" />
-            Edit Year
+            Edit Term
           </button>
-          <div className="my-1 border-t border-slate-700/60" />
+          <div className="my-1 border-t border-slate-200 dark:border-slate-700/60" />
           <button
             onClick={() => handle(onDelete)}
-            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-400 hover:bg-red-900/30 transition-colors text-left"
+            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors text-left"
           >
             <Trash2 className="w-4 h-4" />
-            Delete Year
+            Delete Term
           </button>
         </div>
       )}
@@ -81,6 +82,200 @@ const SORT_OPTIONS = [
   { value: 'start_date', label: 'Start Date' },
   { value: 'end_date', label: 'End Date' },
 ];
+
+// ─── Helper: group flat academic year records into year groups ────────────────
+/**
+ * Groups a flat array of academic year term records by (year, curriculum_type).
+ * Returns an array of group objects sorted by year descending:
+ * [
+ *   {
+ *     key: '2026-CBC',
+ *     year: '2026',
+ *     curriculum_type: 'CBC',
+ *     terms: [ { id, term, start_date, end_date, is_active, ... }, ... ],
+ *     hasActive: true,
+ *   },
+ *   ...
+ * ]
+ */
+function groupAcademicYears(flatYears) {
+  const map = new Map();
+
+  for (const record of flatYears) {
+    const key = `${record.year}||${record.curriculum_type}`;
+    if (!map.has(key)) {
+      map.set(key, {
+        key,
+        year: record.year.toString(),
+        curriculum_type: record.curriculum_type,
+        terms: [],
+        hasActive: false,
+      });
+    }
+    const group = map.get(key);
+    group.terms.push(record);
+    if (record.is_active) group.hasActive = true;
+  }
+
+  // Sort terms within each group by term name
+  for (const group of map.values()) {
+    group.terms.sort((a, b) => {
+      const an = a.term?.toLowerCase() ?? '';
+      const bn = b.term?.toLowerCase() ?? '';
+      return an < bn ? -1 : an > bn ? 1 : 0;
+    });
+  }
+
+  // Sort groups by year desc, then curriculum asc
+  return Array.from(map.values()).sort((a, b) => {
+    const yearDiff = parseInt(b.year) - parseInt(a.year);
+    if (yearDiff !== 0) return yearDiff;
+    return (a.curriculum_type ?? '').localeCompare(b.curriculum_type ?? '');
+  });
+}
+
+// ─── Grouped Year Row — clean table approach ─────────────────────────────────
+function GroupedYearRow({
+  group,
+  showCurriculumColumn,
+  getCurriculumBadgeColor,
+  onEdit,
+  onDelete,
+  onToggleActive,
+  defaultOpen,
+}) {
+  const [open, setOpen] = useState(defaultOpen ?? true);
+
+  return (
+    <>
+      {/* ── Year header row ── */}
+      <tr
+        onClick={() => setOpen(o => !o)}
+        className="cursor-pointer select-none group bg-slate-50 dark:bg-slate-700/25 hover:bg-slate-100 dark:hover:bg-slate-700/40 transition-colors"
+      >
+        <td
+          colSpan={showCurriculumColumn ? 7 : 6}
+          className="px-4 py-3 md:px-6 border-t border-slate-200 dark:border-slate-700/40"
+        >
+          <div className="flex items-center gap-3">
+            {/* Chevron */}
+            <span
+              className="flex-shrink-0 text-slate-400 dark:text-slate-500 transition-transform duration-200"
+              style={{ transform: open ? 'rotate(0deg)' : 'rotate(-90deg)' }}
+            >
+              <ChevronDown className="w-4 h-4" />
+            </span>
+
+            {/* Year number */}
+            <span className="text-sm font-bold text-slate-900 dark:text-white w-10 flex-shrink-0">{group.year}</span>
+
+            {/* Curriculum badge */}
+            {showCurriculumColumn && (
+              <span className={`px-2 py-0.5 text-xs font-semibold rounded-md ${getCurriculumBadgeColor(group.curriculum_type)}`}>
+                {group.curriculum_type}
+              </span>
+            )}
+
+            {/* Term count */}
+            <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+              {group.terms.length} term{group.terms.length !== 1 ? 's' : ''}
+            </span>
+
+            {/* Active indicator */}
+            {group.hasActive && (
+              <span className="flex items-center gap-1.5 text-xs font-medium text-green-600 dark:text-green-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-green-500 dark:bg-green-400" />
+                Active
+              </span>
+            )}
+
+            {/* Collapsed: show term name pills inline */}
+            {!open && (
+              <div className="flex items-center gap-1.5 ml-1">
+                {group.terms.map(t => (
+                  <span
+                    key={t.id}
+                    className={`px-2 py-0.5 text-[11px] font-medium rounded border ${
+                      t.is_active
+                        ? 'bg-green-100 text-green-700 border-green-200 dark:bg-green-500/10 dark:text-green-400 dark:border-green-500/20'
+                        : 'bg-slate-200 text-slate-600 border-slate-300 dark:bg-slate-700/50 dark:text-slate-400 dark:border-slate-700/60'
+                    }`}
+                  >
+                    {t.term}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+        </td>
+      </tr>
+
+      {/* ── Term rows ── */}
+      {open && group.terms.map((term, idx) => (
+        <tr
+          key={term.id}
+          className="hover:bg-slate-50 dark:hover:bg-slate-700/10 transition-colors duration-100"
+        >
+          {/* Indent + connector */}
+          <td className="pl-8 md:pl-10 pr-2 py-3 w-10">
+            <div className="flex items-center justify-end h-full">
+              <div className="w-px h-full min-h-[20px] bg-slate-300 dark:bg-slate-700/50 mr-0" />
+            </div>
+          </td>
+
+          {/* Term name */}
+          <td className="px-4 py-3 text-sm font-medium text-slate-800 dark:text-slate-200">
+            <div className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-400 dark:bg-slate-600 flex-shrink-0" />
+              {term.term}
+            </div>
+          </td>
+
+          {/* Curriculum — dash since shown on header */}
+          {showCurriculumColumn && (
+            <td className="px-4 py-3 text-xs text-slate-400 dark:text-slate-600">—</td>
+          )}
+
+          {/* Start date */}
+          <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400 hidden lg:table-cell">
+            {term.start_date ? DisplayDate(term.start_date) : <span className="text-slate-400 dark:text-slate-700">—</span>}
+          </td>
+
+          {/* End date */}
+          <td className="px-4 py-3 text-sm text-slate-600 dark:text-slate-400 hidden xl:table-cell">
+            {term.end_date ? DisplayDate(term.end_date) : <span className="text-slate-400 dark:text-slate-700">—</span>}
+          </td>
+
+          {/* Status toggle */}
+          <td className="px-4 py-3">
+            <button
+              onClick={() => onToggleActive(term)}
+              title={term.is_active ? 'Click to deactivate' : 'Click to activate'}
+              className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-md border transition-all ${
+                term.is_active
+                  ? 'text-green-700 bg-green-100 border-green-200 hover:bg-green-200 dark:text-green-400 dark:bg-green-500/10 dark:border-green-500/20 dark:hover:bg-green-500/15'
+                  : 'text-slate-500 bg-slate-100 border-slate-200 hover:bg-slate-200 hover:text-slate-700 dark:bg-slate-700/30 dark:border-slate-600/40 dark:hover:text-slate-300 dark:hover:bg-slate-700/50'
+              }`}
+            >
+              <CheckCircle className={`w-3.5 h-3.5 ${term.is_active ? 'text-green-600 dark:text-green-400' : 'text-slate-400 dark:text-slate-600'}`} />
+              {term.is_active ? 'Active' : 'Inactive'}
+            </button>
+          </td>
+
+          {/* Actions */}
+          <td className="px-4 py-3 text-right">
+            <RowActionsMenu
+              onEdit={() => onEdit(term.id)}
+              onDelete={() => onDelete(term.id)}
+            />
+          </td>
+        </tr>
+      ))}
+    </>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
 
 function AcademicYearSetup() {
   const [academicYears, setAcademicYears] = useState([]);
@@ -131,8 +326,8 @@ function AcademicYearSetup() {
       if (schoolData.primary_curriculum !== 'Both') {
         setCurriculumFilter(schoolData.primary_curriculum);
       }
-    } catch (error) {
-      console.error('Failed to fetch school information:', error);
+    } catch (err) {
+      console.error('Failed to fetch school information:', err);
       toast.error('Failed to fetch school information');
     }
   }, []);
@@ -142,10 +337,16 @@ function AcademicYearSetup() {
       setLoading(true);
       setError(null);
       const response = await apiRequest('academic-years', 'GET');
-      const years = response.data || response || [];
+      const rawYears = response.data || response || [];
+      const currentYear = new Date().getFullYear();
+      // Visually mark terms from past years as inactive regardless of DB value
+      const years = (Array.isArray(rawYears) ? rawYears : []).map(t => ({
+        ...t,
+        is_active: parseInt(t.year) < currentYear ? false : t.is_active,
+      }));
       setAcademicYears(years);
-    } catch (error) {
-      console.error('Failed to fetch academic years:', error);
+    } catch (err) {
+      console.error('Failed to fetch academic years:', err);
       setError('Failed to fetch academic years. Please try again.');
       setAcademicYears([]);
       toast.error('Failed to fetch academic years');
@@ -167,24 +368,31 @@ function AcademicYearSetup() {
   const applyFilters = useCallback(() => {
     let filtered = [...academicYears];
 
+    // Only filter by curriculum when school supports both curricula
     if (school && school.primary_curriculum === 'Both' && curriculumFilter !== 'all') {
       filtered = filtered.filter(y => y.curriculum_type === curriculumFilter);
     }
+
     if (yearFilter !== 'all') {
       filtered = filtered.filter(y => y.year.toString() === yearFilter);
     }
-    if (searchTerm) {
+
+    if (searchTerm.trim()) {
+      const q = searchTerm.toLowerCase();
       filtered = filtered.filter(
         y =>
-          y.term?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          y.year.toString().includes(searchTerm)
+          y.term?.toLowerCase().includes(q) ||
+          y.year.toString().includes(q)
       );
     }
 
+    // Sort the flat list before grouping so within-group order can respect sortConfig
     filtered.sort((a, b) => {
-      let aVal = String(a[sortConfig.key] || '').toLowerCase();
-      let bVal = String(b[sortConfig.key] || '').toLowerCase();
-      return sortConfig.direction === 'asc' ? (aVal > bVal ? 1 : -1) : aVal < bVal ? 1 : -1;
+      let aVal = String(a[sortConfig.key] ?? '').toLowerCase();
+      let bVal = String(b[sortConfig.key] ?? '').toLowerCase();
+      if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
     });
 
     setFilteredYears(filtered);
@@ -199,9 +407,11 @@ function AcademicYearSetup() {
     return years.sort((a, b) => parseInt(b) - parseInt(a));
   };
 
+  // Grouped view derived from filtered flat list
+  const groupedYears = groupAcademicYears(filteredYears);
+
   // ─── Sort helpers ───────────────────────────────────────────────────────────
 
-  // Called from table header clicks (keeps existing UX)
   const handleSort = key => {
     setSortConfig(prev => ({
       key,
@@ -209,7 +419,6 @@ function AcademicYearSetup() {
     }));
   };
 
-  // Called from the filter panel dropdowns
   const handleSortKeyChange = e => {
     setSortConfig(prev => ({ ...prev, key: e.target.value }));
   };
@@ -278,7 +487,7 @@ function AcademicYearSetup() {
         term: yearToEdit.term || '',
         start_date: yearToEdit.start_date || '',
         end_date: yearToEdit.end_date || '',
-        curriculum_type: yearToEdit.curriculum_type,
+        curriculum_type: yearToEdit.curriculum_type || '',
         is_active: yearToEdit.is_active || false,
       });
       setFormInitialMode('single');
@@ -325,10 +534,13 @@ function AcademicYearSetup() {
       const submitData = {
         year: formData.year.toString(),
         term: formData.term,
+        is_active: formData.is_active,
       };
+
       if (formData.start_date) submitData.start_date = formData.start_date;
       if (formData.end_date) submitData.end_date = formData.end_date;
-      if (formData.is_active !== undefined) submitData.is_active = formData.is_active;
+
+      // Only send curriculum_type when school has both — backend enforces this
       if (school && school.primary_curriculum === 'Both' && formData.curriculum_type) {
         submitData.curriculum_type = formData.curriculum_type;
       }
@@ -337,7 +549,10 @@ function AcademicYearSetup() {
         const response = await apiRequest(`academic-years/${editingYear.id}`, 'PUT', submitData);
         const updatedYear = response.data || response;
         toast.success('Academic year updated successfully');
-        setAcademicYears(prev => prev.map(y => (y.id === editingYear.id ? updatedYear : y)));
+        // Optimistic update in local state
+        setAcademicYears(prev =>
+          prev.map(y => (y.id === editingYear.id ? { ...y, ...updatedYear } : y))
+        );
       } else {
         const response = await apiRequest('academic-years', 'POST', submitData);
         const newYear = response.data || response;
@@ -346,12 +561,13 @@ function AcademicYearSetup() {
           setAcademicYears(prev => [...prev, newYear]);
         }
       }
+
       handleCloseForm();
-    } catch (error) {
-      console.error('Failed to save academic year:', error);
+    } catch (err) {
+      console.error('Failed to save academic year:', err);
       const errorMessage =
-        error?.response?.data?.message ||
-        error?.response?.data?.errors?.year?.[0] ||
+        err?.response?.data?.message ||
+        err?.response?.data?.errors?.year?.[0] ||
         `Failed to ${editingYear ? 'update' : 'create'} academic year`;
       toast.error(errorMessage);
     } finally {
@@ -370,32 +586,42 @@ function AcademicYearSetup() {
         terms,
       };
 
+      // Only include curriculum_type for 'Both' curriculum schools — backend requires it then
       if (school && school.primary_curriculum === 'Both' && curriculum_type) {
         payload.curriculum_type = curriculum_type;
       }
 
       const response = await apiRequest('academic-years/bulk', 'POST', payload);
-      const result = response.data || response;
 
-      const created = result.data || [];
-      toast.success(result.message || `${created.length} term(s) created successfully`);
+      // apiRequest may return the raw axios response OR already-unwrapped data.
+      // Backend shape: { message: "N term(s) created successfully.", data: [...records] }
+      const unwrapped = response?.data ?? response;
+      const created = Array.isArray(unwrapped?.data)
+        ? unwrapped.data
+        : Array.isArray(unwrapped)
+          ? unwrapped
+          : [];
+      const successMsg = unwrapped?.message
+        ?? `${created.length} term${created.length !== 1 ? 's' : ''} created successfully`;
+
+      toast.success(successMsg);
 
       if (created.length > 0) {
         setAcademicYears(prev => [...prev, ...created]);
       }
 
       handleCloseForm();
-    } catch (error) {
-      console.error('Failed to bulk create academic years:', error);
+    } catch (err) {
+      console.error('Failed to bulk create academic years:', err);
 
-      const existingTerms = error?.response?.data?.existing_terms;
+      const existingTerms = err?.response?.data?.existing_terms;
       if (existingTerms && existingTerms.length > 0) {
         toast.error(
           `Some terms already exist: ${existingTerms.join(', ')}. Please remove them and try again.`
         );
       } else {
         const errorMessage =
-          error?.response?.data?.message || 'Failed to create academic years in bulk';
+          err?.response?.data?.message || 'Failed to create academic years in bulk';
         toast.error(errorMessage);
       }
     } finally {
@@ -405,16 +631,18 @@ function AcademicYearSetup() {
 
   // ─── Toggle active ──────────────────────────────────────────────────────────
 
-  const handleToggleActive = async year => {
+  const handleToggleActive = async term => {
     try {
-      const response = await apiRequest(`academic-years/${year.id}`, 'PUT', {
-        is_active: !year.is_active,
+      const response = await apiRequest(`academic-years/${term.id}`, 'PUT', {
+        is_active: !term.is_active,
       });
       const updatedYear = response.data || response;
-      toast.success(`Academic year ${!year.is_active ? 'activated' : 'deactivated'} successfully`);
-      setAcademicYears(prev => prev.map(y => (y.id === year.id ? updatedYear : y)));
-    } catch (error) {
-      console.error('Failed to toggle active status:', error);
+      toast.success(`Term ${!term.is_active ? 'activated' : 'deactivated'} successfully`);
+      setAcademicYears(prev =>
+        prev.map(y => (y.id === term.id ? { ...y, ...updatedYear } : y))
+      );
+    } catch (err) {
+      console.error('Failed to toggle active status:', err);
       toast.error('Failed to update active status');
     }
   };
@@ -428,7 +656,7 @@ function AcademicYearSetup() {
       setDeleteModal({
         isOpen: true,
         yearId: id,
-        yearName: `${yearToDelete.year} - ${yearToDelete.term}`,
+        yearName: `${yearToDelete.year} — ${yearToDelete.term}`,
       });
     }
   };
@@ -437,18 +665,19 @@ function AcademicYearSetup() {
     setLoading(true);
     try {
       await apiRequest(`academic-years/${deleteModal.yearId}`, 'DELETE');
-      toast.success('Academic year deleted successfully');
+      toast.success('Term deleted successfully');
+      // Optimistic removal — avoids a full re-fetch
+      setAcademicYears(prev => prev.filter(y => y.id !== deleteModal.yearId));
       setDeleteModal({ isOpen: false, yearId: null, yearName: '' });
-      fetchAcademicYears();
-    } catch (error) {
-      const errorMessage = error?.response?.data?.message || 'Failed to delete academic year';
+    } catch (err) {
+      const errorMessage = err?.response?.data?.message || 'Failed to delete academic year';
       toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
   };
 
-  // ─── Helpers ────────────────────────────────────────────────────────────────
+  // ─── UI helpers ─────────────────────────────────────────────────────────────
 
   const getCurriculumBadgeColor = type =>
     type === 'CBC'
@@ -456,12 +685,18 @@ function AcademicYearSetup() {
       : 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300';
 
   const SortIcon = ({ column }) => {
-    if (sortConfig.key !== column) return <span className="text-slate-300 dark:text-slate-500">↕</span>;
-    return <span className="text-cyan-500">{sortConfig.direction === 'desc' ? '↓' : '↑'}</span>;
+    if (sortConfig.key !== column)
+      return <span className="text-slate-300 dark:text-slate-500">↕</span>;
+    return (
+      <span className="text-cyan-500">
+        {sortConfig.direction === 'desc' ? '↓' : '↑'}
+      </span>
+    );
   };
 
   const shouldShowCurriculumFilter = school && school.primary_curriculum === 'Both';
   const shouldShowCurriculumField = school && school.primary_curriculum === 'Both';
+  const shouldShowCurriculumColumn = shouldShowCurriculumFilter;
 
   // ─── Delete confirmation modal ──────────────────────────────────────────────
 
@@ -478,7 +713,7 @@ function AcademicYearSetup() {
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white">
-                  Delete Academic Year
+                  Delete Academic Term
                 </h3>
                 <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
                   Are you sure you want to delete{' '}
@@ -496,7 +731,7 @@ function AcademicYearSetup() {
                 <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
                 <p className="text-xs text-red-800 dark:text-red-300">
                   <strong>Warning:</strong> This will permanently delete all data associated with
-                  this academic year including term records and scheduling information.
+                  this term including scheduling information.
                 </p>
               </div>
             </div>
@@ -507,7 +742,7 @@ function AcademicYearSetup() {
               disabled={loading}
               className="w-full sm:w-auto px-3 sm:px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg text-sm text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 font-medium transition-all disabled:opacity-50"
             >
-              Keep Academic Year
+              Keep Term
             </button>
             <button
               onClick={confirmDelete}
@@ -525,7 +760,7 @@ function AcademicYearSetup() {
               ) : (
                 <>
                   <Trash2 className="w-3.5 h-3.5" />
-                  Delete Academic Year
+                  Delete Term
                 </>
               )}
             </button>
@@ -539,7 +774,7 @@ function AcademicYearSetup() {
 
   const renderMobileBottomSheet = () => {
     if (!mobileSheet.isOpen || !mobileSheet.year) return null;
-    const year = mobileSheet.year;
+    const term = mobileSheet.year;
 
     return (
       <>
@@ -561,9 +796,9 @@ function AcademicYearSetup() {
             <div className="flex items-center justify-between">
               <div className="flex-1 min-w-0">
                 <h2 className="text-xl font-bold text-slate-900 dark:text-white truncate">
-                  {year.year} - {year.term}
+                  {term.year} — {term.term}
                 </h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Academic Year Details</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Term Details</p>
               </div>
               <button
                 onClick={closeMobileSheet}
@@ -582,13 +817,13 @@ function AcademicYearSetup() {
               </div>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-2xl font-bold text-slate-900 dark:text-white">{year.year}</span>
-                  <span className={`text-sm font-medium px-3 py-1 rounded-full ${getCurriculumBadgeColor(year.curriculum_type)}`}>
-                    {year.curriculum_type}
+                  <span className="text-2xl font-bold text-slate-900 dark:text-white">{term.year}</span>
+                  <span className={`text-sm font-medium px-3 py-1 rounded-full ${getCurriculumBadgeColor(term.curriculum_type)}`}>
+                    {term.curriculum_type}
                   </span>
                 </div>
                 <p className="text-sm text-slate-600 dark:text-slate-400">
-                  <span className="font-semibold text-slate-900 dark:text-white">{year.term}</span>
+                  <span className="font-semibold text-slate-900 dark:text-white">{term.term}</span>
                 </p>
               </div>
             </div>
@@ -601,25 +836,25 @@ function AcademicYearSetup() {
               <div className="space-y-3">
                 <div>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Start Date</p>
-                  <p className="text-base font-medium text-slate-900 dark:text-white">{DisplayDate(year.start_date)}</p>
+                  <p className="text-base font-medium text-slate-900 dark:text-white">{DisplayDate(term.start_date)}</p>
                 </div>
                 <div>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">End Date</p>
-                  <p className="text-base font-medium text-slate-900 dark:text-white">{DisplayDate(year.end_date)}</p>
+                  <p className="text-base font-medium text-slate-900 dark:text-white">{DisplayDate(term.end_date)}</p>
                 </div>
               </div>
             </div>
 
             <div className="bg-white dark:bg-slate-800/50 rounded-xl p-4 border border-slate-200 dark:border-slate-600">
               <div className="flex items-center gap-2 mb-3">
-                {year.is_active ? (
+                {term.is_active ? (
                   <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
                 ) : (
                   <XCircle className="w-5 h-5 text-slate-400 dark:text-slate-500" />
                 )}
                 <h3 className="text-sm font-semibold text-slate-900 dark:text-white">Status</h3>
               </div>
-              {year.is_active ? (
+              {term.is_active ? (
                 <span className="text-base font-medium text-green-600 dark:text-green-400">Active</span>
               ) : (
                 <span className="text-base font-medium text-slate-500 dark:text-slate-400">Inactive</span>
@@ -629,32 +864,32 @@ function AcademicYearSetup() {
 
           <div className="border-t border-slate-200 dark:border-slate-700 p-4 space-y-2 bg-white dark:bg-slate-800/50">
             <button
-              onClick={() => { closeMobileSheet(); handleEdit(year.id); }}
+              onClick={() => { closeMobileSheet(); handleEdit(term.id); }}
               className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-600 active:scale-[0.98] transition-all"
             >
               <Edit className="w-4 h-4" />
-              Edit Academic Year
+              Edit Term
             </button>
             <button
-              onClick={() => { closeMobileSheet(); handleToggleActive(year); }}
+              onClick={() => { closeMobileSheet(); handleToggleActive(term); }}
               className={`w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold rounded-xl active:scale-[0.98] transition-all ${
-                year.is_active
+                term.is_active
                   ? 'text-orange-700 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 hover:bg-orange-100 dark:hover:bg-orange-900/30'
                   : 'text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30'
               }`}
             >
-              {year.is_active ? (
+              {term.is_active ? (
                 <><XCircle className="w-4 h-4" />Deactivate</>
               ) : (
                 <><CheckCircle className="w-4 h-4" />Activate</>
               )}
             </button>
             <button
-              onClick={() => handleDelete(year.id)}
+              onClick={() => handleDelete(term.id)}
               className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-xl hover:bg-red-100 dark:hover:bg-red-900/30 active:scale-[0.98] transition-all"
             >
               <Trash2 className="w-4 h-4" />
-              Delete Academic Year
+              Delete Term
             </button>
           </div>
         </div>
@@ -753,7 +988,6 @@ function AcademicYearSetup() {
                 <span className="text-xs text-slate-500 dark:text-slate-400">
                   ({filteredYears.length}/{academicYears.length})
                 </span>
-                {/* Active sort pill */}
                 <span className="flex items-center gap-1 px-2 py-0.5 text-xs font-medium bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800 rounded-full">
                   <ArrowUpDown className="w-3 h-3" />
                   {SORT_OPTIONS.find(o => o.value === sortConfig.key)?.label}
@@ -769,7 +1003,6 @@ function AcademicYearSetup() {
 
             {showFilters && (
               <div className="space-y-3">
-                {/* Search */}
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Search</label>
                   <input
@@ -811,7 +1044,6 @@ function AcademicYearSetup() {
                   </div>
                 </div>
 
-                {/* Sort By — mobile */}
                 <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-medium text-slate-700 dark:text-slate-300">Sort By</label>
                   <div className="flex gap-2">
@@ -850,7 +1082,6 @@ function AcademicYearSetup() {
                 <Filter className="w-4 sm:w-5 h-4 sm:h-5 text-slate-600 dark:text-slate-400" />
                 <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white">Filters & Sort</h3>
               </div>
-              {/* Active sort badge */}
               <span className="flex items-center gap-1.5 px-3 py-1 text-xs font-medium bg-cyan-50 dark:bg-cyan-900/20 text-cyan-700 dark:text-cyan-300 border border-cyan-200 dark:border-cyan-800 rounded-full">
                 <ArrowUpDown className="w-3.5 h-3.5" />
                 Sorted by: <strong>{SORT_OPTIONS.find(o => o.value === sortConfig.key)?.label}</strong>
@@ -858,7 +1089,6 @@ function AcademicYearSetup() {
               </span>
             </div>
 
-            {/* Grid: Search | Curriculum? | Year | Sort By | Count */}
             <div
               className={`grid gap-3 sm:gap-4 ${
                 shouldShowCurriculumFilter
@@ -909,7 +1139,7 @@ function AcademicYearSetup() {
                 </select>
               </div>
 
-              {/* Sort By — desktop */}
+              {/* Sort By */}
               <div className="flex flex-col gap-1 sm:gap-2">
                 <label className="text-xs sm:text-sm font-medium text-slate-700 dark:text-slate-300">Sort By</label>
                 <div className="flex gap-2">
@@ -922,7 +1152,6 @@ function AcademicYearSetup() {
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
                   </select>
-                  {/* Asc / Desc toggle button */}
                   <button
                     type="button"
                     onClick={() =>
@@ -944,8 +1173,8 @@ function AcademicYearSetup() {
               <div className="flex items-end">
                 <div className="px-3 sm:px-4 py-2 bg-slate-100 dark:bg-slate-800 rounded-lg w-full">
                   <span className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
-                    Showing <span className="font-semibold">{filteredYears.length}</span> of{' '}
-                    <span className="font-semibold">{academicYears.length}</span>
+                    Showing <span className="font-semibold">{groupedYears.length}</span> year{groupedYears.length !== 1 ? 's' : ''}{' '}
+                    (<span className="font-semibold">{filteredYears.length}</span> term{filteredYears.length !== 1 ? 's' : ''})
                   </span>
                 </div>
               </div>
@@ -962,148 +1191,99 @@ function AcademicYearSetup() {
         </div>
       )}
 
-      {/* Table + Cards */}
+      {/* ── Academic Years Table ── */}
       {!loading && (
-        <>
-          {/* Desktop table */}
-          <div className="hidden md:block bg-white dark:bg-slate-800/50 rounded-lg sm:rounded-xl border border-slate-200 dark:border-slate-700 p-3 sm:p-4 md:p-6 mb-4 md:mb-6">
-            <h2 className="text-[#0d141b] dark:text-white text-xl sm:text-2xl font-bold leading-tight tracking-[-0.015em] mb-4 sm:mb-6">
+        <div className="bg-white dark:bg-slate-800/40 rounded-xl border border-slate-200 dark:border-slate-700/60 overflow-hidden mb-4 md:mb-6">
+          {/* Table header */}
+          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-slate-700/60">
+            <h2 className="text-base font-bold text-[#0d141b] dark:text-white">
               Academic Years
             </h2>
-            <div className="overflow-x-auto">
-              <div className="border rounded-lg border-slate-200 dark:border-slate-700 min-w-[700px] sm:min-w-full">
-                <table className="w-full text-xs sm:text-sm text-left">
-                  <thead className="bg-slate-50 dark:bg-slate-700/50 text-slate-600 dark:text-slate-300">
-                    <tr>
-                      {['year', 'term', 'curriculum_type', 'start_date', 'end_date'].map((col) => (
-                        <th
-                          key={col}
-                          className={`px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 font-medium cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors select-none ${
-                            col === 'start_date' ? 'hidden lg:table-cell' : ''
-                          } ${col === 'end_date' ? 'hidden xl:table-cell' : ''}`}
-                          onClick={() => handleSort(col)}
-                        >
-                          <div className="flex items-center gap-1">
-                            {col === 'curriculum_type' ? 'Curriculum' : col.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                            <SortIcon column={col} />
-                          </div>
-                        </th>
-                      ))}
-                      <th className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 font-medium">Status</th>
-                      <th className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 font-medium text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                    {filteredYears.length > 0 ? (
-                      filteredYears.map(year => (
-                        <tr key={year.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/20 transition-colors duration-150">
-                          <td className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 font-medium text-slate-900 dark:text-white">{year.year}</td>
-                          <td className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 text-slate-500 dark:text-slate-400">{year.term}</td>
-                          <td className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4">
-                            <span className={`px-2 sm:px-3 py-1 text-xs font-semibold rounded-full ${getCurriculumBadgeColor(year.curriculum_type)}`}>
-                              {year.curriculum_type}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 text-slate-500 dark:text-slate-400 hidden lg:table-cell">
-                            {DisplayDate(year.start_date)}
-                          </td>
-                          <td className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 text-slate-500 dark:text-slate-400 hidden xl:table-cell">
-                            {DisplayDate(year.end_date)}
-                          </td>
-                          <td className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4">
-                            <button
-                              onClick={() => handleToggleActive(year)}
-                              className="flex items-center gap-1 transition-colors group"
-                              title={year.is_active ? 'Click to deactivate' : 'Click to activate'}
-                            >
-                              {year.is_active ? (
-                                <>
-                                  <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-green-600 dark:text-green-400 group-hover:text-green-700" />
-                                  <span className="text-xs sm:text-sm font-medium text-green-600 dark:text-green-400 hidden sm:inline">Active</span>
-                                </>
-                              ) : (
-                                <>
-                                  <XCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-400 dark:text-slate-500" />
-                                  <span className="text-xs sm:text-sm font-medium text-slate-400 dark:text-slate-500 hidden sm:inline">Inactive</span>
-                                </>
-                              )}
-                            </button>
-                          </td>
-                          <td className="px-3 py-2 sm:px-4 sm:py-3 md:px-6 md:py-4 text-right">
-                            <RowActionsMenu
-                              onEdit={() => handleEdit(year.id)}
-                              onDelete={() => handleDelete(year.id)}
-                            />
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan="7" className="px-3 sm:px-4 md:px-6 py-6 sm:py-8 text-center text-slate-500 dark:text-slate-400">
-                          {academicYears.length === 0
-                            ? 'No academic years found. Create your first academic year to get started.'
-                            : 'No academic years match current filters.'}
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          {/* Mobile cards */}
-          <div className="md:hidden space-y-3">
-            {filteredYears.length > 0 ? (
-              filteredYears.map(year => (
-                <button
-                  key={year.id}
-                  onClick={() => openMobileSheet(year)}
-                  className="w-full bg-white dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700 p-4 shadow-sm hover:shadow-md active:scale-[0.98] transition-all text-left min-h-[120px] flex flex-col justify-between"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-base font-bold text-slate-900 dark:text-white truncate">{year.year}</h3>
-                      <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">{year.term}</p>
-                    </div>
-                    <ChevronRight className="w-5 h-5 text-slate-400 flex-shrink-0 ml-2" />
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-600 dark:text-slate-400">Curriculum</span>
-                      <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${getCurriculumBadgeColor(year.curriculum_type)}`}>
-                        {year.curriculum_type}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-600 dark:text-slate-400">Status</span>
-                      {year.is_active ? (
-                        <div className="flex items-center gap-1">
-                          <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
-                          <span className="text-xs font-medium text-green-600 dark:text-green-400">Active</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1">
-                          <XCircle className="w-4 h-4 text-slate-400 dark:text-slate-500" />
-                          <span className="text-xs font-medium text-slate-400 dark:text-slate-500">Inactive</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </button>
-              ))
-            ) : (
-              <div className="bg-white dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700 p-6 text-center">
-                <AlertCircle className="w-10 h-10 text-slate-400 mx-auto mb-3" />
-                <p className="text-slate-500 dark:text-slate-400 text-sm">
-                  {academicYears.length === 0
-                    ? 'No academic years found. Create one to get started.'
-                    : 'No academic years match current filters.'}
-                </p>
-              </div>
+            {groupedYears.length > 0 && (
+              <span className="text-xs text-slate-500 dark:text-slate-500 font-medium">
+                {groupedYears.length} year{groupedYears.length !== 1 ? 's' : ''} &middot; {filteredYears.length} term{filteredYears.length !== 1 ? 's' : ''}
+              </span>
             )}
           </div>
-        </>
+
+          {groupedYears.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm min-w-[640px]">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-700/40 bg-slate-100 dark:bg-slate-800/60">
+                    {/* indent spacer */}
+                    <th className="w-10 px-4 py-3" />
+                    <th
+                      className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider cursor-pointer hover:text-slate-800 dark:hover:text-slate-200 transition-colors select-none"
+                      onClick={() => handleSort('term')}
+                    >
+                      <div className="flex items-center gap-1">Term <SortIcon column="term" /></div>
+                    </th>
+                    {shouldShowCurriculumColumn && (
+                      <th
+                        className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider cursor-pointer hover:text-slate-800 dark:hover:text-slate-200 transition-colors select-none"
+                        onClick={() => handleSort('curriculum_type')}
+                      >
+                        <div className="flex items-center gap-1">Curriculum <SortIcon column="curriculum_type" /></div>
+                      </th>
+                    )}
+                    <th
+                      className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider cursor-pointer hover:text-slate-800 dark:hover:text-slate-200 transition-colors select-none hidden lg:table-cell"
+                      onClick={() => handleSort('start_date')}
+                    >
+                      <div className="flex items-center gap-1">Start Date <SortIcon column="start_date" /></div>
+                    </th>
+                    <th
+                      className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider cursor-pointer hover:text-slate-800 dark:hover:text-slate-200 transition-colors select-none hidden xl:table-cell"
+                      onClick={() => handleSort('end_date')}
+                    >
+                      <div className="flex items-center gap-1">End Date <SortIcon column="end_date" /></div>
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {groupedYears.map((group, idx) => (
+                    <GroupedYearRow
+                      key={group.key}
+                      group={group}
+                      showCurriculumColumn={shouldShowCurriculumColumn}
+                      getCurriculumBadgeColor={getCurriculumBadgeColor}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                      onToggleActive={handleToggleActive}
+                      defaultOpen={idx === 0}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+              <div className="w-12 h-12 rounded-xl bg-slate-700/40 border border-slate-700/60 flex items-center justify-center mb-4">
+                <Calendar className="w-5 h-5 text-slate-500" />
+              </div>
+              <p className="text-sm font-semibold text-slate-400 mb-1">
+                {academicYears.length === 0 ? 'No academic years yet' : 'No results match your filters'}
+              </p>
+              <p className="text-xs text-slate-600">
+                {academicYears.length === 0
+                  ? 'Create your first academic year to get started.'
+                  : 'Try adjusting your search or filter criteria.'}
+              </p>
+              {academicYears.length === 0 && (
+                <button
+                  onClick={handleAddNew}
+                  className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-700/60 hover:bg-slate-700 border border-slate-600/50 text-sm font-medium text-slate-200 transition-all"
+                >
+                  <Plus className="w-4 h-4" />
+                  Create Academic Year
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       )}
 
       {/* Form modal */}
@@ -1127,5 +1307,6 @@ function AcademicYearSetup() {
     </div>
   );
 }
+
 
 export default AcademicYearSetup;

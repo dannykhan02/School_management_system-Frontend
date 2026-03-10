@@ -18,18 +18,20 @@ import {
   PartyPopper,
   TrendingUp,
   Landmark,
+  Hash,
+  ClipboardList,
 } from "lucide-react";
 
 export const NAVIGATION_ITEMS = {
   super_admin: [
     { 
       name: "Schools", 
-      icon: Landmark,           // iconic building — evokes institutions/schools better than Building2
+      icon: Landmark,
       href: "/super_admin/dashboard" 
     },
     { 
       name: "Roles", 
-      icon: ShieldCheck,        // filled checkmark on shield — implies verified permissions
+      icon: ShieldCheck,
       href: "/super_admin/roles" 
     },
     { 
@@ -41,39 +43,50 @@ export const NAVIGATION_ITEMS = {
   admin: [
     { 
       name: "School Profile", 
-      icon: School,             // dedicated school icon — more specific than a generic Home
+      icon: School,
       href: "/admin/dashboard" 
     },
     { 
       name: "Academic Year", 
-      icon: CalendarDays,       // calendar with date grid lines — more detailed than plain Calendar
+      icon: CalendarDays,
       href: "/admin/academic-year" 
     },
     { 
       name: "Classrooms", 
-      icon: LayoutDashboard,    // grid layout — evokes rooms/sections at a glance
+      icon: LayoutDashboard,
       href: "/admin/classrooms" 
     },
     { 
       name: "Streams", 
-      icon: Layers3,            // stacked layers — conveys grouped/tiered streams clearly
+      icon: Layers3,
       href: "/admin/streams",
       requiresStreams: true
     },
     { 
       name: "Subjects", 
-      icon: LibraryBig,         // open library shelves — richer than a plain book
+      icon: LibraryBig,
       href: "/admin/subjects" 
     },
     { 
       name: "Teachers", 
-      icon: UsersRound,         // grouped people silhouette — distinct from single-user icons
+      icon: UsersRound,
       href: "/admin/teachers" 
     },
     { 
       name: "Add Users", 
-      icon: UserRoundPlus,      // user with a plus — unambiguous add-user action
+      icon: UserRoundPlus,
       href: "/admin/new-user" 
+    },
+    // ── Enrollment ──────────────────────────────────────────────────────────
+    { 
+      name: "Enrollments", 
+      icon: ClipboardList,      // clipboard with list — unambiguous applications queue
+      href: "/admin/enrollments" 
+    },
+    { 
+      name: "Admission Setup", 
+      icon: Hash,               // hash/number sign — directly evokes admission numbering
+      href: "/admin/admission-config" 
     },
     { 
       name: "My Profile", 
@@ -84,28 +97,28 @@ export const NAVIGATION_ITEMS = {
   teacher: [
     { 
       name: "Dashboard", 
-      icon: LayoutDashboard,    // structured grid — standard but polished dashboard icon
+      icon: LayoutDashboard,
       href: "/teacher/dashboard" 
     },
     { 
       name: "My Classes", 
-      icon: BookMarked,         // bookmarked book — implies an assigned/personal class list
+      icon: BookMarked,
       href: "/teacher/classes" 
     },
     { 
       name: "Streams", 
-      icon: Layers3,            // consistent with admin streams
+      icon: Layers3,
       href: "/teacher/streams",
       requiresStreams: true
     },
     { 
       name: "Attendance", 
-      icon: ClipboardCheck,     // clipboard with checkmark — classic attendance/register icon
+      icon: ClipboardCheck,
       href: "/teacher/attendance" 
     },
     { 
       name: "Grades", 
-      icon: NotebookPen,        // notebook with pen — evokes marking/grading work
+      icon: NotebookPen,
       href: "/teacher/grades" 
     },
     { 
@@ -122,12 +135,12 @@ export const NAVIGATION_ITEMS = {
     },
     { 
       name: "My Courses", 
-      icon: LibraryBig,         // rich library icon — fits a course/subject catalogue
+      icon: LibraryBig,
       href: "/student/courses" 
     },
     { 
       name: "Grades", 
-      icon: TrendingUp,         // upward trend line — aspirational, implies academic progress
+      icon: TrendingUp,
       href: "/student/grades" 
     },
     { 
@@ -144,17 +157,17 @@ export const NAVIGATION_ITEMS = {
     },
     { 
       name: "My Children", 
-      icon: UsersRound,         // grouped users — better than generic Users for a family context
+      icon: UsersRound,
       href: "/parent/children" 
     },
     { 
       name: "Events", 
-      icon: PartyPopper,        // celebratory — fitting for school events/activities
+      icon: PartyPopper,
       href: "/parent/events" 
     },
     { 
       name: "Reports", 
-      icon: ScrollText,         // scroll document — more formal/report-like than FileText
+      icon: ScrollText,
       href: "/parent/reports" 
     },
     { 

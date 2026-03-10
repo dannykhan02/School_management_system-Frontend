@@ -20,21 +20,20 @@ function SingleTermForm({
     const newYear = e.target.value;
     onInputChange(e);
 
-    if (newYear) {
-      if (formData.start_date) {
-        const existingStartDate = new Date(formData.start_date);
-        const newStartDate = new Date(newYear, existingStartDate.getMonth(), existingStartDate.getDate());
-        onInputChange({ target: { name: 'start_date', value: newStartDate.toISOString().split('T')[0] } });
-      } else {
-        onInputChange({ target: { name: 'start_date', value: `${newYear}-01-01` } });
+    if (newYear && newYear.length === 4 && !isNaN(newYear)) {
+      const isPast = parseInt(newYear) < new Date().getFullYear();
+
+      // Auto-deactivate for past years
+      if (isPast) {
+        onInputChange({ target: { name: 'is_active', type: 'checkbox', checked: false } });
       }
 
+      // Only update year portion of dates already filled — never auto-fill blank dates
+      if (formData.start_date) {
+        onInputChange({ target: { name: 'start_date', value: `${newYear}-${formData.start_date.slice(5)}` } });
+      }
       if (formData.end_date) {
-        const existingEndDate = new Date(formData.end_date);
-        const newEndDate = new Date(newYear, existingEndDate.getMonth(), existingEndDate.getDate());
-        onInputChange({ target: { name: 'end_date', value: newEndDate.toISOString().split('T')[0] } });
-      } else {
-        onInputChange({ target: { name: 'end_date', value: `${newYear}-12-31` } });
+        onInputChange({ target: { name: 'end_date', value: `${newYear}-${formData.end_date.slice(5)}` } });
       }
     }
   };
@@ -70,12 +69,14 @@ function SingleTermForm({
             name="year"
             value={formData.year}
             onChange={handleYearChange}
-            min={currentYear}
+            min="2000"
             max="2100"
             className="w-full px-3 py-2 text-sm sm:text-base border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-[#0d141b] dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all"
             required
           />
-          <p className="text-xs text-slate-500 dark:text-slate-400">Current year or future</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            {editingYear ? 'Year of this academic term' : 'Current year or future'}
+          </p>
         </div>
 
         <div className="space-y-1">
@@ -154,14 +155,14 @@ function SingleTermForm({
             type="date"
             id="start_date"
             name="start_date"
-            value={formData.start_date}
+            value={formData.start_date || `${year}-01-01`}
             onChange={onInputChange}
             min={minDate}
             max={maxDate}
             className="w-full px-3 py-2 text-sm sm:text-base border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-[#0d141b] dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all"
             required
           />
-          <p className="text-xs text-slate-500 dark:text-slate-400">Must be in {formData.year || currentYear}</p>
+
         </div>
 
         <div className="space-y-1">
@@ -172,14 +173,14 @@ function SingleTermForm({
             type="date"
             id="end_date"
             name="end_date"
-            value={formData.end_date}
+            value={formData.end_date || `${year}-12-31`}
             onChange={onInputChange}
             min={formData.start_date || minDate}
             max={maxDate}
             className="w-full px-3 py-2 text-sm sm:text-base border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-[#0d141b] dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all"
             required
           />
-          <p className="text-xs text-slate-500 dark:text-slate-400">Must be in {formData.year || currentYear} and after start date</p>
+
         </div>
       </div>
 
@@ -275,10 +276,16 @@ function BulkTermForm({
   const [curriculumType, setCurriculumType] = useState(
     showCurriculumField ? (initialCurriculumType || '') : (schoolPrimaryCurriculum || '')
   );
+
+  // Helper: blank term — dates left empty so user picks month/day manually
+  const blankTerm = (name) => ({
+    term: name, start_date: '', end_date: '', is_active: false,
+  });
+
   const [terms, setTerms] = useState([
-    { term: 'Term 1', start_date: '', end_date: '', is_active: false },
-    { term: 'Term 2', start_date: '', end_date: '', is_active: false },
-    { term: 'Term 3', start_date: '', end_date: '', is_active: false },
+    blankTerm('Term 1'),
+    blankTerm('Term 2'),
+    blankTerm('Term 3'),
   ]);
 
   const yearNum = parseInt(year) || currentYear;
@@ -286,11 +293,27 @@ function BulkTermForm({
   const maxDate = `${yearNum}-12-31`;
 
   // Apply preset when curriculum changes
+  const handleYearChange = (e) => {
+    const newYear = e.target.value;
+    setYear(newYear);
+    if (newYear && newYear.length === 4 && !isNaN(newYear)) {
+      const isPast = parseInt(newYear) < new Date().getFullYear();
+      setTerms(prev => prev.map(t => ({
+        ...t,
+        // Only update the year portion of dates that are already filled in
+        start_date: t.start_date ? `${newYear}-${t.start_date.slice(5)}` : '',
+        end_date:   t.end_date   ? `${newYear}-${t.end_date.slice(5)}`   : '',
+        // Auto-deactivate all terms for past years
+        is_active: isPast ? false : t.is_active,
+      })));
+    }
+  };
+
   const handleCurriculumChange = (e) => {
     const val = e.target.value;
     setCurriculumType(val);
     if (TERM_PRESETS[val]) {
-      setTerms(TERM_PRESETS[val].map(t => ({ ...t })));
+      setTerms(TERM_PRESETS[val].map(t => ({ ...t, start_date: '', end_date: '' })));
     }
   };
 
@@ -350,8 +373,8 @@ function BulkTermForm({
           <input
             type="number"
             value={year}
-            onChange={e => setYear(e.target.value)}
-            min={currentYear}
+            onChange={handleYearChange}
+            min="2000"
             max="2100"
             className="w-full px-3 py-2 text-sm border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-[#0d141b] dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500 transition-all"
             required
@@ -466,7 +489,7 @@ function BulkTermForm({
                   </label>
                   <input
                     type="date"
-                    value={term.start_date}
+                    value={term.start_date || `${yearNum}-01-01`}
                     onChange={e => handleTermChange(index, 'start_date', e.target.value)}
                     min={minDate}
                     max={maxDate}
@@ -480,7 +503,7 @@ function BulkTermForm({
                   </label>
                   <input
                     type="date"
-                    value={term.end_date}
+                    value={term.end_date || `${yearNum}-12-31`}
                     onChange={e => handleTermChange(index, 'end_date', e.target.value)}
                     min={term.start_date || minDate}
                     max={maxDate}

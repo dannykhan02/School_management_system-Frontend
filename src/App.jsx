@@ -14,18 +14,24 @@ import EditSchoolProfile from './Dashboard/Pages/Admin/EditSchoolProfile';
 import UpdateUser from './Dashboard/Pages/Admin/UpdateUser';
 import CreateUser from './Dashboard/Pages/Admin/CreateUser';
 
-// Import new Manager Components
+// Import Manager Components
 import ClassroomManager from './Dashboard/Pages/Admin/ClassroomManager';
 import StreamManager from './Dashboard/Pages/Admin/StreamManager';
 import SubjectManager from './Dashboard/Pages/Admin/SubjectManager';
 import TeacherManager from './Dashboard/Pages/Admin/TeacherManager';
+
+// ── Enrollment ────────────────────────────────────────────────────────────────
+import AdmissionConfigManager from './Dashboard/Pages/Admin/AdmissionConfigManager';
+import EnrollmentManager from './Dashboard/Pages/Admin/EnrollmentManager';
 
 // Import Dashboard Components for different roles
 import TeacherDashboard from './Dashboard/Pages/Teacher/TeacherDashboard';
 import StudentDashboard from './Dashboard/Pages/Student/StudentDashboard';
 import ParentDashboard from './Dashboard/Pages/Parent/ParentDashboard';
 
-// ProtectedRoute Component
+// ─────────────────────────────────────────────────────────────────────────────
+// ProtectedRoute
+// ─────────────────────────────────────────────────────────────────────────────
 const ProtectedRoute = ({ children, requiredRole }) => {
   const { user, loading, mustChangePassword } = useAuth();
 
@@ -41,7 +47,7 @@ const ProtectedRoute = ({ children, requiredRole }) => {
 
   const currentPath = window.location.pathname;
   const expectedDashboard = `/${user.role}/dashboard`;
-  
+
   if (mustChangePassword && !currentPath.includes(expectedDashboard)) {
     return <Navigate to={expectedDashboard} replace />;
   }
@@ -51,10 +57,13 @@ const ProtectedRoute = ({ children, requiredRole }) => {
       return <Navigate to={`/${user.role}/dashboard`} replace />;
     }
   }
-  
+
   return children;
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// App
+// ─────────────────────────────────────────────────────────────────────────────
 function App() {
   useEffect(() => {
     const initializeTheme = () => {
@@ -85,8 +94,8 @@ function App() {
         <Routes>
           <Route path="/school-registration" element={<SchoolRegistration />} />
           <Route path="/login" element={<Login />} />
-          
-          {/* Super Admin Routes - FIXED */}
+
+          {/* ── Super Admin Routes ─────────────────────────────────────────── */}
           <Route path="/super_admin/*" element={
             <ProtectedRoute requiredRole="super_admin">
               <DashboardLayout />
@@ -95,73 +104,76 @@ function App() {
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<SchoolManager />} />
             <Route path="schools" element={<SchoolManager />} />
-            {/* ✅ FIXED: EditSchool route */}
             <Route path="schools/edit/:id" element={<EditSchool />} />
             <Route path="roles" element={<Roles />} />
             <Route path="user-profile" element={<UserProfile />} />
           </Route>
 
-          {/* Admin Routes */}
+          {/* ── Admin Routes ───────────────────────────────────────────────── */}
           <Route path="/admin/*" element={
             <ProtectedRoute requiredRole="admin">
               <DashboardLayout />
             </ProtectedRoute>
           }>
             <Route index element={<Navigate to="dashboard" replace />} />
-            <Route path="dashboard" element={<SchoolProfile />} />
-            <Route path="edit-school-info" element={<EditSchoolProfile />} />
-            <Route path="academic-year" element={<AcademicYearSetup />} />
-            <Route path="new-user" element={<CreateUser />} />
-            <Route path="update-user/:id" element={<UpdateUser />} />
-            <Route path="user-profile" element={<UserProfile />} />
-            <Route path="classrooms" element={<ClassroomManager />} />
-            <Route path="streams" element={<StreamManager />} />
-            <Route path="subjects" element={<SubjectManager />} />
-            <Route path="teachers" element={<TeacherManager />} />
+            <Route path="dashboard"          element={<SchoolProfile />} />
+            <Route path="edit-school-info"   element={<EditSchoolProfile />} />
+            <Route path="academic-year"      element={<AcademicYearSetup />} />
+            <Route path="new-user"           element={<CreateUser />} />
+            <Route path="update-user/:id"    element={<UpdateUser />} />
+            <Route path="user-profile"       element={<UserProfile />} />
+            <Route path="classrooms"         element={<ClassroomManager />} />
+            <Route path="streams"            element={<StreamManager />} />
+            <Route path="subjects"           element={<SubjectManager />} />
+            <Route path="teachers"           element={<TeacherManager />} />
+
+            {/* ── Enrollment ────────────────────────────────────────────── */}
+            <Route path="enrollments"        element={<EnrollmentManager />} />
+            <Route path="admission-config"   element={<AdmissionConfigManager />} />
           </Route>
 
-          {/* Teacher Routes */}
+          {/* ── Teacher Routes ─────────────────────────────────────────────── */}
           <Route path="/teacher/*" element={
             <ProtectedRoute requiredRole="teacher">
               <DashboardLayout />
             </ProtectedRoute>
           }>
             <Route index element={<Navigate to="dashboard" replace />} />
-            <Route path="dashboard" element={<TeacherDashboard />} />
-            <Route path="classes" element={<div>Teacher Classes Page</div>} />
-            <Route path="attendance" element={<div>Teacher Attendance Page</div>} />
-            <Route path="grades" element={<div>Teacher Grades Page</div>} />
+            <Route path="dashboard"    element={<TeacherDashboard />} />
+            <Route path="classes"      element={<div>Teacher Classes Page</div>} />
+            <Route path="attendance"   element={<div>Teacher Attendance Page</div>} />
+            <Route path="grades"       element={<div>Teacher Grades Page</div>} />
             <Route path="user-profile" element={<UserProfile />} />
           </Route>
-          
-          {/* Student Routes */}
+
+          {/* ── Student Routes ─────────────────────────────────────────────── */}
           <Route path="/student/*" element={
             <ProtectedRoute requiredRole="student">
               <DashboardLayout />
             </ProtectedRoute>
           }>
             <Route index element={<Navigate to="dashboard" replace />} />
-            <Route path="dashboard" element={<StudentDashboard />} />
-            <Route path="courses" element={<div>Student Courses Page</div>} />
-            <Route path="grades" element={<div>Student Grades Page</div>} />
+            <Route path="dashboard"    element={<StudentDashboard />} />
+            <Route path="courses"      element={<div>Student Courses Page</div>} />
+            <Route path="grades"       element={<div>Student Grades Page</div>} />
             <Route path="user-profile" element={<UserProfile />} />
           </Route>
-          
-          {/* Parent Routes */}
+
+          {/* ── Parent Routes ──────────────────────────────────────────────── */}
           <Route path="/parent/*" element={
             <ProtectedRoute requiredRole="parent">
               <DashboardLayout />
             </ProtectedRoute>
           }>
             <Route index element={<Navigate to="dashboard" replace />} />
-            <Route path="dashboard" element={<ParentDashboard />} />
-            <Route path="children" element={<div>Parent Children Page</div>} />
-            <Route path="events" element={<div>Parent Events Page</div>} />
-            <Route path="reports" element={<div>Parent Reports Page</div>} />
+            <Route path="dashboard"    element={<ParentDashboard />} />
+            <Route path="children"     element={<div>Parent Children Page</div>} />
+            <Route path="events"       element={<div>Parent Events Page</div>} />
+            <Route path="reports"      element={<div>Parent Reports Page</div>} />
             <Route path="user-profile" element={<UserProfile />} />
           </Route>
-          
-          {/* Default redirects */}
+
+          {/* ── Default redirects ──────────────────────────────────────────── */}
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
